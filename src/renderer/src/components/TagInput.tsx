@@ -3,10 +3,11 @@ import { useRef, useState } from 'react'
 interface TagInputProps {
   tags: string[]
   onChange: (tags: string[]) => void
+  onInputChange?: (value: string) => void
   className?: string
 }
 
-function TagInput({ tags, onChange, className = '' }: TagInputProps): React.JSX.Element {
+function TagInput({ tags, onChange, onInputChange, className = '' }: TagInputProps): React.JSX.Element {
   const [inputValue, setInputValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -16,6 +17,7 @@ function TagInput({ tags, onChange, className = '' }: TagInputProps): React.JSX.
       onChange([...tags, trimmed])
     }
     setInputValue('')
+    onInputChange?.('')
   }
 
   const removeTag = (index: number): void => {
@@ -38,6 +40,7 @@ function TagInput({ tags, onChange, className = '' }: TagInputProps): React.JSX.
       addTag(val.slice(0, -1))
     } else {
       setInputValue(val)
+      onInputChange?.(val)
     }
   }
 

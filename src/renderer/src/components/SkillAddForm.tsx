@@ -16,6 +16,8 @@ function SkillAddForm({ onSave, onCancel }: SkillAddFormProps): React.JSX.Elemen
     nameRef.current?.focus()
   }, [])
 
+  const pendingTagRef = useRef('')
+
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault()
     const errs: string[] = []
@@ -24,7 +26,13 @@ function SkillAddForm({ onSave, onCancel }: SkillAddFormProps): React.JSX.Elemen
       setErrors(errs)
       return
     }
-    onSave({ name: name.trim(), tags })
+    // Include any pending tag text that wasn't committed with Enter/comma
+    const finalTags = [...tags]
+    const pending = pendingTagRef.current.trim()
+    if (pending && !finalTags.includes(pending)) {
+      finalTags.push(pending)
+    }
+    onSave({ name: name.trim(), tags: finalTags })
   }
 
   const inputClass =
@@ -62,7 +70,7 @@ function SkillAddForm({ onSave, onCancel }: SkillAddFormProps): React.JSX.Elemen
       <div className="mb-4">
         <label className="block text-xs text-zinc-400 mb-1">Tags</label>
         <div className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 focus-within:border-indigo-500 transition-colors">
-          <TagInput tags={tags} onChange={setTags} />
+          <TagInput tags={tags} onChange={setTags} onInputChange={(val) => { pendingTagRef.current = val }} />
         </div>
         <p className="text-xs text-zinc-500 mt-1">
           Press Enter or comma to add a tag
