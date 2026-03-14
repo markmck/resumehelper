@@ -62,7 +62,7 @@ function BulletItem({ id, text, onUpdate, onDelete, onEnterKey, autoFocus, onFoc
         <InlineEdit
           value={text}
           onSave={(v) => {
-            if (!v.trim() && !text.trim()) {
+            if (!v.trim()) {
               onDelete()
             } else {
               onUpdate(v)
@@ -74,6 +74,7 @@ function BulletItem({ id, text, onUpdate, onDelete, onEnterKey, autoFocus, onFoc
           className="text-sm text-zinc-300 block w-full"
           autoFocus={autoFocus}
           onFocused={onFocused}
+          alwaysFireSave
         />
       </div>
 

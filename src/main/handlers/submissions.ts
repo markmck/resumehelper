@@ -18,7 +18,7 @@ async function buildSnapshotForVariant(variantId: number): Promise<SubmissionSna
 
   const layoutTemplate = variant?.layoutTemplate ?? 'traditional'
 
-  const allJobs = await db.select().from(jobs).orderBy(desc(jobs.createdAt))
+  const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
   const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
   const allSkills = await db.select().from(skills)
   const exclusionItems = await db

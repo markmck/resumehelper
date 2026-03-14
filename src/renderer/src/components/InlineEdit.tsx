@@ -9,6 +9,7 @@ interface InlineEditProps {
   multiline?: boolean
   autoFocus?: boolean
   onFocused?: () => void
+  alwaysFireSave?: boolean
 }
 
 function InlineEdit({
@@ -20,6 +21,7 @@ function InlineEdit({
   multiline = false,
   autoFocus = false,
   onFocused,
+  alwaysFireSave = false,
 }: InlineEditProps): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -49,7 +51,7 @@ function InlineEdit({
 
   const handleSave = (): void => {
     setEditing(false)
-    if (draft !== value) {
+    if (alwaysFireSave || draft !== value) {
       onSave(draft)
     }
   }

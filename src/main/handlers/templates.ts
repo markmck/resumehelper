@@ -74,7 +74,7 @@ export function registerTemplateHandlers(): void {
   })
 
   ipcMain.handle('templates:getBuilderData', async (_, variantId: number) => {
-    const allJobs = await db.select().from(jobs).orderBy(desc(jobs.createdAt))
+    const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
 
     const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
 
