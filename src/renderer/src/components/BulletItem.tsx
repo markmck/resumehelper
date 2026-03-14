@@ -7,10 +7,11 @@ interface BulletItemProps {
   text: string
   onUpdate: (text: string) => void
   onDelete: () => void
+  onEnterKey?: () => void
   editOnMount?: boolean
 }
 
-function BulletItem({ id, text, onUpdate, onDelete }: BulletItemProps): React.JSX.Element {
+function BulletItem({ id, text, onUpdate, onDelete, onEnterKey }: BulletItemProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
   })
@@ -59,6 +60,7 @@ function BulletItem({ id, text, onUpdate, onDelete }: BulletItemProps): React.JS
         <InlineEdit
           value={text}
           onSave={onUpdate}
+          onEnter={onEnterKey}
           placeholder="Add bullet text..."
           multiline={false}
           className="text-sm text-zinc-300 block w-full"

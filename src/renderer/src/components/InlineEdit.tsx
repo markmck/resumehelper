@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 interface InlineEditProps {
   value: string
   onSave: (value: string) => void
+  onEnter?: () => void
   placeholder?: string
   className?: string
   multiline?: boolean
@@ -11,6 +12,7 @@ interface InlineEditProps {
 function InlineEdit({
   value,
   onSave,
+  onEnter,
   placeholder = 'Click to edit',
   className = '',
   multiline = false,
@@ -45,6 +47,7 @@ function InlineEdit({
     if (e.key === 'Enter' && !multiline) {
       e.preventDefault()
       handleSave()
+      onEnter?.()
     } else if (e.key === 'Escape') {
       setDraft(value)
       setEditing(false)
