@@ -6,18 +6,14 @@ function ExperienceTab(): React.JSX.Element {
     <div className="overflow-y-auto h-[calc(100vh-48px)]">
       <div className="max-w-2xl mx-auto px-8 py-8">
         {/* Work History Section */}
-        <section className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Work History</h2>
-          </div>
+        <section style={{ marginBottom: '48px' }}>
+          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider" style={{ marginBottom: '16px' }}>Work History</h2>
           <JobList />
         </section>
 
         {/* Skills Section */}
         <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Skills</h2>
-          </div>
+          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider" style={{ marginBottom: '16px' }}>Skills</h2>
           <SkillList />
         </section>
       </div>

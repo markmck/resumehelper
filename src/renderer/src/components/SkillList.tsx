@@ -65,7 +65,7 @@ function SkillList(): React.JSX.Element {
   const groups = computeGroups()
 
   return (
-    <div className="space-y-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Add Skill button */}
       {!adding && (
         <div>

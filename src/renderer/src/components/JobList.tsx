@@ -55,7 +55,7 @@ function JobList(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Add Job button */}
       {!adding && (
         <div>
