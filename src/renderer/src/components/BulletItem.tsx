@@ -61,7 +61,13 @@ function BulletItem({ id, text, onUpdate, onDelete, onEnterKey, autoFocus, onFoc
       <div className="flex-1 min-w-0">
         <InlineEdit
           value={text}
-          onSave={onUpdate}
+          onSave={(v) => {
+            if (!v.trim() && !text.trim()) {
+              onDelete()
+            } else {
+              onUpdate(v)
+            }
+          }}
           onEnter={onEnterKey}
           placeholder="Add bullet text..."
           multiline={false}
