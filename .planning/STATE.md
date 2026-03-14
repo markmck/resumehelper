@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-template-variants/02-01 (template variants data layer)
-last_updated: "2026-03-14T19:13:08.813Z"
+stopped_at: Completed 02-template-variants/02-02 (template variants UI) — awaiting human verify checkpoint
+last_updated: "2026-03-14T19:17:23.156Z"
 last_activity: 2026-03-13 — Plans 01-01 and 01-02 complete; human verified Work History CRUD
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 67
 ---
 
@@ -54,6 +54,7 @@ Progress: [███████░░░] 67%
 | Phase 01-foundation P02 | 3 | 2 tasks | 11 files |
 | Phase 01-foundation P03 | 10 | 2 tasks | 5 files |
 | Phase 02-template-variants P01 | 3 | 2 tasks | 8 files |
+| Phase 02-template-variants P02 | 5 | 1 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,8 @@ Recent decisions affecting current work:
 - [Phase 02-template-variants]: Discriminator model for templateVariantItems: itemType column with nullable bulletId/skillId/jobId — supports bullet, skill, and job exclusions in one table
 - [Phase 02-template-variants]: Explicit-exclusion semantics: absence of row means included, excluded=true row means excluded — no backfill needed for new experience items
 - [Phase 02-template-variants]: Job toggle cascades to all child bullets: setItemExcluded for itemType=job also inserts/deletes exclusion rows for all bullets in that job
+- [Phase 02-template-variants]: Optimistic updates for checkbox toggles: update local state immediately then IPC async — avoids visible lag
+- [Phase 02-template-variants]: Layout template selector uses button group (not dropdown) to match minimal zinc aesthetic
 
 ### Pending Todos
 
@@ -87,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T19:13:08.811Z
-Stopped at: Completed 02-template-variants/02-01 (template variants data layer)
+Last session: 2026-03-14T19:17:23.154Z
+Stopped at: Completed 02-template-variants/02-02 (template variants UI) — awaiting human verify checkpoint
 Resume file: None
