@@ -25,13 +25,13 @@ function BulletItem({ id, text, onUpdate, onDelete }: BulletItemProps): React.JS
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-start gap-2 group py-0.5"
+      className="flex items-center gap-2 group py-0.5"
     >
       {/* Drag handle */}
       <button
         {...attributes}
         {...listeners}
-        className="mt-1.5 flex-shrink-0 text-zinc-600 hover:text-zinc-400 cursor-grab active:cursor-grabbing transition-colors opacity-0 group-hover:opacity-100"
+        className="flex-shrink-0 text-zinc-600 hover:text-zinc-400 cursor-grab active:cursor-grabbing transition-colors opacity-0 group-hover:opacity-100"
         tabIndex={-1}
         aria-label="Drag to reorder"
       >
@@ -52,7 +52,7 @@ function BulletItem({ id, text, onUpdate, onDelete }: BulletItemProps): React.JS
       </button>
 
       {/* Bullet dot */}
-      <span className="mt-2 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-zinc-500" />
+      <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-zinc-500" />
 
       {/* Bullet text */}
       <div className="flex-1 min-w-0">
@@ -68,7 +68,7 @@ function BulletItem({ id, text, onUpdate, onDelete }: BulletItemProps): React.JS
       {/* Delete button */}
       <button
         onClick={onDelete}
-        className="mt-1 flex-shrink-0 text-zinc-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-sm leading-none"
+        className="flex-shrink-0 text-zinc-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-sm leading-none"
         aria-label="Delete bullet"
       >
         ×

@@ -30,7 +30,7 @@ function VariantEditor({
       {/* Editor header */}
       <div className="flex-shrink-0 border-b border-zinc-800 px-6 py-3">
         {/* Variant name — inline editable */}
-        <div className="mb-3">
+        <div className="mb-2">
           <InlineEdit
             value={variant.name}
             onSave={(name) => onRename(variant.id, name)}
@@ -39,41 +39,44 @@ function VariantEditor({
           />
         </div>
 
-        {/* Layout template selector */}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-xs text-zinc-500">Layout:</span>
+        {/* Sub-tab bar + layout selector (layout only on preview) */}
+        <div className="flex items-center gap-4">
           <div className="flex gap-1">
-            {LAYOUT_TEMPLATES.map((lt) => (
+            {(['builder', 'preview'] as SubTab[]).map((tab) => (
               <button
-                key={lt.id}
-                onClick={() => onLayoutChange(variant.id, lt.id)}
-                className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                  variant.layoutTemplate === lt.id
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                key={tab}
+                onClick={() => setActiveSubTab(tab)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors capitalize ${
+                  activeSubTab === tab
+                    ? 'bg-zinc-700 text-zinc-100'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
                 }`}
               >
-                {lt.label}
+                {tab}
               </button>
             ))}
           </div>
-        </div>
 
-        {/* Sub-tab bar */}
-        <div className="flex gap-1">
-          {(['builder', 'preview'] as SubTab[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveSubTab(tab)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors capitalize ${
-                activeSubTab === tab
-                  ? 'bg-zinc-700 text-zinc-100'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+          {activeSubTab === 'preview' && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-500">Layout:</span>
+              <div className="flex gap-1">
+                {LAYOUT_TEMPLATES.map((lt) => (
+                  <button
+                    key={lt.id}
+                    onClick={() => onLayoutChange(variant.id, lt.id)}
+                    className={`px-2.5 py-1 text-xs rounded transition-colors ${
+                      variant.layoutTemplate === lt.id
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                    }`}
+                  >
+                    {lt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

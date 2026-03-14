@@ -30,26 +30,25 @@ export function registerTemplateHandlers(): void {
   })
 
   ipcMain.handle('templates:duplicate', async (_, id: number) => {
-    return db.transaction(async (tx) => {
-      const [source] = await tx
-        .select()
-        .from(templateVariants)
-        .where(eq(templateVariants.id, id))
+    // better-sqlite3 transactions must be synchronous — use .all() instead of await
+    const [source] = db.select().from(templateVariants).where(eq(templateVariants.id, id)).all()
+    if (!source) throw new Error(`Template variant ${id} not found`)
 
-      if (!source) throw new Error(`Template variant ${id} not found`)
+    const sourceItems = db
+      .select()
+      .from(templateVariantItems)
+      .where(eq(templateVariantItems.variantId, id))
+      .all()
 
-      const [newVariant] = await tx
-        .insert(templateVariants)
-        .values({ name: `${source.name} (Copy)`, layoutTemplate: source.layoutTemplate })
-        .returning()
+    const [newVariant] = db
+      .insert(templateVariants)
+      .values({ name: `${source.name} (Copy)`, layoutTemplate: source.layoutTemplate })
+      .returning()
+      .all()
 
-      const sourceItems = await tx
-        .select()
-        .from(templateVariantItems)
-        .where(eq(templateVariantItems.variantId, id))
-
-      if (sourceItems.length > 0) {
-        await tx.insert(templateVariantItems).values(
+    if (sourceItems.length > 0) {
+      db.insert(templateVariantItems)
+        .values(
           sourceItems.map((item) => ({
             variantId: newVariant.id,
             itemType: item.itemType,
@@ -59,10 +58,10 @@ export function registerTemplateHandlers(): void {
             excluded: item.excluded,
           })),
         )
-      }
+        .run()
+    }
 
-      return newVariant
-    })
+    return newVariant
   })
 
   ipcMain.handle('templates:setLayoutTemplate', async (_, id: number, layoutTemplate: string) => {
