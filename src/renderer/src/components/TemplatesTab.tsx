@@ -44,11 +44,6 @@ function TemplatesTab(): React.JSX.Element {
     setVariants((prev) => prev.map((v) => (v.id === id ? updated : v)))
   }
 
-  const handleLayoutChange = async (id: number, layoutTemplate: string): Promise<void> => {
-    const updated = await window.api.templates.setLayoutTemplate(id, layoutTemplate)
-    setVariants((prev) => prev.map((v) => (v.id === id ? updated : v)))
-  }
-
   const selectedVariant = variants.find((v) => v.id === selectedId) ?? null
 
   return (
@@ -71,7 +66,6 @@ function TemplatesTab(): React.JSX.Element {
           <VariantEditor
             variant={selectedVariant}
             onRename={handleRename}
-            onLayoutChange={handleLayoutChange}
           />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-zinc-500">

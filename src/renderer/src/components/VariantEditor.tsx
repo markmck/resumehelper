@@ -6,23 +6,12 @@ import VariantPreview from './VariantPreview'
 
 type SubTab = 'builder' | 'preview'
 
-const LAYOUT_TEMPLATES = [
-  { id: 'traditional', label: 'Traditional' },
-  { id: 'modern', label: 'Modern' },
-  { id: 'compact', label: 'Compact' },
-]
-
 interface VariantEditorProps {
   variant: TemplateVariant
   onRename: (id: number, name: string) => void
-  onLayoutChange: (id: number, layoutTemplate: string) => void
 }
 
-function VariantEditor({
-  variant,
-  onRename,
-  onLayoutChange,
-}: VariantEditorProps): React.JSX.Element {
+function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Element {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('builder')
 
   return (
@@ -39,7 +28,7 @@ function VariantEditor({
           />
         </div>
 
-        {/* Sub-tab bar + layout selector (layout only on preview) */}
+        {/* Sub-tab bar */}
         <div className="flex items-center gap-4">
           <div className="flex gap-1">
             {(['builder', 'preview'] as SubTab[]).map((tab) => (
@@ -56,36 +45,13 @@ function VariantEditor({
               </button>
             ))}
           </div>
-
-          {activeSubTab === 'preview' && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-500">Layout:</span>
-              <div className="flex gap-1">
-                {LAYOUT_TEMPLATES.map((lt) => (
-                  <button
-                    key={lt.id}
-                    onClick={() => onLayoutChange(variant.id, lt.id)}
-                    className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                      variant.layoutTemplate === lt.id
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                    }`}
-                  >
-                    {lt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
       {/* Sub-tab content */}
       <div className="flex-1 overflow-hidden">
         {activeSubTab === 'builder' && <VariantBuilder variantId={variant.id} />}
-        {activeSubTab === 'preview' && (
-          <VariantPreview variantId={variant.id} layoutTemplate={variant.layoutTemplate} />
-        )}
+        {activeSubTab === 'preview' && <VariantPreview variantId={variant.id} />}
       </div>
     </div>
   )
