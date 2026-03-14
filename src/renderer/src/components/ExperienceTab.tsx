@@ -1,4 +1,5 @@
 import JobList from './JobList'
+import SkillList from './SkillList'
 
 function ExperienceTab(): React.JSX.Element {
   return (
@@ -13,7 +14,7 @@ function ExperienceTab(): React.JSX.Element {
         {/* Skills Section */}
         <section>
           <h2 className="text-lg font-semibold text-zinc-300 mb-4">Skills</h2>
-          <div className="text-zinc-500 text-sm">Skills section — coming in Plan 03</div>
+          <SkillList />
         </section>
       </div>
     </div>
