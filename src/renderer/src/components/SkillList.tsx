@@ -65,15 +65,17 @@ function SkillList(): React.JSX.Element {
   const groups = computeGroups()
 
   return (
-    <div>
+    <div className="space-y-4">
       {/* Add Skill button */}
       {!adding && (
-        <button
-          onClick={() => setAdding(true)}
-          className="mb-5 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded transition-colors"
-        >
-          + Add Skill
-        </button>
+        <div>
+          <button
+            onClick={() => setAdding(true)}
+            className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded transition-colors"
+          >
+            + Add Skill
+          </button>
+        </div>
       )}
 
       {/* Inline add form */}

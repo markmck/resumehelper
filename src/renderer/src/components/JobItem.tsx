@@ -55,7 +55,7 @@ function JobItem({ job, onUpdate, onDelete }: JobItemProps): React.JSX.Element {
   const endDisplay = job.endDate ? formatMonthDate(job.endDate) : 'Present'
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3.5 mb-4 group/job">
+    <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3.5 group/job">
       {/* Header row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">

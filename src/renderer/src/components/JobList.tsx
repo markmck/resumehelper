@@ -55,15 +55,17 @@ function JobList(): React.JSX.Element {
   }
 
   return (
-    <div>
-      {/* Add Job button — always visible at top */}
+    <div className="space-y-4">
+      {/* Add Job button */}
       {!adding && (
-        <button
-          onClick={() => setAdding(true)}
-          className="mb-5 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded transition-colors"
-        >
-          + Add Job
-        </button>
+        <div>
+          <button
+            onClick={() => setAdding(true)}
+            className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded transition-colors"
+          >
+            + Add Job
+          </button>
+        </div>
       )}
 
       {/* Inline add form */}
@@ -74,7 +76,7 @@ function JobList(): React.JSX.Element {
       {/* Job list */}
       {jobs.length === 0 && !adding ? (
         <div className="text-center py-8">
-          <p className="text-zinc-500 text-sm mb-3">
+          <p className="text-zinc-500 text-sm" style={{ marginBottom: '12px' }}>
             No work history yet. Add your first job to get started.
           </p>
           <button
