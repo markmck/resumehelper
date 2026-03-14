@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-template-variants/02-02 (template variants UI) — awaiting human verify checkpoint
-last_updated: "2026-03-14T19:17:23.156Z"
+stopped_at: Completed 02-template-variants/02-02 — all TMPL requirements verified
+last_updated: "2026-03-14T19:52:28.160Z"
 last_activity: 2026-03-13 — Plans 01-01 and 01-02 complete; human verified Work History CRUD
 progress:
   total_phases: 4
@@ -55,6 +55,7 @@ Progress: [███████░░░] 67%
 | Phase 01-foundation P03 | 10 | 2 tasks | 5 files |
 | Phase 02-template-variants P01 | 3 | 2 tasks | 8 files |
 | Phase 02-template-variants P02 | 5 | 1 tasks | 6 files |
+| Phase 02-template-variants P02 | 95 | 2 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,9 @@ Recent decisions affecting current work:
 - [Phase 02-template-variants]: Job toggle cascades to all child bullets: setItemExcluded for itemType=job also inserts/deletes exclusion rows for all bullets in that job
 - [Phase 02-template-variants]: Optimistic updates for checkbox toggles: update local state immediately then IPC async — avoids visible lag
 - [Phase 02-template-variants]: Layout template selector uses button group (not dropdown) to match minimal zinc aesthetic
+- [Phase 02-template-variants]: Layout template selector placed on Preview sub-tab only — reduces noise on Builder, contextually meaningful
+- [Phase 02-template-variants]: better-sqlite3 duplicate transaction must be synchronous — async/await inside .transaction() silently prevents row insertion
+- [Phase 02-template-variants]: Migration wrapped in try-catch for resilience — app restarts cleanly when tables already exist
 
 ### Pending Todos
 
@@ -90,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T19:17:23.154Z
-Stopped at: Completed 02-template-variants/02-02 (template variants UI) — awaiting human verify checkpoint
+Last session: 2026-03-14T19:52:28.158Z
+Stopped at: Completed 02-template-variants/02-02 — all TMPL requirements verified
 Resume file: None
