@@ -1,15 +1,17 @@
+import { useState } from 'react'
 import ExperienceTab from './components/ExperienceTab'
+import TemplatesTab from './components/TemplatesTab'
 
 type Tab = 'experience' | 'templates' | 'submissions'
 
 const tabs: { id: Tab; label: string; enabled: boolean }[] = [
   { id: 'experience', label: 'Experience', enabled: true },
-  { id: 'templates', label: 'Templates', enabled: false },
+  { id: 'templates', label: 'Templates', enabled: true },
   { id: 'submissions', label: 'Submissions', enabled: false },
 ]
 
 function App(): React.JSX.Element {
-  const activeTab: Tab = 'experience'
+  const [activeTab, setActiveTab] = useState<Tab>('experience')
 
   return (
     <div className="flex flex-col min-h-screen bg-zinc-950 text-zinc-100">
@@ -19,6 +21,7 @@ function App(): React.JSX.Element {
           <button
             key={tab.id}
             disabled={!tab.enabled}
+            onClick={() => tab.enabled && setActiveTab(tab.id)}
             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               tab.enabled && activeTab === tab.id
                 ? 'bg-zinc-700 text-zinc-100'
@@ -35,6 +38,7 @@ function App(): React.JSX.Element {
       {/* Tab Content */}
       <main className="pt-12 flex-1">
         {activeTab === 'experience' && <ExperienceTab />}
+        {activeTab === 'templates' && <TemplatesTab />}
       </main>
     </div>
   )

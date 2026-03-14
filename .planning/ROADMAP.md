@@ -44,7 +44,7 @@ Plans:
   2. User can toggle individual experience items in or out of a variant and the change persists
   3. User can duplicate an existing variant as a starting point, then modify the copy independently
   4. User can delete a template variant without affecting experience items or other variants
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 02-01-PLAN.md — Schema migration (discriminator model + layoutTemplate), IPC handlers, preload bridge
@@ -84,6 +84,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-03-14 |
-| 2. Template Variants | 0/2 | Not started | - |
+| 2. Template Variants | 1/2 | In Progress|  |
 | 3. Submissions | 0/2 | Not started | - |
 | 4. Export | 0/2 | Not started | - |
