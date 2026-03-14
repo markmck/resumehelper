@@ -54,4 +54,6 @@ export const submissions = sqliteTable('submissions', {
   submittedAt: integer('submitted_at', { mode: 'timestamp' }),
   variantId: integer('variant_id').references(() => templateVariants.id),
   resumeSnapshot: text('resume_snapshot').notNull().default('{}'),
+  url: text('url'),
+  notes: text('notes'),
 })
