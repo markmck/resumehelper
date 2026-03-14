@@ -3,6 +3,7 @@ import { TemplateVariant } from '../../../preload/index.d'
 import InlineEdit from './InlineEdit'
 import VariantBuilder from './VariantBuilder'
 import VariantPreview from './VariantPreview'
+import { useToast } from './Toast'
 
 type SubTab = 'builder' | 'preview'
 
@@ -13,6 +14,41 @@ interface VariantEditorProps {
 
 function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Element {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('builder')
+  const [exporting, setExporting] = useState<'pdf' | 'docx' | null>(null)
+  const { showToast } = useToast()
+
+  const sanitize = (s: string): string =>
+    s.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '')
+
+  const handleExportPdf = async (): Promise<void> => {
+    if (exporting) return
+    setExporting('pdf')
+    try {
+      const profile = await window.api.profile.get()
+      const filename = `${sanitize(profile.name || 'Resume')}_Resume_${sanitize(variant.name)}.pdf`
+      const result = await window.api.exportFile.pdf(variant.id, filename)
+      if (!result.canceled) {
+        showToast('Resume exported as PDF')
+      }
+    } finally {
+      setExporting(null)
+    }
+  }
+
+  const handleExportDocx = async (): Promise<void> => {
+    if (exporting) return
+    setExporting('docx')
+    try {
+      const profile = await window.api.profile.get()
+      const filename = `${sanitize(profile.name || 'Resume')}_Resume_${sanitize(variant.name)}.docx`
+      const result = await window.api.exportFile.docx(variant.id, filename)
+      if (!result.canceled) {
+        showToast('Resume exported as DOCX')
+      }
+    } finally {
+      setExporting(null)
+    }
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -28,8 +64,8 @@ function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Ele
           />
         </div>
 
-        {/* Sub-tab bar */}
-        <div className="flex items-center gap-4">
+        {/* Sub-tab bar + export buttons */}
+        <div className="flex items-center justify-between gap-4">
           <div className="flex gap-1">
             {(['builder', 'preview'] as SubTab[]).map((tab) => (
               <button
@@ -45,6 +81,26 @@ function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Ele
               </button>
             ))}
           </div>
+
+          {/* Export buttons — only shown on preview sub-tab */}
+          {activeSubTab === 'preview' && (
+            <div className="flex gap-2">
+              <button
+                onClick={handleExportPdf}
+                disabled={exporting !== null}
+                className="px-3 py-1.5 text-sm font-medium rounded-md transition-colors bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {exporting === 'pdf' ? 'Exporting…' : 'Export PDF'}
+              </button>
+              <button
+                onClick={handleExportDocx}
+                disabled={exporting !== null}
+                className="px-3 py-1.5 text-sm font-medium rounded-md transition-colors bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {exporting === 'docx' ? 'Exporting…' : 'Export DOCX'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
