@@ -57,7 +57,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User can log a submission (company, role, date, which variant) and the resume content at that moment is frozen — editing the template afterward does not change the submission record
   2. User can view all submissions in a list showing company, role, date, variant name, and current status
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 03-01-PLAN.md — Schema migration (url + notes columns), IPC handlers with snapshot capture, preload bridge
@@ -85,5 +85,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-03-14 |
 | 2. Template Variants | 2/2 | Complete    | 2026-03-14 |
-| 3. Submissions | 0/2 | Not started | - |
+| 3. Submissions | 1/2 | In Progress|  |
 | 4. Export | 0/2 | Not started | - |

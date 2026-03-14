@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-template-variants/02-02 — all TMPL requirements verified
-last_updated: "2026-03-14T19:52:28.160Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-03-14T20:21:38.779Z"
 last_activity: 2026-03-13 — Plans 01-01 and 01-02 complete; human verified Work History CRUD
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
   percent: 67
 ---
 
@@ -56,6 +56,7 @@ Progress: [███████░░░] 67%
 | Phase 02-template-variants P01 | 3 | 2 tasks | 8 files |
 | Phase 02-template-variants P02 | 5 | 1 tasks | 6 files |
 | Phase 02-template-variants P02 | 95 | 2 tasks | 17 files |
+| Phase 03-submissions P01 | 2m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,9 @@ Recent decisions affecting current work:
 - [Phase 02-template-variants]: Layout template selector placed on Preview sub-tab only — reduces noise on Builder, contextually meaningful
 - [Phase 02-template-variants]: better-sqlite3 duplicate transaction must be synchronous — async/await inside .transaction() silently prevents row insertion
 - [Phase 02-template-variants]: Migration wrapped in try-catch for resilience — app restarts cleanly when tables already exist
+- [Phase 03-submissions]: Snapshot captures layoutTemplate alongside jobs+skills so renderer can reconstruct exact resume layout without the variant
+- [Phase 03-submissions]: submissions:update intentionally excludes resumeSnapshot to enforce snapshot immutability at IPC boundary
+- [Phase 03-submissions]: buildSnapshotForVariant duplicated from getBuilderData (not extracted) since snapshot version adds layoutTemplate and may diverge independently
 
 ### Pending Todos
 
@@ -94,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T19:52:28.158Z
-Stopped at: Completed 02-template-variants/02-02 — all TMPL requirements verified
+Last session: 2026-03-14T20:21:38.777Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None
