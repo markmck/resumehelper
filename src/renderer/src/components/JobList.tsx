@@ -60,7 +60,7 @@ function JobList(): React.JSX.Element {
       {!adding && (
         <button
           onClick={() => setAdding(true)}
-          className="mb-4 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-md transition-colors"
+          className="mb-3 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded transition-colors"
         >
           + Add Job
         </button>
@@ -73,13 +73,13 @@ function JobList(): React.JSX.Element {
 
       {/* Job list */}
       {jobs.length === 0 && !adding ? (
-        <div className="text-center py-12">
-          <p className="text-zinc-500 text-sm mb-4">
+        <div className="text-center py-8">
+          <p className="text-zinc-500 text-sm mb-3">
             No work history yet. Add your first job to get started.
           </p>
           <button
             onClick={() => setAdding(true)}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-md transition-colors"
+            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded transition-colors"
           >
             + Add Job
           </button>

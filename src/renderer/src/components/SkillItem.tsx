@@ -15,9 +15,9 @@ interface SkillItemProps {
 
 function SkillItem({ skill, onUpdate, onDelete }: SkillItemProps): React.JSX.Element {
   return (
-    <div className="group flex items-center gap-3 bg-zinc-900 hover:bg-zinc-800/60 border border-zinc-800 rounded-lg px-3 py-2 mb-2 transition-colors">
+    <div className="group flex items-center gap-2 hover:bg-zinc-800/40 rounded px-2 py-1.5 -mx-2 transition-colors">
       {/* Skill name — inline editable */}
-      <div className="w-40 shrink-0">
+      <div className="w-28 shrink-0">
         <InlineEdit
           value={skill.name}
           onSave={(newName) => onUpdate(skill.id, { name: newName })}
@@ -27,7 +27,7 @@ function SkillItem({ skill, onUpdate, onDelete }: SkillItemProps): React.JSX.Ele
       </div>
 
       {/* Tags — chip-style editable */}
-      <div className="flex-1 bg-zinc-800/50 border border-zinc-700/50 rounded-md px-2 py-1">
+      <div className="flex-1">
         <TagInput
           tags={skill.tags}
           onChange={(newTags) => onUpdate(skill.id, { tags: newTags })}
@@ -38,7 +38,7 @@ function SkillItem({ skill, onUpdate, onDelete }: SkillItemProps): React.JSX.Ele
       <button
         type="button"
         onClick={() => onDelete(skill.id)}
-        className="opacity-0 group-hover:opacity-100 flex-shrink-0 w-6 h-6 flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-zinc-700 rounded transition-all"
+        className="opacity-0 group-hover:opacity-100 flex-shrink-0 w-5 h-5 flex items-center justify-center text-zinc-500 hover:text-red-400 rounded transition-all"
         aria-label="Delete skill"
       >
         ×

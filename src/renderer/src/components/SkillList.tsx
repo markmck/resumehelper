@@ -70,7 +70,7 @@ function SkillList(): React.JSX.Element {
       {!adding && (
         <button
           onClick={() => setAdding(true)}
-          className="mb-4 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-md transition-colors"
+          className="mb-3 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded transition-colors"
         >
           + Add Skill
         </button>
@@ -83,23 +83,23 @@ function SkillList(): React.JSX.Element {
 
       {/* Empty state */}
       {skills.length === 0 && !adding ? (
-        <div className="text-center py-12">
-          <p className="text-zinc-500 text-sm mb-4">
+        <div className="text-center py-8">
+          <p className="text-zinc-500 text-sm mb-3">
             No skills added yet. Add your first skill to get started.
           </p>
           <button
             onClick={() => setAdding(true)}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-md transition-colors"
+            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded transition-colors"
           >
             + Add Skill
           </button>
         </div>
       ) : (
         // Tag-grouped display
-        <div className="space-y-6">
+        <div className="space-y-4">
           {Array.from(groups.entries()).map(([tag, tagSkills]) => (
             <div key={tag}>
-              <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wide mb-2">
+              <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
                 {tag}
               </h3>
               <div>

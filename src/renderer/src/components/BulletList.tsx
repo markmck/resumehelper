@@ -74,7 +74,7 @@ function BulletList({ jobId, initialBullets }: BulletListProps): React.JSX.Eleme
   }
 
   return (
-    <div className="mt-2 pl-2">
+    <div className="mt-1.5 pl-1">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={bullets.map((b) => b.id)} strategy={verticalListSortingStrategy}>
           {bullets.map((bullet) => (
@@ -91,7 +91,7 @@ function BulletList({ jobId, initialBullets }: BulletListProps): React.JSX.Eleme
 
       <button
         onClick={handleAddBullet}
-        className="mt-1 ml-5 text-sm text-zinc-500 hover:text-indigo-400 transition-colors"
+        className="mt-0.5 ml-4 text-xs text-zinc-500 hover:text-indigo-400 transition-colors"
       >
         + Add bullet
       </button>
