@@ -28,6 +28,23 @@ const api = {
       ipcRenderer.invoke('skills:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('skills:delete', id),
   },
+  templates: {
+    list: () => ipcRenderer.invoke('templates:list'),
+    create: (data: { name: string }) => ipcRenderer.invoke('templates:create', data),
+    rename: (id: number, name: string) => ipcRenderer.invoke('templates:rename', id, name),
+    duplicate: (id: number) => ipcRenderer.invoke('templates:duplicate', id),
+    delete: (id: number) => ipcRenderer.invoke('templates:delete', id),
+    setLayoutTemplate: (id: number, layoutTemplate: string) =>
+      ipcRenderer.invoke('templates:setLayoutTemplate', id, layoutTemplate),
+    getBuilderData: (variantId: number) =>
+      ipcRenderer.invoke('templates:getBuilderData', variantId),
+    setItemExcluded: (
+      variantId: number,
+      itemType: string,
+      itemId: number,
+      excluded: boolean,
+    ) => ipcRenderer.invoke('templates:setItemExcluded', variantId, itemType, itemId, excluded),
+  },
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

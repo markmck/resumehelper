@@ -29,6 +29,7 @@ export const skills = sqliteTable('skills', {
 export const templateVariants = sqliteTable('template_variants', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
+  layoutTemplate: text('layout_template').notNull().default('traditional'),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -39,10 +40,11 @@ export const templateVariantItems = sqliteTable('template_variant_items', {
   variantId: integer('variant_id')
     .notNull()
     .references(() => templateVariants.id, { onDelete: 'cascade' }),
-  bulletId: integer('bullet_id')
-    .notNull()
-    .references(() => jobBullets.id, { onDelete: 'cascade' }),
-  included: integer('included', { mode: 'boolean' }).notNull().default(true),
+  itemType: text('item_type').notNull(),
+  bulletId: integer('bullet_id').references(() => jobBullets.id, { onDelete: 'cascade' }),
+  skillId: integer('skill_id').references(() => skills.id, { onDelete: 'cascade' }),
+  jobId: integer('job_id').references(() => jobs.id, { onDelete: 'cascade' }),
+  excluded: integer('excluded', { mode: 'boolean' }).notNull().default(false),
 })
 
 export const submissions = sqliteTable('submissions', {

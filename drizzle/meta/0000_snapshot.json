@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d01d5173-8015-4f27-9a79-cfb78fa9fd3b",
+  "id": "f436a767-3e7e-4a31-a645-fca178ec0c0f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "job_bullets": {
@@ -225,20 +225,41 @@
           "notNull": true,
           "autoincrement": false
         },
-        "bullet_id": {
-          "name": "bullet_id",
-          "type": "integer",
+        "item_type": {
+          "name": "item_type",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "included": {
-          "name": "included",
+        "bullet_id": {
+          "name": "bullet_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "skill_id": {
+          "name": "skill_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "job_id": {
+          "name": "job_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "excluded": {
+          "name": "excluded",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": true
+          "default": false
         }
       },
       "indexes": {},
@@ -268,6 +289,32 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "template_variant_items_skill_id_skills_id_fk": {
+          "name": "template_variant_items_skill_id_skills_id_fk",
+          "tableFrom": "template_variant_items",
+          "tableTo": "skills",
+          "columnsFrom": [
+            "skill_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "template_variant_items_job_id_jobs_id_fk": {
+          "name": "template_variant_items_job_id_jobs_id_fk",
+          "tableFrom": "template_variant_items",
+          "tableTo": "jobs",
+          "columnsFrom": [
+            "job_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -290,6 +337,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "layout_template": {
+          "name": "layout_template",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'traditional'"
         },
         "created_at": {
           "name": "created_at",
