@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [ ] 01-01-PLAN.md — Database schema (all 5 tables), Drizzle migration runner, IPC handlers, preload bridge
-- [ ] 01-02-PLAN.md — App shell, dark theme, Work History CRUD UI with inline editing and bullet drag-reorder
+- [x] 01-02-PLAN.md — App shell, dark theme, Work History CRUD UI with inline editing and bullet drag-reorder
 - [ ] 01-03-PLAN.md — Skills CRUD UI with freeform tag input and tag-grouped display
 
 ### Phase 2: Template Variants
