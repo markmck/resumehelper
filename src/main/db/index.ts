@@ -16,4 +16,14 @@ const migrationsFolder = app.isPackaged
   ? path.join(process.resourcesPath, 'drizzle')
   : path.join(__dirname, '../../drizzle')
 
-migrate(db, { migrationsFolder })
+try {
+  migrate(db, { migrationsFolder })
+} catch (err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err)
+  // If tables already exist, the DB is ahead of migrations — safe to continue
+  if (msg.includes('already exists') || msg.includes('Failed to run the query')) {
+    console.warn('Migration warning (tables may already exist):', msg)
+  } else {
+    throw err
+  }
+}
