@@ -12,7 +12,7 @@ Build a local-first Electron desktop app for managing structured resume content.
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - Database schema + Experience Library CRUD
+- [x] **Phase 1: Foundation** - Database schema + Experience Library CRUD (completed 2026-03-14)
 - [ ] **Phase 2: Template Variants** - Named resume variants with experience item toggling
 - [ ] **Phase 3: Submissions** - Submission log with pipeline tracking
 - [ ] **Phase 4: Export** - PDF and DOCX export from variants and snapshots
@@ -28,7 +28,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. User can edit and delete existing work history entries
   3. User can add, edit, and delete skills with category tags (e.g., "frontend", "C#")
   4. The app starts fresh on a clean install with migrations applied automatically — no manual setup required
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 01-01-PLAN.md — Database schema (all 5 tables), Drizzle migration runner, IPC handlers, preload bridge
@@ -44,11 +44,11 @@ Plans:
   2. User can toggle individual experience items in or out of a variant and the change persists
   3. User can duplicate an existing variant as a starting point, then modify the copy independently
   4. User can delete a template variant without affecting experience items or other variants
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01: Template variant data layer + TemplateService (including buildSnapshot method)
-- [ ] 02-02: Template Builder UI — variant management, item toggle, duplicate, delete
+- [ ] 02-01-PLAN.md — Schema migration (discriminator model + layoutTemplate), IPC handlers, preload bridge
+- [ ] 02-02-PLAN.md — Template Builder UI: tab routing, sidebar, builder with checkboxes, resume preview
 
 ### Phase 3: Submissions
 **Goal**: Users can log every job application with the exact resume variant used and track each application's pipeline status
@@ -83,7 +83,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 2/3 | In Progress|  |
+| 1. Foundation | 3/3 | Complete    | 2026-03-14 |
 | 2. Template Variants | 0/2 | Not started | - |
 | 3. Submissions | 0/2 | Not started | - |
 | 4. Export | 0/2 | Not started | - |
