@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import ExperienceTab from './components/ExperienceTab'
 import TemplatesTab from './components/TemplatesTab'
+import SubmissionsTab from './components/SubmissionsTab'
 
 type Tab = 'experience' | 'templates' | 'submissions'
 
 const tabs: { id: Tab; label: string; enabled: boolean }[] = [
   { id: 'experience', label: 'Experience', enabled: true },
   { id: 'templates', label: 'Templates', enabled: true },
-  { id: 'submissions', label: 'Submissions', enabled: false },
+  { id: 'submissions', label: 'Submissions', enabled: true },
 ]
 
 function App(): React.JSX.Element {
@@ -39,6 +40,7 @@ function App(): React.JSX.Element {
       <main className="pt-12 flex-1">
         {activeTab === 'experience' && <ExperienceTab />}
         {activeTab === 'templates' && <TemplatesTab />}
+        {activeTab === 'submissions' && <SubmissionsTab />}
       </main>
     </div>
   )
