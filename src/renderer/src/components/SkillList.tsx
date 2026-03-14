@@ -70,7 +70,7 @@ function SkillList(): React.JSX.Element {
       {!adding && (
         <button
           onClick={() => setAdding(true)}
-          className="mb-3 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded transition-colors"
+          className="mb-5 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded transition-colors"
         >
           + Add Skill
         </button>
