@@ -68,6 +68,15 @@ export interface SubmissionSnapshot {
   skills: BuilderSkill[]
 }
 
+export interface Profile {
+  id: number
+  name: string
+  email: string
+  phone: string
+  location: string
+  linkedin: string
+}
+
 export interface Submission {
   id: number
   company: string
@@ -143,6 +152,20 @@ export interface Api {
       },
     ) => Promise<Submission>
     delete: (id: number) => Promise<void>
+  }
+  profile: {
+    get: () => Promise<Profile>
+    set: (data: {
+      name: string
+      email: string
+      phone: string
+      location: string
+      linkedin: string
+    }) => Promise<Profile>
+  }
+  exportFile: {
+    pdf: (variantId: number, defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string }>
+    docx: (variantId: number, defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string }>
   }
 }
 

@@ -67,6 +67,22 @@ const api = {
     ) => ipcRenderer.invoke('submissions:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('submissions:delete', id),
   },
+  profile: {
+    get: () => ipcRenderer.invoke('profile:get'),
+    set: (data: {
+      name: string
+      email: string
+      phone: string
+      location: string
+      linkedin: string
+    }) => ipcRenderer.invoke('profile:set', data),
+  },
+  exportFile: {
+    pdf: (variantId: number, defaultFilename: string) =>
+      ipcRenderer.invoke('export:pdf', variantId, defaultFilename),
+    docx: (variantId: number, defaultFilename: string) =>
+      ipcRenderer.invoke('export:docx', variantId, defaultFilename),
+  },
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

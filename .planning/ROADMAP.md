@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Database schema + Experience Library CRUD (completed 2026-03-14)
 - [x] **Phase 2: Template Variants** - Named resume variants with experience item toggling (completed 2026-03-14)
-- [ ] **Phase 3: Submissions** - Submission log with pipeline tracking
+- [x] **Phase 3: Submissions** - Submission log with pipeline tracking (completed 2026-03-14)
 - [ ] **Phase 4: Export** - PDF and DOCX export from variants and snapshots
 
 ## Phase Details
@@ -57,7 +57,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User can log a submission (company, role, date, which variant) and the resume content at that moment is frozen — editing the template afterward does not change the submission record
   2. User can view all submissions in a list showing company, role, date, variant name, and current status
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 03-01-PLAN.md — Schema migration (url + notes columns), IPC handlers with snapshot capture, preload bridge
@@ -70,11 +70,11 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User can export a template variant as a PDF and the file opens correctly with all experience items rendered and no content cut off
   2. User can export a template variant as a Word DOCX file with correct formatting and all experience items present
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 04-01: PDF export via webContents.printToPDF() with resume renderer page
-- [ ] 04-02: DOCX export via docx library in main process
+- [ ] 04-01-PLAN.md — Profile table, ProfessionalLayout component, UI refactor (replace 3 layouts with 1 polished layout)
+- [ ] 04-02-PLAN.md — PDF export via printToPDF, DOCX export via docx library, export buttons on Preview tab
 
 ## Progress
 
@@ -85,5 +85,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-03-14 |
 | 2. Template Variants | 2/2 | Complete    | 2026-03-14 |
-| 3. Submissions | 1/2 | In Progress|  |
+| 3. Submissions | 2/2 | Complete    | 2026-03-14 |
 | 4. Export | 0/2 | Not started | - |

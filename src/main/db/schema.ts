@@ -57,3 +57,12 @@ export const submissions = sqliteTable('submissions', {
   url: text('url'),
   notes: text('notes'),
 })
+
+export const profile = sqliteTable('profile', {
+  id: integer('id').primaryKey(),
+  name: text('name').notNull().default(''),
+  email: text('email').notNull().default(''),
+  phone: text('phone').notNull().default(''),
+  location: text('location').notNull().default(''),
+  linkedin: text('linkedin').notNull().default(''),
+})
