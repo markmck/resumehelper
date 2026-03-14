@@ -51,17 +51,17 @@ Plans:
 - [ ] 02-02-PLAN.md — Template Builder UI: tab routing, sidebar, builder with checkboxes, resume preview
 
 ### Phase 3: Submissions
-**Goal**: Users can log every job application with the exact resume variant used and track each application's pipeline status
+**Goal**: Users can log every job application with a frozen snapshot of the exact resume sent, and view all submissions in a scannable list with inline editing and snapshot viewing
 **Depends on**: Phase 2
 **Requirements**: SUB-01, SUB-02
 **Success Criteria** (what must be TRUE):
   1. User can log a submission (company, role, date, which variant) and the resume content at that moment is frozen — editing the template afterward does not change the submission record
   2. User can view all submissions in a list showing company, role, date, variant name, and current status
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 03-01: Submission log + snapshot storage (SubmissionService with JSON snapshot on insert)
-- [ ] 03-02: Submissions list UI with status display
+- [ ] 03-01-PLAN.md — Schema migration (url + notes columns), IPC handlers with snapshot capture, preload bridge
+- [ ] 03-02-PLAN.md — Submissions tab UI: add form, table with inline editing, frozen snapshot viewer modal
 
 ### Phase 4: Export
 **Goal**: Users can export any template variant as a properly formatted PDF or DOCX file ready to submit to employers
@@ -84,6 +84,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-03-14 |
-| 2. Template Variants | 2/2 | Complete   | 2026-03-14 |
+| 2. Template Variants | 2/2 | Complete    | 2026-03-14 |
 | 3. Submissions | 0/2 | Not started | - |
 | 4. Export | 0/2 | Not started | - |
