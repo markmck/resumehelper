@@ -45,6 +45,28 @@ const api = {
       excluded: boolean,
     ) => ipcRenderer.invoke('templates:setItemExcluded', variantId, itemType, itemId, excluded),
   },
+  submissions: {
+    list: () => ipcRenderer.invoke('submissions:list'),
+    create: (data: {
+      company: string
+      role: string
+      submittedAt: Date
+      variantId: number | null
+      url?: string
+      notes?: string
+    }) => ipcRenderer.invoke('submissions:create', data),
+    update: (
+      id: number,
+      data: {
+        company?: string
+        role?: string
+        submittedAt?: Date
+        url?: string | null
+        notes?: string | null
+      },
+    ) => ipcRenderer.invoke('submissions:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('submissions:delete', id),
+  },
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

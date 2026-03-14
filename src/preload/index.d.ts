@@ -62,6 +62,24 @@ export interface BuilderData {
   skills: BuilderSkill[]
 }
 
+export interface SubmissionSnapshot {
+  layoutTemplate: string
+  jobs: BuilderJob[]
+  skills: BuilderSkill[]
+}
+
+export interface Submission {
+  id: number
+  company: string
+  role: string
+  submittedAt: Date | null
+  variantId: number | null
+  resumeSnapshot: string       // JSON string — parse to SubmissionSnapshot
+  url: string | null
+  notes: string | null
+  variantName: string | null   // from LEFT JOIN, null if variant deleted
+}
+
 export interface Api {
   jobs: {
     list: () => Promise<JobWithBullets[]>
@@ -103,6 +121,28 @@ export interface Api {
       itemId: number,
       excluded: boolean,
     ) => Promise<void>
+  }
+  submissions: {
+    list: () => Promise<Submission[]>
+    create: (data: {
+      company: string
+      role: string
+      submittedAt: Date
+      variantId: number | null
+      url?: string
+      notes?: string
+    }) => Promise<Submission>
+    update: (
+      id: number,
+      data: {
+        company?: string
+        role?: string
+        submittedAt?: Date
+        url?: string | null
+        notes?: string | null
+      },
+    ) => Promise<Submission>
+    delete: (id: number) => Promise<void>
   }
 }
 
