@@ -30,6 +30,7 @@ interface BulletListProps {
 
 function BulletList({ jobId, initialBullets }: BulletListProps): React.JSX.Element {
   const [bullets, setBullets] = useState<Bullet[]>(initialBullets)
+  const [focusBulletId, setFocusBulletId] = useState<number | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -61,6 +62,7 @@ function BulletList({ jobId, initialBullets }: BulletListProps): React.JSX.Eleme
       sortOrder: bullets.length,
     })
     setBullets((prev) => [...prev, newBullet])
+    setFocusBulletId(newBullet.id)
   }
 
   const handleUpdateBullet = async (id: number, text: string): Promise<void> => {
@@ -85,6 +87,8 @@ function BulletList({ jobId, initialBullets }: BulletListProps): React.JSX.Eleme
               onUpdate={(text) => handleUpdateBullet(bullet.id, text)}
               onDelete={() => handleDeleteBullet(bullet.id)}
               onEnterKey={handleAddBullet}
+              autoFocus={bullet.id === focusBulletId}
+              onFocused={() => setFocusBulletId(null)}
             />
           ))}
         </SortableContext>

@@ -5,7 +5,7 @@ import { eq, asc, desc } from 'drizzle-orm'
 
 export function registerJobHandlers(): void {
   ipcMain.handle('jobs:list', async () => {
-    const allJobs = await db.select().from(jobs).orderBy(desc(jobs.createdAt))
+    const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
     const result = await Promise.all(
       allJobs.map(async (job) => {
         const bullets = await db

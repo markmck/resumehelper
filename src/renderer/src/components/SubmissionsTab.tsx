@@ -86,7 +86,8 @@ function SubmissionsTab(): React.JSX.Element {
                 <th className="text-zinc-500 text-xs uppercase tracking-wider px-4 py-3">
                   Variant
                 </th>
-                <th className="text-zinc-500 text-xs uppercase tracking-wider px-4 py-3">Links</th>
+                <th className="text-zinc-500 text-xs uppercase tracking-wider px-4 py-3">URL</th>
+                <th className="text-zinc-500 text-xs uppercase tracking-wider px-4 py-3">Notes</th>
                 <th className="text-zinc-500 text-xs uppercase tracking-wider px-4 py-3">
                   Actions
                 </th>
@@ -124,29 +125,24 @@ function SubmissionsTab(): React.JSX.Element {
                     {sub.variantName ?? ''}
                   </td>
 
-                  {/* Links */}
-                  <td className="border-b border-zinc-800 px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      {sub.url && (
-                        <a
-                          href={sub.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-indigo-400 hover:text-indigo-300 text-xs underline"
-                          title={sub.url}
-                        >
-                          Link
-                        </a>
-                      )}
-                      {sub.notes && (
-                        <span
-                          className="text-zinc-500 text-xs cursor-default"
-                          title={sub.notes}
-                        >
-                          Notes
-                        </span>
-                      )}
-                    </div>
+                  {/* URL */}
+                  <td className="border-b border-zinc-800 px-2 py-2 text-xs">
+                    <InlineEdit
+                      value={sub.url ?? ''}
+                      onSave={(v) => handleUpdate(sub.id, { url: v || null })}
+                      placeholder="Add URL..."
+                      className="text-xs text-zinc-400"
+                    />
+                  </td>
+
+                  {/* Notes */}
+                  <td className="border-b border-zinc-800 px-2 py-2 text-xs">
+                    <InlineEdit
+                      value={sub.notes ?? ''}
+                      onSave={(v) => handleUpdate(sub.id, { notes: v || null })}
+                      placeholder="Add notes..."
+                      className="text-xs text-zinc-400"
+                    />
                   </td>
 
                   {/* Actions */}

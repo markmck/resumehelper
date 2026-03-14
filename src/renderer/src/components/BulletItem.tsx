@@ -8,10 +8,12 @@ interface BulletItemProps {
   onUpdate: (text: string) => void
   onDelete: () => void
   onEnterKey?: () => void
+  autoFocus?: boolean
+  onFocused?: () => void
   editOnMount?: boolean
 }
 
-function BulletItem({ id, text, onUpdate, onDelete, onEnterKey }: BulletItemProps): React.JSX.Element {
+function BulletItem({ id, text, onUpdate, onDelete, onEnterKey, autoFocus, onFocused }: BulletItemProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
   })
@@ -64,6 +66,8 @@ function BulletItem({ id, text, onUpdate, onDelete, onEnterKey }: BulletItemProp
           placeholder="Add bullet text..."
           multiline={false}
           className="text-sm text-zinc-300 block w-full"
+          autoFocus={autoFocus}
+          onFocused={onFocused}
         />
       </div>
 

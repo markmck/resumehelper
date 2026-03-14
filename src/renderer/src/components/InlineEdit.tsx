@@ -7,6 +7,8 @@ interface InlineEditProps {
   placeholder?: string
   className?: string
   multiline?: boolean
+  autoFocus?: boolean
+  onFocused?: () => void
 }
 
 function InlineEdit({
@@ -16,6 +18,8 @@ function InlineEdit({
   placeholder = 'Click to edit',
   className = '',
   multiline = false,
+  autoFocus = false,
+  onFocused,
 }: InlineEditProps): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -30,6 +34,13 @@ function InlineEdit({
       inputRef.current.focus()
     }
   }, [editing])
+
+  useEffect(() => {
+    if (autoFocus) {
+      setEditing(true)
+      onFocused?.()
+    }
+  }, [autoFocus])
 
   const handleClick = (): void => {
     setDraft(value)
