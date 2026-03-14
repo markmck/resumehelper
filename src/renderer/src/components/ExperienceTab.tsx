@@ -1,3 +1,5 @@
+import JobList from './JobList'
+
 function ExperienceTab(): React.JSX.Element {
   return (
     <div className="overflow-y-auto h-[calc(100vh-48px)]">
@@ -5,7 +7,7 @@ function ExperienceTab(): React.JSX.Element {
         {/* Work History Section */}
         <section className="mb-12">
           <h2 className="text-lg font-semibold text-zinc-300 mb-4">Work History</h2>
-          <div className="text-zinc-500 text-sm">Loading work history...</div>
+          <JobList />
         </section>
 
         {/* Skills Section */}
