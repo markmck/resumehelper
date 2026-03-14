@@ -14,6 +14,6 @@ export const db = drizzle(sqlite, { schema })
 
 const migrationsFolder = app.isPackaged
   ? path.join(process.resourcesPath, 'drizzle')
-  : path.join(__dirname, '../../../drizzle')
+  : path.join(__dirname, '../../drizzle')
 
 migrate(db, { migrationsFolder })
