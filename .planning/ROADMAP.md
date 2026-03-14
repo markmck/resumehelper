@@ -70,7 +70,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User can export a template variant as a PDF and the file opens correctly with all experience items rendered and no content cut off
   2. User can export a template variant as a Word DOCX file with correct formatting and all experience items present
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 04-01-PLAN.md — Profile table, ProfessionalLayout component, UI refactor (replace 3 layouts with 1 polished layout)
@@ -86,4 +86,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Foundation | 3/3 | Complete    | 2026-03-14 |
 | 2. Template Variants | 2/2 | Complete    | 2026-03-14 |
 | 3. Submissions | 2/2 | Complete    | 2026-03-14 |
-| 4. Export | 0/2 | Not started | - |
+| 4. Export | 1/2 | In Progress|  |

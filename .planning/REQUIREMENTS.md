@@ -23,8 +23,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Export
 
-- [ ] **EXPRT-01**: User can export a template variant as PDF
-- [ ] **EXPRT-02**: User can export a template variant as Word/DOCX
+- [x] **EXPRT-01**: User can export a template variant as PDF
+- [x] **EXPRT-02**: User can export a template variant as Word/DOCX
 
 ### Submissions
 
@@ -82,8 +82,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TMPL-04 | Phase 2 | Complete |
 | SUB-01 | Phase 3 | Complete |
 | SUB-02 | Phase 3 | Complete |
-| EXPRT-01 | Phase 4 | Pending |
-| EXPRT-02 | Phase 4 | Pending |
+| EXPRT-01 | Phase 4 | Complete |
+| EXPRT-02 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 12 total
