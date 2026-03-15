@@ -2,6 +2,7 @@ import { useState } from 'react'
 import JobList from './JobList'
 import SkillList from './SkillList'
 import ProfileSettings from './ProfileSettings'
+import ProjectList from './ProjectList'
 
 function ExperienceTab(): React.JSX.Element {
   const [profileOpen, setProfileOpen] = useState(false)
@@ -29,9 +30,15 @@ function ExperienceTab(): React.JSX.Element {
         </section>
 
         {/* Skills Section */}
-        <section>
+        <section style={{ marginBottom: '48px' }}>
           <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider" style={{ marginBottom: '16px' }}>Skills</h2>
           <SkillList />
+        </section>
+
+        {/* Projects Section */}
+        <section>
+          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider" style={{ marginBottom: '16px' }}>Projects</h2>
+          <ProjectList />
         </section>
       </div>
     </div>
