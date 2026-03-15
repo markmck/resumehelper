@@ -1,7 +1,7 @@
 # Stack Research
 
 **Domain:** Desktop resume management app — PDF/DOCX export, resume templating, AI-assisted job matching
-**Researched:** 2026-03-13
+**Researched:** 2026-03-13 (v1.0), updated 2026-03-14 (v1.1 additions)
 **Confidence:** MEDIUM (core choices HIGH, AI/vector layer MEDIUM due to alpha-stage packages)
 
 > **Scope note:** This document covers ONLY the additional libraries needed on top of the existing
@@ -10,149 +10,197 @@
 
 ---
 
-## Recommended Stack
+## v1.1 Additions
 
-### PDF Export
-
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Electron `webContents.printToPDF()` | built-in (Electron 39) | Render React resume template → PDF | Zero dependencies, uses the same Chromium engine already bundled in Electron. Supports full CSS including Tailwind utility classes, backgrounds, and custom fonts. No binary download conflicts. |
-
-**Approach:** Create a hidden `BrowserWindow` (`show: false`) in the main process, load an internal `file://` URL pointing to a dedicated resume-renderer renderer page, wait for `did-finish-load`, call `printToPDF({ printBackground: true, pageSize: 'A4' })`, and write the `Buffer` to disk via `dialog.showSaveDialog`. Expose this as an IPC handler.
-
-**Confidence:** HIGH — This is the officially documented Electron approach. Verified against Electron docs and multiple real-world implementations.
-
-**Why NOT Puppeteer:** Puppeteer requires its own Chromium binary download (150–400 MB), creating a conflict with Electron's already-bundled Chromium. Packaging an Electron app with Puppeteer is notoriously fragile — the compiled app fails to locate Chromium at runtime. The `puppeteer-core` workaround (pointing at Electron's Chromium) requires version-pinning gymnastics and has no reliable long-term support path.
-
-**Why NOT jsPDF / PDFMake / PDFKit:** These libraries generate PDFs via a JavaScript draw API or JSON document definitions. They do not render HTML/CSS. Maintaining a parallel document-definition representation alongside your React template creates a two-source-of-truth problem. Any CSS layout change (spacing, fonts, columns) must be manually mirrored in the PDF definition. This approach does not scale for a template-driven system.
+These four new features require the following new library decisions. The existing stack handles
+everything else.
 
 ---
 
-### DOCX Export
+### resume.json Import — Parsing and Validation
+
+**Feature:** Read a `.json` file from disk and map it into the app's internal schema.
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| `docx` | ^9.6.1 | Programmatically generate .docx files from resume data | Fully TypeScript-native with bundled types (no `@types/` needed). Declarative API maps cleanly to structured resume data (sections, paragraphs, tables, styles). Works in Node.js main process. 2.7M weekly downloads, actively maintained. |
+| `resume-schema` | ^1.0.0 | Validate imported JSON against the official JSON Resume schema before mapping | Authoritative — maintained by the jsonresume org. Wraps `jsonschema` validation internally. Calling `resumeSchema.validate(obj, callback)` gives a structured error list that can surface user-readable import warnings. Zero-dependency validator. |
 
-**Approach:** Build the DOCX from resume data objects fetched via Drizzle — not by converting from HTML. Write a `ResumeDocxBuilder` class in the main process that reads the versioned resume snapshot from SQLite and constructs a `docx.Document` with typed section builders. Expose via IPC the same way as PDF.
+**Approach:** In the Electron main process, after `dialog.showOpenDialog` picks the `.json` file,
+read it with `fs.readFileSync`, `JSON.parse`, call `resumeSchema.validate()`, then map conforming
+fields to internal Drizzle schema models. Validation errors should be collected and shown to the
+user as import warnings (not hard failures) — partial imports are acceptable.
 
-**Confidence:** HIGH — npmjs.com confirms v9.6.1 published within days of research date. TypeScript types are first-class. Actively maintained GitHub repo.
+**No parsing library needed:** The resume.json format is plain JSON. `JSON.parse` is sufficient.
+`resume-schema` adds only schema validation on top of that — it is not a parser.
 
-**Why NOT `docxtemplater`:** Template-based approach requires maintaining a `.docx` Word template file as a binary asset in the repo. Any layout change requires editing the Word template externally, then re-committing the binary. For a programmers's tool where the template IS the product, a code-first API (`docx`) is more maintainable and version-control-friendly.
+**Confidence:** HIGH — Official jsonresume package. Schema is at stable v1.0.0. The validate()
+API is well-documented and callback-based (no async complications for the main process).
 
-**Why NOT `html-docx-js` / `html-to-docx`:** HTML-to-DOCX converters produce poor output — DOCX is not HTML and the mapping is lossy. Tables, margins, and fonts frequently render incorrectly in Word. The `docx` library produces specification-compliant OOXML that Word, LibreOffice, and Google Docs handle correctly.
+**Alternative considered:** `@jsonresume/schema` (v1.2.1) — a newer scoped package from the same
+org. Use `resume-schema` (the older package) instead: it is the canonical reference implementation
+explicitly linked from the official schema docs, and its v1.0.0 stable tag signals intentional API
+stability. The newer scoped package has no substantial API advantage for simple validation.
 
 ---
 
-### AI-Assisted Job Matching
+### resume.json Theme Rendering
 
-The project constraint is clear: AI suggests relevant existing experience items; it never generates or rephrases text. This means the core operation is **semantic similarity search** — not generative AI.
+**Feature:** Allow users to select an installed jsonresume theme, render their resume data through
+it, and display or export the resulting HTML.
 
-Two viable architectures:
+This is the most architecturally complex of the four new features. The theme contract is:
 
-#### Option A: Local Embeddings + sqlite-vec (Recommended for privacy-first)
+```javascript
+// All jsonresume themes export a render() function:
+import * as theme from 'jsonresume-theme-even';
+const html = theme.render(resumeObject); // returns complete HTML string
+```
+
+The HTML string is self-contained (inlined CSS, no external requests required by well-written
+themes). The challenge is loading theme modules at runtime in Electron's main process.
+
+#### Theme Module Loading Strategy
+
+**Recommended approach: bundle 2–3 curated themes at install time (not dynamic user-installed plugins)**
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| `@huggingface/transformers` | ^3.8.1 | Run embedding model locally in Node.js (ONNX/WASM runtime) | No API key required, no data leaves the machine. v3 replaced the `@xenova/transformers` package. Supports `all-MiniLM-L6-v2` model (22 MB) which produces 384-dim embeddings suitable for semantic similarity. Works in Node.js main process. |
-| `sqlite-vec` | ^0.1.7-alpha.10 | Vector KNN search as a SQLite extension | Same database already used for all app data. No separate vector DB process. Loads into `better-sqlite3` via `sqliteVec.load(db)` — one-liner integration. MIT/Apache-2.0 licensed. |
+| `jsonresume-theme-even` | ^0.14.x | First-party bundled theme — flat, modern layout, dual ESM/CJS builds | Most actively maintained community theme. Explicitly supports both ESM and CJS. Full CSS inlined in output. Wide adoption. |
+| `jsonresume-theme-class` | latest | Official jsonresume org theme — self-contained, offline-safe | Published under the jsonresume org. Documented as "self-contained" and designed to work offline — directly relevant to an Electron desktop app. |
 
-**Model recommendation:** `Xenova/all-MiniLM-L6-v2` — 22 MB ONNX model, 384 dimensions, well-benchmarked for semantic sentence similarity. Download on first use and cache in Electron's `userData` directory.
+**Why NOT dynamic user-installed themes (require/import at arbitrary user-provided paths):**
+Electron's main process CJS bundle (`electron-vite` default output) can call `require()` on a
+known node_modules path, but arbitrary user-installed npm packages introduce: (1) path resolution
+complexity on packaged apps where `node_modules` is bundled differently, (2) ESM/CJS conflicts —
+many newer themes are ESM-only, requiring `import()` inside an async function which complicates
+IPC handler design, (3) no sandboxing — a theme module runs in the main process with full Node.js
+access. For v1.1, bundle 2–3 known-good themes. Expose a theme selector in UI. Dynamic plugin
+loading is a v2+ concern.
 
-**Confidence:** MEDIUM — `@huggingface/transformers` v3 is confirmed stable (released 2024, current v3.8.1). `sqlite-vec` is confirmed compatible with `better-sqlite3` and loads cleanly, but the npm package is still versioned as alpha (v0.1.7-alpha.10). Core functionality is stable and production-used, but the alpha label warrants a smoke test during integration.
+**ESM caveat for theme packages:** `electron-vite` compiles the main process as CJS by default.
+Themes that are ESM-only require `await import('jsonresume-theme-X')` inside an async IPC handler.
+`jsonresume-theme-even` provides both CJS and ESM builds, making it safe for either approach.
+Verify the target theme's `package.json` `"type"` field before adding it — if `"type": "module"`,
+use dynamic `import()`.
 
-**Operational flow:**
-1. On experience item save → generate embedding → store in `vec_items` virtual table
-2. On job description paste → generate embedding for the pasted text
-3. SQL KNN query against `vec_items` → return top-N experience items by cosine distance
-4. Display ranked suggestions; user selects which to include — no text is modified
+#### Rendering the HTML in the UI
 
-#### Option B: OpenAI API Embeddings (Simpler, requires network + API key)
+**Recommended approach: `<iframe srcdoc={html}>`**
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| `openai` | ^4.x (current ~4.90) | Call `text-embedding-3-small` API to generate embeddings | Easier to set up than local ONNX models. `text-embedding-3-small` at 1536 dimensions outperforms local MiniLM on most benchmarks. |
-| `sqlite-vec` | ^0.1.7-alpha.10 | Same vector storage as Option A | Same rationale |
+Render the HTML string from the theme's `render()` call inside an `<iframe>` with the `srcdoc`
+attribute. No new library needed — this is built-in browser/Electron behavior.
 
-**Confidence:** HIGH for the OpenAI SDK. MEDIUM for sqlite-vec (same alpha caveat).
+```tsx
+// In the renderer process:
+<iframe
+  srcdoc={themeHtml}
+  sandbox="allow-same-origin"
+  style={{ width: '100%', height: '100%', border: 'none' }}
+/>
+```
 
-**When to choose Option B:** If the user is comfortable providing an OpenAI API key and the app is used in environments with reliable internet access. Eliminates the 22 MB model download and ONNX startup latency.
+The `sandbox="allow-same-origin"` attribute blocks scripts inside the theme HTML (appropriate
+since theme HTML is CSS-only presentation) while allowing CSS to apply correctly.
 
-**Recommendation:** Start with Option A (local). It matches the project's offline-first desktop nature and eliminates privacy concerns about pasting job descriptions to a third-party API. Option B can be added as a user-configurable setting later with minimal refactoring (swap the embedding provider, keep the sqlite-vec query layer unchanged).
+**Why NOT a hidden BrowserWindow + loadURL:** A separate BrowserWindow for preview is heavyweight
+(additional process, IPC round-trip, window management). The `srcdoc` approach renders inline in
+the existing renderer process, which is sufficient for a preview panel. Reserve the separate-window
+approach for PDF export (which already uses it via `printToPDF`).
+
+**Why NOT dangerouslySetInnerHTML:** Theme HTML includes `<html>`, `<head>`, and `<body>` tags.
+Injecting a full document tree into a React component via `innerHTML` produces malformed DOM.
+An `<iframe>` is the correct container for a complete foreign HTML document.
+
+**Confidence:** MEDIUM — The `srcdoc` + `sandbox` iframe pattern is well-established for
+embedding foreign HTML. The specific behavior of Electron's renderer process with `srcdoc` iframes
+matches standard Chromium. The ESM/CJS theme loading concern is a REAL issue that needs
+verification per-theme during integration.
 
 ---
 
-### Supporting Libraries
+### Projects Section
 
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| `sqlite-vec` | ^0.1.7-alpha.10 | Vector KNN search in SQLite | Required for AI matching feature regardless of embedding provider |
-| `@huggingface/transformers` | ^3.8.1 | Local ONNX embedding inference | Option A (local embeddings) only |
-| `openai` | ^4.90.x | OpenAI API client for embeddings | Option B (cloud embeddings) only |
+**Feature:** New database entity (`projects` table) with the same toggleable-bullet pattern as
+`work_experience`. CRUD UI in the Experience tab.
+
+**No new libraries required.** This is entirely implemented using the existing stack:
+
+- Drizzle ORM + better-sqlite3 → schema migration for the `projects` table
+- React 19 + TypeScript → CRUD UI components (mirrors the existing work experience pattern)
+- Tailwind CSS 4 / inline styles → styling (follow existing patterns)
+- @dnd-kit/sortable → bullet reordering (already installed, already used for work experience)
+
+The projects section is a database + UI concern, not a library concern.
 
 ---
 
-## Installation
+### Tag Autocomplete
+
+**Feature:** When typing a tag in skill or project tag inputs, suggest existing tags already in
+the database.
+
+**Recommended approach: custom component (no new library)**
+
+The existing stack provides everything needed. The autocomplete behavior is:
+1. On input change → query SQLite for all existing tag strings (via IPC → Drizzle)
+2. Filter client-side with `Array.filter` + `String.includes` (or `startsWith`)
+3. Render a `<ul>` dropdown with keyboard navigation (arrow keys, Enter, Escape)
+4. On selection → append tag to field
+
+This is a ~60–80 line component. The complexity does not justify a library dependency.
+
+**Why NOT `react-tag-autocomplete` (v7.5.1):**
+The library is solid (React 18+ compatible, accessible, well-maintained at v7.5.1), but it imposes
+its own data model (`{ label, value }` tag objects with `id` fields) that conflicts with the app's
+existing freeform string-based tag storage. Adapting the library's model to the DB schema requires
+as much code as a custom implementation, with the added cost of a dependency that owns the input
+styling and interaction model — difficult to reconcile with the existing Tailwind/inline style
+approach.
+
+**Why NOT `@headlessui/react` Combobox:**
+Headless UI's Combobox is excellent for standalone combobox fields but is optimized for
+single-selection scenarios. Tag inputs require multi-value selection with chip display, which
+Headless UI does not handle out of the box. Would require significant wrapper code anyway.
+
+**If a library becomes necessary** (e.g., accessibility requirements for WCAG compliance surface
+during implementation), use `react-tag-autocomplete` v7.5.1. It is the only actively-maintained
+library specifically designed for this pattern (React 18+, accessible, allows new tags via
+`allowNew` prop).
+
+**Confidence:** HIGH — Custom implementation is the established practice for tag inputs in
+apps with existing design systems. The data model mismatch with `react-tag-autocomplete` is
+a concrete technical reason, not a preference.
+
+---
+
+## Full Updated Installation
 
 ```bash
-# PDF export — no additional packages needed.
-# It uses Electron's built-in webContents.printToPDF() API.
+# v1.1 — new dependencies only
 
-# DOCX export
-npm install docx
+# resume.json schema validation
+npm install resume-schema
 
-# AI matching — Option A (local, recommended)
-npm install @huggingface/transformers sqlite-vec
+# resume.json themes (bundle 2 curated themes)
+npm install jsonresume-theme-even jsonresume-theme-class
 
-# AI matching — Option B (cloud, optional/alternative)
-npm install openai sqlite-vec
+# No new installs needed for:
+# - Projects section (uses existing Drizzle + @dnd-kit)
+# - Tag autocomplete (custom component, no library)
 ```
 
 ---
 
-## Alternatives Considered
-
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| `webContents.printToPDF()` | Puppeteer | Never in an Electron app — binary conflicts make packaging unreliable |
-| `webContents.printToPDF()` | jsPDF / PDFMake | Only if you need PDF generation in a pure browser context with no Electron runtime |
-| `docx` (code-first) | `docxtemplater` (template-first) | If your team already has Word `.docx` templates maintained by non-developers and wants a mail-merge workflow |
-| Local embeddings (`@huggingface/transformers`) | OpenAI API (`openai`) | If offline-first is not a priority and the user already has an OpenAI API key |
-| `sqlite-vec` | Separate vector DB (Chroma, Qdrant, LanceDB) | Never for this use case — adding a separate DB process defeats the point of an offline desktop app |
-
----
-
-## What NOT to Use
+## What NOT to Add
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `puppeteer` / `puppeteer-core` | Electron already bundles Chromium; Puppeteer downloads a second incompatible Chromium binary. Packaging consistently fails or produces a 400 MB+ app. | `webContents.printToPDF()` |
-| `jsPDF` | Cannot render HTML/CSS. Requires manually re-implementing layout in a JS draw API, creating parallel maintenance burden with your React template. | `webContents.printToPDF()` |
-| `html-docx-js` / `html-to-docx` | Lossy HTML→DOCX conversion. Produces documents with broken tables, wrong margins, and non-compliant OOXML that fails in some Word versions. | `docx` (code-first API) |
-| `@xenova/transformers` | Deprecated. v3 of Transformers.js moved to `@huggingface/transformers`. The `@xenova/` package is no longer updated. | `@huggingface/transformers` |
-| `sqlite-vss` | Predecessor to `sqlite-vec`. Depends on Faiss (C++ build complexity). `sqlite-vec` is the maintained successor, written in pure C with no dependencies. | `sqlite-vec` |
-| Full LLM (GPT-4, Llama) for matching | The project explicitly prohibits AI-generated or AI-rephrased text. Using a generative LLM introduces the exact exaggeration risk the app is designed to eliminate. Semantic similarity via embeddings is the correct tool. | Embedding similarity only |
-
----
-
-## Stack Patterns by Variant
-
-**If user wants fully offline (no API keys ever):**
-- Use `@huggingface/transformers` with `all-MiniLM-L6-v2` model
-- Download model to `app.getPath('userData')/models/` on first AI feature use
-- Disable remote model loading: `env.allowRemoteModels = false` after first download
-- Accept ~500 ms cold-start latency on first embedding call per session (ONNX WASM warmup)
-
-**If user provides OpenAI API key:**
-- Use `openai` SDK with `text-embedding-3-small` model
-- Store API key in Electron's `safeStorage` (encrypted with OS keychain)
-- Rate-limit calls: debounce job description input before sending embedding request
-- Keep sqlite-vec storage layer identical — only the embedding generation changes
-
-**For PDF resume template rendering:**
-- The dedicated resume renderer page should be a separate Electron renderer entry point (already supported by `electron-vite` multi-page config)
-- Inject resume data via IPC `sendToFrame` or load as a JSON `file://` URL parameter
-- Use `@media print` CSS for page-break control; Tailwind's `print:` variant is available in Tailwind CSS 4
+| `@jsonresume/schema` | Newer scoped package with no API advantage over `resume-schema` for validation; less stable versioning history | `resume-schema` ^1.0.0 |
+| Dynamic theme plugin system (runtime npm install) | Main process has full Node.js access; running user-provided code in-process is a security liability. Complex path resolution in packaged Electron apps. | Bundle 2–3 curated themes at build time |
+| `react-tag-autocomplete` | Data model (`{label, value, id}`) conflicts with existing freeform string tags; library owns styling that conflicts with existing approach | Custom ~70-line component using existing React state patterns |
+| `headlessui/react` Combobox for tags | Designed for single-select comboboxes, not multi-value tag inputs; would need extensive wrapper code | Custom component |
+| `dangerouslySetInnerHTML` for theme HTML | Cannot inject a full `<html><head><body>` document into React DOM | `<iframe srcdoc={html}>` |
+| ESM-only themes (e.g., themes with `"type": "module"` and no CJS fallback) | Requires async `import()` in IPC handlers; complicates main process CJS bundle | Prefer themes with dual ESM/CJS exports; `jsonresume-theme-even` has both |
 
 ---
 
@@ -160,29 +208,37 @@ npm install openai sqlite-vec
 
 | Package | Compatible With | Notes |
 |---------|-----------------|-------|
-| `sqlite-vec` ^0.1.7-alpha | `better-sqlite3` >=12 | Already on 12.8.0 — confirmed compatible. Load via `sqliteVec.load(db)`. |
-| `@huggingface/transformers` ^3.8.1 | Node.js >=18, ESM | Electron 39 ships Node.js 20.x — compatible. Use dynamic `import()` in main process. ESM-only package. |
-| `docx` ^9.6.1 | Node.js >=14 | No native dependencies. CJS/ESM compatible. Works in Electron main process. |
-| `openai` ^4.90 | Node.js >=18 | Works in Electron main process. Do NOT call from renderer — API key would be exposed. |
+| `resume-schema` ^1.0.0 | Node.js >=12, CJS | No native dependencies. Works in Electron main process. Callback-based API — no async needed. |
+| `jsonresume-theme-even` ^0.14.x | Node.js >=14, ESM + CJS | Dual build — safe for electron-vite CJS main process. Verify with `node -e "require('jsonresume-theme-even')"` after install. |
+| `jsonresume-theme-class` latest | Node.js >=14 | Official jsonresume org theme. Self-contained output. Verify module format after install. |
+| `react-tag-autocomplete` 7.5.1 (if needed) | React 18+, React 19 compatible (peerDeps say ">=18") | TypeScript types included. `allowNew` prop enables freeform tag creation. |
 
-**ESM note for `@huggingface/transformers`:** `electron-vite` compiles the main process as CJS by default. Use dynamic `import('@huggingface/transformers')` inside an async function, or configure the main process bundle to output ESM. This requires a `"type": "module"` consideration in `electron-vite` config — verify during integration.
+---
+
+## Existing v1.0 Stack (Not Re-Researched)
+
+The following remain unchanged from v1.0 research:
+
+- **PDF export** — `webContents.printToPDF()` (built-in Electron)
+- **DOCX export** — `docx` ^9.6.1
+- **AI matching** — `@huggingface/transformers` ^3.8.1 + `sqlite-vec` ^0.1.7-alpha.10 (Option A) or `openai` ^4.x + `sqlite-vec` (Option B)
+
+See prior research sections above for full rationale on those choices.
 
 ---
 
 ## Sources
 
-- Electron `webContents.printToPDF()` official docs — https://www.electronjs.org/docs/latest/api/web-contents (HIGH confidence)
-- sqlite-vec Node.js integration docs — https://alexgarcia.xyz/sqlite-vec/js.html (HIGH confidence)
-- `docx` npm package — https://www.npmjs.com/package/docx — v9.6.1 confirmed (HIGH confidence)
-- `@huggingface/transformers` v3 announcement — https://huggingface.co/blog/transformersjs-v3 (HIGH confidence)
-- `@huggingface/transformers` npm — https://www.npmjs.com/package/@huggingface/transformers — v3.8.1 current (HIGH confidence)
-- `openai` npm package — https://www.npmjs.com/package/openai — v4.x current (HIGH confidence)
-- Puppeteer + Electron conflict discussion — https://github.com/puppeteer/puppeteer/issues/2134 (MEDIUM confidence — issue thread, confirmed architectural incompatibility)
-- sqlite-vec v0.1.0 stable release announcement — https://alexgarcia.xyz/blog/2024/sqlite-vec-stable-release/index.html (HIGH confidence)
-- Transformers.js Electron fork (AnythingLLM) — https://github.com/Mintplex-Labs/transformersjs-electron (MEDIUM confidence — third-party implementation reference)
-- OpenAI text-embedding-3-small model docs — https://platform.openai.com/docs/models/text-embedding-3-small (HIGH confidence)
+- JSON Resume schema docs — https://docs.jsonresume.org/schema — validate() API confirmed (HIGH confidence)
+- `resume-schema` npm — https://www.npmjs.com/package/resume-schema — v1.0.0 stable (HIGH confidence)
+- JSON Resume theme development contract — https://jsonresume.org/theme-development — render() signature confirmed (HIGH confidence)
+- `jsonresume-theme-even` GitHub — https://github.com/rbardini/jsonresume-theme-even — dual ESM/CJS confirmed (MEDIUM confidence — indirect, repo structure implied)
+- `jsonresume-theme-class` GitHub — https://github.com/jsonresume/jsonresume-theme-class — self-contained, offline-safe (MEDIUM confidence)
+- `react-tag-autocomplete` GitHub — https://github.com/i-like-robots/react-tag-autocomplete — v7.5.1, React 18+ peerDep (HIGH confidence)
+- Electron ESM docs — https://www.electronjs.org/docs/latest/tutorial/esm — dynamic import() in main process (HIGH confidence)
+- Electron IPC docs — https://www.electronjs.org/docs/latest/tutorial/ipc — srcdoc iframe rendering approach (MEDIUM confidence — indirect; standard browser behavior confirmed)
 
 ---
 
-*Stack research for: ResumeHelper — additional libraries for PDF/DOCX export and AI matching*
-*Researched: 2026-03-13*
+*Stack research for: ResumeHelper — v1.0 export/AI + v1.1 resume.json import, theme rendering, tag autocomplete*
+*Researched: 2026-03-13 (v1.0), 2026-03-14 (v1.1 additions)*

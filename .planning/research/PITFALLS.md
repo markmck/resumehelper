@@ -1,8 +1,8 @@
 # Pitfalls Research
 
 **Domain:** Resume management desktop app (Electron + SQLite + AI matching + PDF/DOCX export)
-**Researched:** 2026-03-13
-**Confidence:** MEDIUM-HIGH (architecture pitfalls HIGH; AI boundary and export pitfalls MEDIUM based on community reports and official docs)
+**Researched:** 2026-03-14 (v1.1 update — appended to v1.0 findings)
+**Confidence:** HIGH for schema/migration and IPC patterns (code verified); MEDIUM for resume.json theme integration (official docs reviewed, no live Electron integration examples found)
 
 ---
 
@@ -186,6 +186,229 @@ Project scaffolding phase, established before any feature IPC handlers are writt
 
 ---
 
+## v1.1 Pitfalls — Projects Section, resume.json Import, Themes, Tag Autocomplete
+
+The following pitfalls are specific to the v1.1 feature set. They build on the existing codebase (Electron + better-sqlite3 + Drizzle ORM + React 19 + inline styles, CREATE TABLE IF NOT EXISTS schema pattern).
+
+---
+
+### Pitfall 9: Projects Schema Breaks Existing `templateVariantItems` Logic
+
+**What goes wrong:**
+Projects are added as a new table (`projects` + `project_bullets`) mirroring the `jobs`/`job_bullets` pattern. The `templateVariantItems` table uses a single `item_type` discriminator column (`'job'`, `'bullet'`, `'skill'`) to identify what an exclusion row refers to. When project items are added using new `item_type` values (`'project'`, `'project_bullet'`), all existing code that reads `templateVariantItems` — template rendering, submission snapshot capture, DOCX export, PDF export — silently ignores projects because it only filters for the three known types. Projects appear to be saved but never appear in exports.
+
+**Why it happens:**
+The `templateVariantItems` architecture is a polymorphic exclusion table that was designed for three entity types. Adding a fourth and fifth type requires updating every consumer of that table, but callers often only update the handler that saves project exclusions, not the handlers that read exclusion state for rendering and export.
+
+**How to avoid:**
+When adding project item types to `templateVariantItems`, immediately audit and update every site that queries `templateVariantItems`: `templates:getBuilderData`, `export:pdf` (`getBuilderDataForVariant`), `export:docx`, and `submissions:create` (snapshot capture). Add a TypeScript union type for `item_type` so the compiler flags any handler that doesn't handle `'project'` and `'project_bullet'`.
+
+**Warning signs:**
+- Projects are toggleable in the UI but don't appear in PDF/DOCX output
+- `export.ts` `getBuilderDataForVariant` function does not query `projects` table
+- `SubmissionSnapshot` interface in `index.d.ts` has no `projects` array
+- `item_type` is typed as `string` instead of a discriminated union
+
+**Phase to address:**
+Projects section phase. Treat export pipeline extension as a required deliverable of the same phase, not a separate follow-up.
+
+---
+
+### Pitfall 10: `CREATE TABLE IF NOT EXISTS` Doesn't Add Columns to Existing Tables
+
+**What goes wrong:**
+The app's schema strategy (in `db/index.ts`) uses `CREATE TABLE IF NOT EXISTS` to ensure tables exist on startup. This works perfectly for new installs. However, `CREATE TABLE IF NOT EXISTS` is a no-op if the table already exists — it does not add new columns to an existing table. For v1.1, if a new column is needed on an existing table (e.g., adding a `url` field to `jobs`, or `description` to a future `projects` table), the `ensureSchema()` function silently skips it on existing databases. The column is missing and queries fail or return wrong data.
+
+**Why it happens:**
+Developers add the column to the `CREATE TABLE IF NOT EXISTS` statement, test on a fresh database (it works), and ship. Users upgrading from v1.0 have the old table schema — the new column never gets added. The current codebase already has this pattern with a `migrate()` fallback, but the fallback silently swallows migration errors when Drizzle's journal doesn't know about tables created by `ensureSchema`.
+
+**How to avoid:**
+For any column added to an existing table, use `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in the `ensureSchema()` function (SQLite supports this since 3.37.0, 2021 — the version bundled with Electron is modern enough). Do not rely on Drizzle's file-based migration runner for column additions on the existing tables — the `migrate()` catch block in `db/index.ts` will swallow errors silently. The pattern is:
+
+```sql
+ALTER TABLE `projects` ADD COLUMN `url` text;
+-- Wrap in a try/catch in JS if "duplicate column" is a concern,
+-- or use a __applied_alterations tracking table
+```
+
+Alternatively, maintain a simple `__schema_version` table and run conditional ALTER TABLE statements based on version number.
+
+**Warning signs:**
+- New column added to a `CREATE TABLE IF NOT EXISTS` block for a table that existed in v1.0
+- Queries for the new column return `undefined` or SQLite `no such column` errors only on upgraded databases, not fresh installs
+- The `migrate()` call in `ensureSchema()` succeeds silently but the column is absent
+
+**Phase to address:**
+Projects section phase (schema addition). Must be verified on a database that was created by v1.0 before the new column was added.
+
+---
+
+### Pitfall 11: resume.json Import Creates Duplicate Data Without Deduplication Strategy
+
+**What goes wrong:**
+The user imports a `resume.json` file. The importer creates jobs, bullets, and skills from the JSON. The user runs the import again (or imports a slightly updated version of the same file). All records are duplicated — every job appears twice, every skill appears twice. There is no natural primary key in resume.json entries that maps to the app's integer IDs.
+
+**Why it happens:**
+The resume.json schema has no stable unique identifiers for work entries or skills — only human-readable strings. An importer that blindly inserts all records produces duplicates on any re-import. Developers often defer deduplication as "the user can clean it up manually," but with 20 work bullets per job across 5 jobs, manual cleanup is painful.
+
+**How to avoid:**
+Choose an explicit import strategy up front and communicate it clearly in the UI:
+
+- **Replace strategy (recommended for v1.1):** Before import, ask "This will replace all existing experience data. Continue?" Then run a transaction that deletes all existing jobs/bullets/skills and inserts from the JSON. Simple, predictable, no duplicates.
+- **Merge strategy (complex, defer):** Match incoming records by `(company + role + startDate)` tuple for jobs, and by `name` for skills. Upsert matched records, insert new ones. More code, more edge cases.
+
+The replace strategy is the right call for an initial import feature. Implement merge only if the user requests it.
+
+**Warning signs:**
+- Import handler uses `INSERT` without any preceding `DELETE` or duplicate check
+- No confirmation dialog before import that warns about existing data
+- Import is idempotent by accident (actually adds duplicates) but looks correct on the first run
+
+**Phase to address:**
+resume.json import phase. Decide and document the strategy before writing the importer.
+
+---
+
+### Pitfall 12: resume.json Field Mapping Assumptions Break on Real Files
+
+**What goes wrong:**
+The resume.json schema is lenient — every field except a few basics is optional, and real-world files vary widely. The importer assumes `work[i].highlights` is always an array, or `skills[i].keywords` exists, or `basics.location` is a string (it's actually an object: `{ city, region, countryCode }`). The importer throws on first parse or silently drops data from non-standard files.
+
+**Why it happens:**
+Developers test the importer against one well-formed example file (often their own or the official sample). Production resume.json files exported from LinkedIn, Reactive Resume, or hand-edited by users routinely omit optional sections or use unexpected types.
+
+**How to avoid:**
+Write a defensive mapper that explicitly handles:
+- Missing top-level sections (`work`, `skills`, `projects` may be absent — default to empty arrays)
+- `basics.location` is an object `{ city, countryCode }`, not a string — extract `city` for display
+- `work[i].highlights` may be absent, null, or an empty array — default to `[]`
+- `skills[i].keywords` may be absent — default to `[]`
+- Date fields (`startDate`, `endDate`) may be `""`, absent, or `"Present"` — normalize before storing
+- `projects` section may use `highlights` for bullets (same as `work`)
+
+Write the mapper to `console.warn` on unexpected shapes rather than throw, and surface a post-import summary ("Imported 4 jobs, 12 skills. 2 items skipped due to missing required fields.") rather than an error dialog.
+
+**Warning signs:**
+- Importer uses `data.work.map(...)` without a null/undefined guard
+- Location is stored as-is from `basics.location` (it will be `[object Object]` in the UI)
+- Import fails silently on files exported from LinkedIn or Reactive Resume
+
+**Phase to address:**
+resume.json import phase. Test with at least 3 real-world files: the official example, a LinkedIn export, and a hand-written file with missing sections.
+
+---
+
+### Pitfall 13: resume.json Theme `render()` Function Runs Synchronously and Expects No Side Effects — Electron Integration Breaks This
+
+**What goes wrong:**
+The resume.json theme ecosystem defines a contract: themes export a synchronous `render(resume)` function that returns an HTML string, with no side effects (no `fs`, no `http`). Most themes follow this contract. However, some themes:
+- Read CSS files from disk using Node's `fs` module (violates the contract but is common in older themes)
+- Use `require()` to load their own Handlebars templates at runtime (path relative to the npm package, which breaks when installed and run from inside an Electron ASAR bundle)
+- Return a Promise instead of a string (some newer async themes)
+
+The result is either a blank render, a runtime error in the main process, or correct output that fails when packaged.
+
+**Why it happens:**
+The resume.json ecosystem evolved organically — some themes were written before the no-side-effects contract was formalized. Themes that use `require('./templates/resume.hbs')` work fine in a regular Node.js environment but fail inside Electron's ASAR where relative `require()` paths resolve to the compressed archive.
+
+**How to avoid:**
+- Vet any theme before integrating it: inspect its `index.js` for `fs` or `require()` calls
+- Wrap the theme `render()` call in a `try/catch` with a clear fallback
+- If themes are run in the main process (recommended — Node.js context, no CSP issues), ensure the theme package is excluded from ASAR: add `asarUnpack: ["**/jsonresume-theme-*/**"]` to electron-builder config
+- If the theme returns a Promise, handle it: `const html = await Promise.resolve(theme.render(resume))`
+- Test each theme in both dev (unpackaged) and the packaged binary before surfacing it in the UI
+
+**Warning signs:**
+- Theme renders correctly in `npm start` but produces blank output in the packaged build
+- Theme's `index.js` contains `const template = fs.readFileSync(...)` or `const hbs = require('./resume.hbs')`
+- No `asarUnpack` entry for theme packages in electron-builder config
+- Theme is called with `theme.render(data)` but no async handling
+
+**Phase to address:**
+resume.json theme phase. Resolve the ASAR unpacking requirement before testing any theme.
+
+---
+
+### Pitfall 14: resume.json Theme HTML Rendered Inside React Causes CSP and Style Conflicts
+
+**What goes wrong:**
+The resume.json theme returns a complete `<!DOCTYPE html>` document with its own `<style>` blocks, inline CSS, and sometimes Google Fonts `<link>` tags. Injecting this into a React component via `dangerouslySetInnerHTML` in the renderer:
+1. Strips the `<html>`, `<head>`, and `<body>` tags (they're invalid inside a `<div>`)
+2. `<style>` tags inside `dangerouslySetInnerHTML` may not apply in some Electron/React versions
+3. External font `<link>` tags fail if the CSP blocks external origins
+4. The theme's CSS leaks into the parent app, overwriting app styles with `*` or `body` rules
+
+**Why it happens:**
+Themes return complete HTML documents meant for standalone display, not for embedding. Injecting them directly is the obvious first approach but doesn't account for the HTML structure stripping and style isolation problem.
+
+**How to avoid:**
+Render theme HTML inside an `<iframe>` with `srcdoc` or via `loadURL('data:text/html,...')`. This gives the theme a fully isolated browser context with its own `<head>`, its own style scope, and no access to the parent app's DOM. For PDF generation, use the same hidden `BrowserWindow` + `printToPDF()` approach already in place — load the theme's HTML directly into the window via `loadURL('data:text/html,...')` or `win.loadFile()` with the HTML written to a temp file.
+
+For preview (live render in the UI), a sandboxed `<iframe srcdoc={themeHtml}>` is the cleanest approach. Set `sandbox="allow-same-origin"` to allow CSS parsing without allowing scripts.
+
+**Warning signs:**
+- Theme HTML injected via `dangerouslySetInnerHTML` directly into a React component
+- App styles visually broken after viewing a theme (CSS leakage from the theme's `body` or `*` rules)
+- Theme preview shows unstyled text (styles stripped because `<head>` tag content is dropped)
+- Google Fonts URLs in the theme produce console CSP errors
+
+**Phase to address:**
+resume.json theme phase. Decide on the iframe/data-URL rendering approach before building the preview UI component.
+
+---
+
+### Pitfall 15: Tag Autocomplete Suggestion List Never Closes — Focus and Z-Index Problems
+
+**What goes wrong:**
+A tag autocomplete dropdown is added to `TagInput`. The dropdown opens on input focus and shows existing tags. It never closes because:
+- Clicking a suggestion causes the input to blur, which fires `onBlur` and closes the dropdown, which means the click event on the suggestion never fires (the element is gone before `onClick` runs)
+- The dropdown renders inside a scrollable container and is clipped by `overflow: hidden` on an ancestor
+- The dropdown has no `z-index` high enough and renders under a modal or sidebar
+
+These are the three most common bugs in custom autocomplete implementations, well-documented in open source issues.
+
+**Why it happens:**
+The existing `TagInput` component has no dropdown — it only manages tags. Adding autocomplete requires layering a positioned element on top of existing layout, which always surfaces the focus/blur race condition and the z-index/overflow problem.
+
+**How to avoid:**
+- Use `onMouseDown={e => e.preventDefault()}` on suggestion items to prevent the input from losing focus before the click registers. This is the standard fix for the blur-before-click race condition.
+- Render the dropdown using a React portal (`ReactDOM.createPortal`) into `document.body` to escape any `overflow: hidden` ancestor
+- Assign a high `z-index` (e.g., `9999`) to the portal-rendered dropdown
+- Close the dropdown on `Escape` key and on document click outside (use a `mousedown` listener on `document`, not `click`, to handle the focus ordering correctly)
+
+**Warning signs:**
+- Clicking a suggestion removes the dropdown but doesn't add the tag (blur fires before click)
+- Dropdown appears clipped or invisible in the Experience tab's scrollable section
+- Dropdown appears under the modal/dialog overlay
+
+**Phase to address:**
+Tag autocomplete phase. Implement the portal + `preventDefault` pattern from the start, not as a bugfix.
+
+---
+
+### Pitfall 16: Tag Autocomplete Regenerates the Suggestion Function on Every Keystroke
+
+**What goes wrong:**
+The autocomplete filter function (matching input value against all existing tags) is defined inside the React render function. Every keystroke triggers a re-render, which creates a new function reference, which re-runs the filter on every character. For a user with 200 skills and tags, this is negligible. But the bigger risk is that if a `useEffect` or `useCallback` with the filter function as a dependency is involved, it causes infinite re-renders or stale closures.
+
+**Why it happens:**
+Autocomplete feels simple — "just filter the tags array" — so developers inline the logic without stabilizing references. The React hooks linting rules usually catch this, but not always when the function is defined inline rather than as a named callback.
+
+**How to avoid:**
+- Collect all existing tags into a flat `Set<string>` using `useMemo` (recompute only when the skills list changes, not on every keystroke)
+- Filter suggestions using a `useMemo` that depends on `[inputValue, allTagsSet]` — React will only recompute when these values change
+- The existing `TagInput` receives an `onInputChange` prop — use this to pass the current input value up to the parent, where the suggestion filtering lives (keeping `TagInput` itself simple and stateless about suggestions)
+
+**Warning signs:**
+- Filter logic is inside `TagInput` as an inline arrow function with no `useMemo`
+- `allTags` is fetched from IPC inside `TagInput` on every render
+- React DevTools shows `TagInput` re-rendering on every keystroke even when suggestions haven't changed
+
+**Phase to address:**
+Tag autocomplete phase. Keep `TagInput` unaware of the data source; pass `suggestions` as a prop.
+
+---
+
 ## Technical Debt Patterns
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
@@ -198,6 +421,10 @@ Project scaffolding phase, established before any feature IPC handlers are writt
 | Hardcoding database path relative to `__dirname` | Works in dev | Crashes in packaged app (ASAR read-only) | Never |
 | Generating PDF without preview UI | Faster export feature | Users blind-export broken layouts | Acceptable only if preview is next milestone |
 | Testing only on dev machine (not packaged binary) | Faster iteration | Packaging bugs discovered only after ship | Never — test packaged binary every release |
+| Adding `projects` columns to `CREATE TABLE IF NOT EXISTS` only | Works on fresh install | Upgrading users never get new columns | Never — use ALTER TABLE for additive schema changes |
+| Injecting theme HTML via `dangerouslySetInnerHTML` | Obvious first approach | CSS leaks, styles stripped, CSP errors | Never — use iframe/srcdoc |
+| resume.json importer with no deduplication guard | Simple insert code | Duplicate data on re-import | Never — choose replace or merge strategy explicitly |
+| Tag suggestion list rendered in-place (no portal) | Simpler markup | Clipped by overflow ancestors in scrollable panes | Acceptable for prototype; must fix before shipping |
 
 ---
 
@@ -213,6 +440,11 @@ Project scaffolding phase, established before any feature IPC handlers are writt
 | `docxtemplater` template file | Template file bundled in ASAR (read-only) | Unpack template `.docx` from ASAR or copy to userData on first launch |
 | LLM API key storage | Storing key in renderer-accessible `localStorage` or hardcoded in source | Store in `safeStorage` (Electron's encrypted credential store) or OS keychain via `keytar` |
 | Drizzle `push` vs `generate`+`migrate` | Using `drizzle-kit push` in production workflow | `push` is dev-only; use `generate` then `migrate()` at runtime for any deployed version |
+| resume.json theme packages + ASAR | Theme's `require('./template.hbs')` fails inside ASAR | Add `asarUnpack: ["**/jsonresume-theme-*/**"]` to electron-builder config |
+| resume.json theme HTML in React renderer | `dangerouslySetInnerHTML` strips `<head>` + leaks CSS | Render inside `<iframe srcdoc={...}>` for isolation |
+| resume.json theme async render | Some themes return Promise; code expects string | Always `await Promise.resolve(theme.render(resume))` defensively |
+| ALTER TABLE on existing v1.0 database | Adding column to `CREATE TABLE IF NOT EXISTS` is a no-op | Use `ALTER TABLE ... ADD COLUMN` in `ensureSchema()` for additive column changes |
+| Tag autocomplete dropdown click | `onBlur` fires before `onClick` closes dropdown early | Use `onMouseDown={e => e.preventDefault()}` on suggestion items |
 
 ---
 
@@ -225,6 +457,8 @@ Project scaffolding phase, established before any feature IPC handlers are writt
 | Generating PDF synchronously in main process | UI freezes for 2-5 seconds during export | Run PDF generation in a hidden background `BrowserWindow` or worker; show progress indicator | Any PDF generation — user perceives freeze immediately |
 | Sending full experience text to LLM for every AI suggestion call | Slow, expensive, token-heavy | Cache embedding vectors locally; only re-embed items that changed | 50+ experience items per suggestion call |
 | SQLite WAL file not managed | Database grows unbounded, app startup slows | Enable WAL mode; run `PRAGMA wal_checkpoint` periodically or on app close | After 6+ months of continuous use |
+| Tag autocomplete filter re-created every render | Stale closures, unnecessary re-renders | `useMemo` for tag set; pass `suggestions` as prop to `TagInput` | Noticeable at 200+ tags; logic bugs at any scale |
+| resume.json import inserting records one-by-one | Import of 20 jobs + 100 bullets takes seconds | Batch insert inside a single `better-sqlite3` transaction | Imports with 10+ jobs and 50+ bullets |
 
 ---
 
@@ -237,6 +471,7 @@ Project scaffolding phase, established before any feature IPC handlers are writt
 | LLM API key in source code or `localStorage` | Key exposed in packaged app (ASAR is inspectable) | Use `safeStorage.encryptString()` + SQLite or OS keychain via `keytar` |
 | No input validation on IPC handlers | Malformed data reaches SQLite or filesystem | Validate and sanitize all IPC payloads before any DB or FS operation |
 | Logging job descriptions to disk unencrypted | Job search data (company names, roles, salary expectations) exposed in log files | Avoid logging sensitive content; if logs needed, redact company/role fields |
+| Executing resume.json theme code from user-supplied npm package | User imports a theme with malicious code; runs in main process with full Node access | Only support a curated list of known-good themes; never execute arbitrary theme code from user-provided paths |
 
 ---
 
@@ -250,6 +485,9 @@ Project scaffolding phase, established before any feature IPC handlers are writt
 | Pipeline status requires opening each submission to check | Impossible to scan application state at a glance | Pipeline kanban or list view with status badge visible without drilling in |
 | No distinction between "template variant" and "submission snapshot" in UI | User confused about what "editing" affects | Label clearly: "Template (editable)" vs "Submitted version (read-only archive)" |
 | Submission form lets user pick "no template / no version" | Submission record has no resume attached; tracking breaks | Make template selection required at submission time; no save without a version linked |
+| resume.json import with no preview | User imports 5-year-old file and overwrites current data without realizing | Show a summary of what will be imported ("14 jobs, 31 skills found") before confirming |
+| Tag autocomplete always shows all tags even when nothing is typed | Dropdown appears before user has intent; visually noisy | Only show suggestions when input length >= 1 character |
+| Projects appear at a non-obvious position in resume | User expects "Projects" near Work Experience; placement unclear | Always render projects after Work Experience and before Skills; document section order explicitly |
 
 ---
 
@@ -262,7 +500,15 @@ Project scaffolding phase, established before any feature IPC handlers are writt
 - [ ] **Packaged app:** Run the packaged binary on a machine without the dev environment. Confirm SQLite loads, the database is created in userData, and migrations run successfully on first launch.
 - [ ] **AI boundary:** Confirm the AI service function has no code path that returns modified experience text. All outputs are item IDs + relevance scores + rationale strings only.
 - [ ] **Upgrade path:** Install v1 of the app, create data, then install v2 with a schema change. Confirm migrations run and existing data is intact.
-- [ ] **IPC security:** Confirm preload script uses `contextBridge` with named handler functions only — not `ipcRenderer` exposure. Run `grep -r "ipcRenderer" preload` and verify no direct exposure.
+- [ ] **IPC security:** Confirm preload script uses `contextBridge` with named handler functions only — not `ipcRenderer` exposure.
+- [ ] **Projects in exports:** After adding a project and toggling it into a template, export to PDF and DOCX. Confirm project section appears with correct bullets.
+- [ ] **Projects in snapshots:** Create a submission with a project included. Edit the project. Confirm submission snapshot still shows original project content.
+- [ ] **resume.json import — schema upgrade:** Run import on a database upgraded from v1.0 (not a fresh install). Confirm all columns exist and no silent failures.
+- [ ] **resume.json import — duplicates:** Import the same file twice. Confirm no duplicate records appear (regardless of chosen strategy — replace or merge).
+- [ ] **resume.json theme — packaged app:** Test a selected theme in the packaged binary. Confirm HTML renders correctly (ASAR unpack working).
+- [ ] **resume.json theme — iframe isolation:** Confirm theme CSS does not leak into the parent application's UI after viewing a themed preview.
+- [ ] **Tag autocomplete — click behavior:** Click a suggestion item. Confirm it adds the tag (not that the dropdown disappears with nothing added).
+- [ ] **Tag autocomplete — overflow:** Open the autocomplete in the ExperienceTab's scrollable pane. Confirm dropdown is not clipped.
 
 ---
 
@@ -276,6 +522,10 @@ Project scaffolding phase, established before any feature IPC handlers are writt
 | SQLite ASAR packaging failure | LOW | Add `asarUnpack` config; rebuild; re-package; no data loss |
 | Drizzle migration not running at startup | MEDIUM | Add startup `migrate()` call; distribute patch; users with corrupt schema may need manual recovery script |
 | DOCX formatting broken | MEDIUM | Rebuild using docxtemplater + .docx template approach; existing exports already sent cannot be recalled |
+| Projects not appearing in exports | LOW | Update `getBuilderDataForVariant` in both `templates.ts` and `export.ts`; no data loss |
+| resume.json import created duplicates | MEDIUM | Provide a "clear imported data" function; user must re-enter any hand-edited additions made after the bad import |
+| Theme CSS leaked into app | LOW | Isolate theme in iframe; reload app to clear leaked styles |
+| Tag autocomplete click bug | LOW | Add `onMouseDown={e => e.preventDefault()}`; no data loss |
 
 ---
 
@@ -291,27 +541,37 @@ Project scaffolding phase, established before any feature IPC handlers are writt
 | DOCX formatting destruction | Export phase (DOCX) | Open in Word; verify bullet styles, fonts, spacing |
 | Drizzle migration not running at startup | Database schema + every schema-change phase | Fresh install + upgrade install paths both tested with packaged binary |
 | IPC channel sprawl and security | Project scaffolding | Preload audit: no raw `ipcRenderer` exposure; all handlers typed |
+| Projects break templateVariantItems consumers | Projects section phase | Export PDF/DOCX with a project toggled in; confirm it appears |
+| CREATE TABLE IF NOT EXISTS column omission | Projects section phase (schema) | Test on a copy of an existing v1.0 database; confirm new columns appear |
+| resume.json import duplicates | Import phase | Import the same file twice; confirm no duplicates |
+| resume.json field mapping failures | Import phase | Test with LinkedIn export, official example, and hand-written partial file |
+| Theme ASAR unpacking failure | Theme phase | Test packaged binary with a theme selected; confirm render is not blank |
+| Theme HTML isolation / CSS leakage | Theme phase | Inspect parent app styles after rendering a theme; confirm no leakage |
+| Tag autocomplete dropdown click bug | Autocomplete phase | Click suggestion items in all contexts; confirm tag is added |
+| Tag autocomplete overflow/z-index | Autocomplete phase | Open autocomplete inside the scrollable ExperienceTab pane |
 
 ---
 
 ## Sources
 
+- [Post-mortems referenced]
+- [JSON Resume Theme Development — Official Docs](https://jsonresume.org/theme-development)
+- [JSON Resume Schema — Official Docs](https://jsonresume.org/schema)
+- [resume-schema GitHub — field validation](https://github.com/jsonresume/resume-schema)
+- [SQLite ALTER TABLE Docs](https://www.sqlite.org/lang_altertable.html)
+- [Drizzle ORM Migrations — Official Docs](https://orm.drizzle.team/docs/migrations)
+- [Drizzle SQLite Push vs Migrate (Medium)](https://andriisherman.medium.com/migrations-with-drizzle-just-got-better-push-to-sqlite-is-here-c6c045c5d0fb)
+- [Electron Security — Official Docs](https://www.electronjs.org/docs/latest/tutorial/security)
+- [Electron CSP local file protocol (blog.coding.kiwi)](https://blog.coding.kiwi/electron-csp-local/)
+- [How to throttle and debounce autocomplete in React (Peterbe.com)](https://www.peterbe.com/plog/how-to-throttle-and-debounce-an-autocomplete-input-in-react)
+- [How to debounce in React without losing your mind (developerway.com)](https://www.developerway.com/posts/debouncing-in-react)
 - [Challenges Building an Electron App (Daniel Corin, 2024)](https://www.danielcorin.com/posts/2024/challenges-building-an-electron-app/)
 - [How to Build an Electron Desktop App — SQLite, Native Modules, Multithreading (freeCodeCamp)](https://www.freecodecamp.org/news/how-to-build-an-electron-desktop-app-in-javascript-multithreading-sqlite-native-modules-and-1679d5ec0ac)
 - [electron-builder ASAR + SQLite issue #1474](https://github.com/electron-userland/electron-builder/issues/1474)
-- [Electron Security — Official Docs](https://www.electronjs.org/docs/latest/tutorial/security)
-- [Context Isolation — Electron Official](https://www.electronjs.org/docs/latest/tutorial/context-isolation)
-- [The Risks of Misusing Electron IPC (DEV Community)](https://dev.to/code-nit-whit/the-risks-of-misusing-electron-ipc-2jii)
-- [Drizzle ORM Migrations — Official Docs](https://orm.drizzle.team/docs/migrations)
-- [Drizzle SQLite Push vs Migrate (Medium)](https://andriisherman.medium.com/migrations-with-drizzle-just-got-better-push-to-sqlite-is-here-c6c045c5d0fb)
 - [How to Generate PDFs in 2025 (DEV Community)](https://dev.to/michal_szymanowski/how-to-generate-pdfs-in-2025-26gi)
-- [Puppeteer PDF Generation — Official Guide](https://pptr.dev/guides/pdf-generation)
 - [DOCX generation with docxtemplater — Official Docs](https://docxtemplater.com/docs/get-started-node/)
-- [PDF from DOCX templates using LibreOffice (LinkedIn)](https://www.linkedin.com/pulse/pdf-generation-service-efficient-from-docx-templates-using)
-- [SAP Note: Resume updated but didn't replicate to Application snapshot](https://userapps.support.sap.com/sap/support/knowledge/en/2618812)
-- [AI Hallucinations — State of 2025 (Maxim AI)](https://www.getmaxim.ai/articles/the-state-of-ai-hallucinations-in-2025-challenges-solutions-and-the-maxim-ai-advantage/)
-- [Word Resume Templates: Why They Fail (CandyCV)](https://www.candycv.com/how-to/free-word-resume-templates-why-you-shouldnt-use-them-and-the-best-alternative-24)
+- Codebase audit: `src/main/db/index.ts`, `src/main/db/schema.ts`, `src/main/handlers/export.ts`, `src/main/handlers/templates.ts`, `src/renderer/src/components/TagInput.tsx`, `src/preload/index.d.ts`
 
 ---
 *Pitfalls research for: Resume management desktop app (Electron + SQLite + AI matching + PDF/DOCX export)*
-*Researched: 2026-03-13*
+*Researched: 2026-03-14 (v1.1 update: projects section, resume.json import/themes, tag autocomplete)*

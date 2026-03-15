@@ -1,14 +1,107 @@
 # Feature Research
 
 **Domain:** Personal resume management and job application tracking desktop app
-**Researched:** 2026-03-13
-**Confidence:** HIGH (cross-referenced competitor products Teal, Huntr, Careerflow, plus market research)
+**Researched:** 2026-03-13 (v1.0) / 2026-03-14 (v1.1 additions)
+**Confidence:** HIGH (core schema/theme mechanics verified against official docs), MEDIUM (integration complexity estimates)
 
-## Feature Landscape
+---
+
+## v1.1 Feature Landscape (Current Milestone)
+
+This section covers the four new features being added in v1.1. The v1.0 feature landscape is preserved below.
+
+### What Already Exists (v1.0 Foundation)
+
+The app has: work history (jobs + toggleable bullets), skills with freeform tag arrays (stored as JSON in SQLite), template variants (checkbox-based include/exclude per job/bullet/skill), PDF export (hidden BrowserWindow + `printToPDF`) and DOCX export (docx library), submission tracking with frozen JSON snapshots, and profile/contact info.
+
+Tags are stored as `JSON.stringify(string[])` in `skills.tags`. Template variant exclusions are stored in `templateVariantItems` with flexible `itemType` + `bulletId`/`skillId`/`jobId` FK columns.
+
+---
+
+### Table Stakes (Users Expect These — v1.1)
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Projects section with toggleable bullets | Work history has this pattern; projects are standard resume content for developers; schema parity with jobs | MEDIUM | New DB tables: `projects` (name, description, url, startDate, endDate) and `projectBullets` (projectId FK, text, sortOrder). Mirrors `jobs`/`jobBullets` exactly. Must be added to template variant include/exclude (add `projectId` FK column to `templateVariantItems`), PDF print template, and DOCX builder. Renders after work experience on output. |
+| Tag autocomplete (suggest existing tags while typing) | Typing tags without suggestions is friction; users expect combobox/dropdown on any tag input | LOW | Query all distinct tags from all existing `skills.tags` rows. Deduplicate in-memory. Show filtered dropdown below input as user types. Accept suggestion via click or Enter; custom value created on Enter/comma. No new IPC handler needed — data is available from the already-loaded skills list. |
+| resume.json data import | Any structured format has an import path; users migrating from other tools or exporting from LinkedIn/other sites have resume.json files | MEDIUM | File picker (`dialog.showOpenDialog`) → `fs.readFile` → `JSON.parse` → validate top-level keys → map to internal schema. Field mappings: `basics` → profile, `work[]` → jobs+bullets (highlights[]), `skills[]` → skills+tags (keywords[]), `projects[]` → projects+projectBullets (highlights[]). Partial import is correct behavior — skip unknown/missing sections. Show import summary (X jobs added, Y skills added, Z projects added). |
+
+### Differentiators (v1.1)
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| resume.json theme support | Unlocks 400+ community themes without building layouts in-house; users pick from curated bundled themes | HIGH | Themes are npm packages (`jsonresume-theme-{name}`) that export `render(resumeJson) => htmlString` with all CSS inlined. Integration: (1) write `toResumeJson(variantId)` mapper that transforms internal DB data filtered by variant exclusions into resume.json shape, (2) call `theme.render(resumeJson)` in main process, (3) inject resulting HTML into the existing hidden-BrowserWindow PDF pipeline via `loadURL('data:text/html,...')` or temp HTML file. Bundle 3-5 curated themes as npm deps. The `templateVariants.layoutTemplate` field already exists and maps theme names directly. |
+
+### Anti-Features (v1.1 — Commonly Requested, Often Problematic)
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Full merge/conflict UI on resume.json import | Importing into a populated DB feels like it needs merge logic | Massive scope increase; users expect "add to existing" semantics for imports | Detect non-empty DB and show "this will add to your existing experience" warning. Allow user to see what will be imported before confirming. |
+| Dynamic theme installation from npm at runtime | Users want any of 400+ community themes on demand | npm install at runtime in Electron is fragile, slow, creates arbitrary dependency surface; themes can pull in heavy build tooling | Bundle 3-5 curated self-contained themes. Provide local-file escape hatch (load a `render.js` from disk) for power users. |
+| Theme CSS editing in-app | Seems like the next step after picking a theme | Themes are npm packages with their own build pipeline; in-app CSS editing is a separate product | Themes are open source — users who want custom layouts fork the package. |
+| resumé.json export | Symmetric with import | Not in scope for v1.1; adds complexity with little immediate value for this user | Consider for v1.2 if users request it. |
+
+---
+
+### v1.1 Feature Dependencies
+
+```
+[Tag Autocomplete]
+    └──reads from──> [Skills (existing, v1.0)]
+    No new data model. Zero blocking dependencies.
+
+[Projects Section]
+    └──requires──> [New DB tables: projects + projectBullets]
+    └──requires──> [templateVariantItems: add projectId FK column]
+    └──requires──> [PDF print template: add projects rendering]
+    └──requires──> [DOCX builder: add PROJECTS section]
+
+[resume.json Data Import]
+    └──populates──> [Jobs/Bullets (existing v1.0)]
+    └──populates──> [Skills (existing v1.0)]
+    └──populates──> [Profile (existing v1.0)]
+    └──populates──> [Projects] (new — import maps projects[] to projects table)
+    NOTE: data import is independent of theme import
+
+[resume.json Theme Support]
+    └──requires──> [toResumeJson(variantId) mapper]
+                       └──ideally includes──> [Projects Section] (complete data)
+    └──uses──> [existing PDF export pipeline (hidden BrowserWindow + printToPDF)]
+    └──reads from──> [templateVariants.layoutTemplate (already exists)]
+```
+
+#### Dependency Notes
+
+- **Projects section should precede theme import:** The `toResumeJson()` mapper for themes should include `projects[]`. Building projects first means themes get complete data. They can be developed in parallel but projects must be complete before theme output is considered final.
+- **Data import and theme import are independent pipelines:** Import populates the DB; themes consume the DB via the mapper. A user does not need to have imported data to use a theme.
+- **Tag autocomplete has zero blocking dependencies:** Reads existing data, no new schema. Can be built in any order.
+- **Resume.json data import benefits from projects section being complete:** So the import can map `projects[]` from the file to the new projects table. If projects is built first, import is complete in one pass.
+
+---
+
+### v1.1 Implementation Notes
+
+#### Projects Section
+Copy the `jobs`/`jobBullets` table structure exactly. Add a `projectId` integer FK column to `templateVariantItems` (nullable, same as existing `bulletId`/`skillId`/`jobId`). The `itemType` field can use `'project'` and `'projectBullet'` as new values — no structural change required beyond the FK column. The template variant builder UI (checkbox tree) gains a PROJECTS subtree identical to the WORK EXPERIENCE subtree. The PDF print component and DOCX builder each need a new section appended after work experience.
+
+resume.json project fields to accept on import: `name`, `description`, `highlights[]` (→ bullets), `url`, `startDate`, `endDate`, `keywords[]` (→ tags on project if a tags field is added, or discard for now).
+
+#### Tag Autocomplete
+Tags are `string[]` arrays parsed from JSON in the skills list. The autocomplete data source is: `Array.from(new Set(allSkills.flatMap(s => s.tags)))`. Filter this list by the current input value (case-insensitive prefix or substring match). Standard combobox UX: dropdown appears after first character, keyboard navigation (arrow + Enter to select), click to select, typing and pressing Enter/comma creates a new tag. Shadcn/ui ships a Combobox component that fits directly.
+
+#### resume.json Data Import
+IPC flow: renderer triggers `import:resumeJson` → main process calls `dialog.showOpenDialog` → reads and parses file → validates keys → inserts rows → returns summary object `{ profile: boolean, jobs: number, skills: number, projects: number, errors: string[] }`. The renderer shows a preview/confirmation step before the user commits the import. Failure modes to handle: malformed JSON (surface parse error), missing required fields on a row (skip row, include in errors), duplicate job entries (insert anyway — user can clean up, or detect by company+role and ask).
+
+#### resume.json Theme Support
+Themes export `render(resume: ResumeJson): string`. Output is self-contained HTML. Key constraint: "all assets and CSS must be inlined" — verify bundled themes work fully offline before including. Integration path for PDF: if `variant.layoutTemplate` is a known theme name, call `theme.render(toResumeJson(variantId))` in main process, write result to a temp `.html` file, then `win.loadFile(tempHtmlPath)` instead of the React print route, then `printToPDF` as usual. For DOCX there is no theme equivalent — themes are HTML/CSS only. DOCX continues using the custom builder regardless of theme selection.
+
+---
+
+## v1.0 Feature Landscape (Reference)
+
+*(Preserved from initial research. These are shipped features.)*
 
 ### Table Stakes (Users Expect These)
-
-Features users assume exist. Missing these = product feels incomplete.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
@@ -24,8 +117,6 @@ Features users assume exist. Missing these = product feels incomplete.
 
 ### Differentiators (Competitive Advantage)
 
-Features that set the product apart. Not required, but valued.
-
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
 | AI experience matching (suggest, never write) | Solves the #1 user pain: AI exaggeration. Competitors like Huntr, Teal, Kickresume all rewrite bullets — this app does not. User retains every word. | HIGH | Paste job description → AI returns ranked list of existing experience items from DB. No text generation. Core differentiator. |
@@ -36,9 +127,7 @@ Features that set the product apart. Not required, but valued.
 | Pipeline stage notes and dates | Record interview dates, notes from calls, who you spoke to — turns the tracker into a full submission record | MEDIUM | Adds significant value to pipeline view; contacts + notes per stage |
 | ATS-safety indicators on export | Visual warning if resume layout choices (tables, columns) may harm ATS parsing | MEDIUM | Educates user without being prescriptive; would require ATS rule knowledge embedded in app |
 
-### Anti-Features (Commonly Requested, Often Problematic)
-
-Features that seem good but create problems.
+### Anti-Features (v1.0)
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
@@ -51,7 +140,7 @@ Features that seem good but create problems.
 | Team / recruiter collaboration features | Might be useful for agencies | Adds multi-tenancy, permissions, conflict resolution; completely different product | Single-user desktop tool; explicitly not a team product |
 | Interview prep / flashcards | Logically adjacent to job search | Different domain entirely; no connection to resume data model | Not in scope; refer users to dedicated tools |
 
-## Feature Dependencies
+## Feature Dependencies (Full, Including v1.1)
 
 ```
 [Experience Database]
@@ -74,107 +163,76 @@ Features that seem good but create problems.
 [PDF Export] ──independent of──> [DOCX Export]
 
 [AI Experience Matching] ──enhances──> [Per-job Customization]
-    (suggests items; user still toggles manually)
 
-[Pipeline Tracking] ──enhances──> [Application Dashboard]
-    (status stages populate the board/table)
+[Projects Section (v1.1)]
+    └──extends──> [Experience Database]
+    └──extends──> [Per-job Customization]
+    └──extends──> [PDF Export]
+    └──extends──> [DOCX Export]
+
+[Tag Autocomplete (v1.1)]
+    └──reads from──> [Skills (existing)]
+
+[resume.json Data Import (v1.1)]
+    └──populates──> [Experience Database + Projects]
+
+[resume.json Theme Support (v1.1)]
+    └──requires──> [toResumeJson mapper]
+    └──extends──> [PDF Export pipeline]
 ```
 
-### Dependency Notes
+## MVP Definition (v1.1 Scope)
 
-- **Experience Database required by everything:** No experience stored = no variants, no tailoring, no AI matching. This is phase 1, non-negotiable.
-- **Template Variants required by Per-job Customization:** Users need a named base to deviate from; per-job resumes are variants of variants, not built from scratch.
-- **Submission Log required by Pipeline Tracking:** A pipeline stage without a submission record is meaningless. Log the submission first, then track its status.
-- **Per-job Customization required by Export:** Export must reflect the current customized state for a specific job, not just a generic template.
-- **AI Experience Matching enhances Per-job Customization:** It accelerates the toggle workflow by surfacing relevant items, but users can use the toggle interface without AI. AI is additive, not load-bearing.
-- **Resume Version Snapshot enhances Submission Log:** Storing a frozen copy of the resume at submission time is what transforms a basic log into a full audit trail. Medium complexity but high value.
+### v1.1 Launch With
 
-## MVP Definition
+- [ ] **Projects section** — table stakes for a developer resume; mirrors existing job pattern so scope is well-bounded
+- [ ] **Tag autocomplete** — low complexity, high daily UX value; immediately noticeable improvement
+- [ ] **resume.json data import** — unblocks users migrating existing data; maps to existing + new projects table
+- [ ] **resume.json theme support (curated set of 3-5 themes)** — avoids runtime npm complexity; validates the theme pipeline end-to-end
 
-### Launch With (v1)
+### Add After v1.1 Validation
 
-Minimum viable product — what's needed to validate the concept.
-
-- [ ] Experience database (jobs, skills, projects, education) — without this, nothing else is possible
-- [ ] Template variant creation and management — the "Frontend Focus" / "Backend Heavy" starting points
-- [ ] Per-job customization (toggle experience items in/out of a variant) — the core daily workflow
-- [ ] PDF export — required for actual job applications; text-based, ATS-safe layout
-- [ ] Submission log (company, role, date, which template variant used) — validates the tracking value prop
-- [ ] Pipeline status tracking (Applied, Interview, Offer, Rejected) — validates the visibility value prop
-- [ ] Application dashboard — the full-picture view that closes the loop
-
-### Add After Validation (v1.x)
-
-Features to add once core is working.
-
-- [ ] DOCX export — add when users report ATS or employer rejection of PDF; important but non-blocking for v1
-- [ ] AI experience matching — add when the experience database is rich enough to make suggestions meaningful; needs populated DB to be useful
-- [ ] Resume version snapshot at submission — add once the submission log proves valuable; increases trust substantially
-- [ ] Pipeline stage notes and dates — add when users want richer history beyond status alone
+- [ ] **Local theme file loading** — power user escape hatch: load a `render.js` from disk without it being a bundled dep
+- [ ] **Pipeline status tracking** — already deferred from v1.0; logical next milestone
+- [ ] **resume.json export** — symmetric with import; adds interoperability
 
 ### Future Consideration (v2+)
 
-Features to defer until product-market fit is established.
+- [ ] **Dynamic npm theme installation** — only if curated set proves insufficient
+- [ ] **AI job matching** — suggest relevant experience items for a given job description
 
-- [ ] ATS-safety indicators on export — defer; requires maintaining ATS compatibility knowledge; medium complexity for moderate value
-- [ ] Import from LinkedIn PDF export — defer; parsing is fragile; only worth it if users cite data-entry friction as the #1 blocker
-- [ ] Resume analytics (which template variant gets responses) — defer; needs enough submission data to be meaningful (>20 submissions)
-
-## Feature Prioritization Matrix
+## Feature Prioritization Matrix (v1.1)
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Experience database | HIGH | MEDIUM | P1 |
-| Template variants | HIGH | MEDIUM | P1 |
-| Per-job customization (toggle) | HIGH | MEDIUM | P1 |
-| PDF export | HIGH | MEDIUM | P1 |
-| Submission log | HIGH | LOW | P1 |
-| Pipeline status tracking | HIGH | LOW | P1 |
-| Application dashboard | HIGH | MEDIUM | P1 |
-| DOCX export | HIGH | MEDIUM | P2 |
-| AI experience matching | HIGH | HIGH | P2 |
-| Version snapshot at submission | MEDIUM | MEDIUM | P2 |
-| Pipeline stage notes | MEDIUM | LOW | P2 |
-| ATS-safety indicators | MEDIUM | HIGH | P3 |
-| Resume analytics | LOW | HIGH | P3 |
-| LinkedIn PDF import | MEDIUM | HIGH | P3 |
+| Projects section | HIGH | MEDIUM | P1 |
+| Tag autocomplete | HIGH | LOW | P1 |
+| resume.json data import | MEDIUM | MEDIUM | P1 |
+| resume.json theme support | MEDIUM | HIGH | P2 |
 
 **Priority key:**
-- P1: Must have for launch
-- P2: Should have, add when possible
-- P3: Nice to have, future consideration
-
-## Competitor Feature Analysis
-
-| Feature | Teal | Huntr | Careerflow | Our Approach |
-|---------|------|-------|------------|--------------|
-| Experience database | Yes — check/uncheck items per version | Yes — versioned per role | Partial | Core foundation; same model as Teal |
-| Multiple resume versions | Yes — unlimited | Yes | Yes | Template variants as named archetypes, not per-job documents |
-| Per-job tailoring | Yes — driven by job description | Yes — fast iteration | Yes | Manual toggle + optional AI suggestion |
-| AI text rewriting | Yes — rewrites bullets | Yes — rewrites bullets | Yes | Explicitly NOT done; AI suggests only |
-| PDF export | Yes | Yes | Yes | Yes; text-based, ATS-safe layout |
-| DOCX export | Yes | Yes | Yes | Yes |
-| Job application pipeline | Yes — basic | Yes — kanban | Yes | Kanban + table; with resume version linked |
-| Which version was sent | Partial — linked but mutable | Partial | No | Frozen snapshot at submission time |
-| Local / offline | No — cloud only | No — cloud only | No — cloud only | Yes — SQLite desktop; genuine differentiator |
-| AI auto-apply | No | No | No | No — anti-feature |
-| Cover letter | Yes | Yes | Yes | No — out of scope |
-| Job board scraping | No | Extension-assisted | No | No — anti-feature |
+- P1: Must ship in v1.1
+- P2: Ship in v1.1 after P1 features stabilize
+- P3: Defer
 
 ## Sources
 
+**v1.1 sources:**
+- [JSON Resume Schema Documentation](https://docs.jsonresume.org/schema) — projects section field definitions (HIGH confidence)
+- [JSON Resume Theme Development](https://jsonresume.org/theme-development) — render function API and packaging requirements (HIGH confidence)
+- [jsonresume/resume-schema GitHub](https://github.com/jsonresume/resume-schema) — authoritative schema source (HIGH confidence)
+- [W3C Combobox Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/) — keyboard navigation expectations for autocomplete (HIGH confidence)
+- [jsonresume-theme-boilerplate](https://github.com/jsonresume/jsonresume-theme-boilerplate) — reference for theme structure (MEDIUM confidence)
+- [resume-cli Puppeteer PDF rendering](https://github.com/jsonresume/resume-cli/pull/275) — confirms standard HTML→PDF via headless browser (MEDIUM confidence)
+
+**v1.0 sources:**
 - [Teal resume builder feature documentation](https://help.tealhq.com/en/collections/9568976-resume-builder) — HIGH confidence (official docs)
 - [Teal review: features, pros, cons (2025)](https://www.usesprout.com/blog/teal-review-pricing-alternatives) — MEDIUM confidence
 - [Huntr vs Teal comparison 2026](https://huntr.co/blog/huntr-vs-teal) — MEDIUM confidence (vendor-authored but feature-accurate)
-- [Huntr vs Teal vs Careerflow](https://www.careerflow.ai/blog/huntr-vs-teal-vs-careerflow) — MEDIUM confidence
-- [Job application tracker best-of 2026](https://worldmetrics.org/best/job-application-tracking-software/) — MEDIUM confidence
-- [Kanban for job hunting patterns](https://kanbanzone.com/2023/personal-kanban-for-job-hunting/) — MEDIUM confidence
 - [ATS PDF vs DOCX compatibility (2026)](https://smallpdf.com/blog/do-applicant-tracking-systems-prefer-resumes-in-pdf-format) — HIGH confidence
 - [ATS formatting pitfalls (2025)](https://blog.theinterviewguys.com/ats-friendly-resume-template-2025/) — MEDIUM confidence
-- [AI resume tailoring tools analysis (2025-2026)](https://www.reztune.com/blog/best-ai-resume-tailoring-2025/) — MEDIUM confidence
-- [AI resume survival guide (anti-AI-writing perspective)](https://natesnewsletter.substack.com/p/the-ai-resume-survival-guide-for) — MEDIUM confidence
-- [Resume tailoring callback rate research](https://huntr.co/blog/how-to-tailor-resume-to-job-description) — LOW confidence (vendor claim: 40% more callbacks for tailored resumes)
 
 ---
-*Feature research for: Personal resume management and job application tracking desktop app*
-*Researched: 2026-03-13*
+
+*Feature research for: ResumeHelper v1.0 and v1.1*
+*Last updated: 2026-03-14*

@@ -1,484 +1,661 @@
 # Architecture Research
 
-**Domain:** Resume management desktop application (Electron + React + Drizzle ORM + SQLite)
-**Researched:** 2026-03-13
-**Confidence:** HIGH (brownfield — existing architecture is confirmed, patterns derived from it)
+**Domain:** Resume management desktop application — v1.1 integration patterns
+**Researched:** 2026-03-14
+**Confidence:** HIGH (brownfield — all existing code inspected, integration points are concrete)
+
+> **Scope:** This document supersedes the v1.0 architecture document for v1.1 planning purposes.
+> It focuses on how four new features — projects CRUD, resume.json import, resume.json theme rendering,
+> and tag autocomplete — integrate with the existing Electron + React + Drizzle ORM + SQLite architecture.
 
 ---
 
-## Standard Architecture
+## Existing Architecture Snapshot (v1.0)
 
-### System Overview
+Before documenting integration points, the confirmed v1.0 shape:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       RENDERER PROCESS                          │
-│                                                                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │  Experience  │  │   Template   │  │  Submissions / Track │  │
-│  │   Library    │  │   Builder    │  │       Board          │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘  │
-│         │                 │                      │              │
-│  ┌──────┴─────────────────┴──────────────────────┴───────────┐  │
-│  │          window.api (preload bridge — typed channels)      │  │
-│  └──────────────────────────────┬────────────────────────────┘  │
-└─────────────────────────────────│───────────────────────────────┘
-                                  │  IPC (invoke / handle)
-┌─────────────────────────────────│───────────────────────────────┐
-│                       MAIN PROCESS                              │
-│                                                                 │
-│  ┌──────────────────────────────▼────────────────────────────┐  │
-│  │                   IPC Handler Registry                     │  │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────────────┐   │  │
-│  │  │ experience │  │ templates  │  │    submissions     │   │  │
-│  │  │  handlers  │  │  handlers  │  │     handlers       │   │  │
-│  │  └─────┬──────┘  └─────┬──────┘  └─────────┬──────────┘   │  │
-│  │        │               │                    │              │  │
-│  │  ┌─────┴───────────────┴────────────────────┴──────────┐   │  │
-│  │  │                  Service Layer                       │   │  │
-│  │  │  ExperienceService  TemplateService  SubmitService   │   │  │
-│  │  └─────────────────────────┬────────────────────────────┘   │  │
-│  └────────────────────────────│───────────────────────────────┘  │
-│                               │                                  │
-│  ┌────────────────────────────▼───────────────────────────────┐  │
-│  │                      Database Layer                         │  │
-│  │    db (Drizzle singleton)  ←  schema.ts (source of truth)  │  │
-│  │    better-sqlite3  →  app.db  (userData path)              │  │
-│  └────────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐    │
-│  │              Export Services (PDF / DOCX)                │    │
-│  │         Puppeteer / html-pdf  |  docx / officegen        │    │
-│  └──────────────────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────────────────┘
+RENDERER PROCESS
+  App.tsx (tab switcher: experience | templates | submissions)
+    ExperienceTab       → JobList, SkillList, ProfileSettings
+    TemplatesTab        → VariantList, VariantEditor
+      VariantEditor     → VariantBuilder (checkboxes), VariantPreview → ProfessionalLayout
+    SubmissionsTab      → SubmissionAddForm, SnapshotViewer
+
+  window.api (preload bridge — typed, contextBridge)
+    jobs, bullets, skills, templates, submissions, profile, exportFile
+
+IPC (ipcMain.handle / ipcRenderer.invoke)
+
+MAIN PROCESS
+  handlers/
+    jobs.ts, bullets.ts, skills.ts, templates.ts,
+    submissions.ts, profile.ts, export.ts
+  db/
+    schema.ts  — jobs, jobBullets, skills, templateVariants,
+                 templateVariantItems, submissions, profile
+    index.ts   — Drizzle singleton + ensureSchema() (CREATE TABLE IF NOT EXISTS)
+
+PRINT FLOW (PDF export)
+  export:pdf handler → hidden BrowserWindow → print.html → PrintApp.tsx
+    → ProfessionalLayout → printToPDF()
 ```
 
-### Component Responsibilities
-
-| Component | Responsibility | Communicates With |
-|-----------|----------------|-------------------|
-| Experience Library (UI) | Browse, add, edit experience items (jobs, skills, projects, education) | Template Builder (selection state), IPC bridge |
-| Template Builder (UI) | Create/edit template variants; toggle experience items in/out; preview layout | Experience Library, Submission flow, IPC bridge |
-| Submission Board (UI) | Log submissions, update pipeline status, link resume snapshot to job | IPC bridge |
-| window.api bridge (preload) | Type-safe channel surface; all renderer→main calls route through here | Renderer (consumes), Main IPC Registry (registers) |
-| IPC Handler Registry (main) | Route named channels to domain handlers; no business logic | Service layer |
-| ExperienceService (main) | CRUD for raw experience data (immutable content, only metadata editable) | Database |
-| TemplateService (main) | CRUD for template variants and resume versions (snapshots at submission) | Database |
-| SubmissionService (main) | Log submissions, transition pipeline status, link to frozen snapshot | Database |
-| AIMatchService (main) | Score and rank experience items against a pasted job description | ExperienceService (reads only) |
-| ExportService (main) | Render resume variant to PDF or DOCX on disk | TemplateService (reads snapshot) |
-| Database Layer | Single Drizzle db instance wrapping better-sqlite3; schema is source of truth | All services |
+Key characteristics confirmed in code:
+- Schema additions use `ensureSchema()` (raw SQL `CREATE TABLE IF NOT EXISTS`) not file-based migrations
+- Tags stored as `JSON.stringify(string[])` in `skills.tags` TEXT column
+- `templateVariantItems` uses `itemType` + nullable foreign keys (`bulletId`, `skillId`, `jobId`)
+- `BuilderData` type in `preload/index.d.ts` drives both VariantBuilder and ProfessionalLayout
+- `ProfessionalLayout` accepts `jobs: BuilderJob[]` and `skills: BuilderSkill[]` — no projects yet
+- PrintApp reads `variantId` from URL query string, fetches data via IPC, renders ProfessionalLayout
 
 ---
 
-## Recommended Project Structure
+## Feature 1: Projects CRUD
 
-```
-src/
-├── main/
-│   ├── db/
-│   │   ├── index.ts          # Drizzle singleton (unchanged)
-│   │   ├── schema.ts         # ALL table definitions (single source of truth)
-│   │   └── migrations/       # Generated by drizzle-kit generate
-│   ├── handlers/             # IPC channel → service dispatch (thin layer)
-│   │   ├── index.ts          # registerAllHandlers(ipcMain) entry point
-│   │   ├── experience.ts
-│   │   ├── templates.ts
-│   │   ├── submissions.ts
-│   │   └── export.ts
-│   ├── services/             # Domain logic; services call db directly
-│   │   ├── ExperienceService.ts
-│   │   ├── TemplateService.ts
-│   │   ├── SubmissionService.ts
-│   │   ├── AIMatchService.ts
-│   │   └── ExportService.ts
-│   └── index.ts              # App bootstrap; calls registerAllHandlers()
-├── preload/
-│   ├── index.ts              # contextBridge — exposes window.api
-│   └── api.ts                # Typed channel definitions (shared with renderer via import)
-├── renderer/src/
-│   ├── pages/
-│   │   ├── ExperienceLibrary/
-│   │   ├── TemplateBuilder/
-│   │   └── SubmissionBoard/
-│   ├── components/           # Shared UI primitives
-│   ├── hooks/                # useApi() wrappers around window.api calls
-│   └── main.tsx
-└── shared/
-    └── types.ts              # DTOs shared across all three processes (no Electron imports)
-```
+### What Needs to Exist
 
-### Structure Rationale
+Projects are structurally identical to jobs: a named item with a description date range and toggleable bullet points. The pattern is already proven by `jobs` + `jobBullets`.
 
-- **handlers/ vs services/:** Handlers are wire-thin — they validate input shape, call one service method, return the result. All business logic lives in services. This keeps IPC concerns (channel names, serialization) separated from domain logic, and makes services independently testable without Electron.
-- **shared/types.ts:** The only way to safely share types across the process boundary. Must not import Electron APIs. DTOs mirror Drizzle inferred types but are plain objects (no Date instances — SQLite returns numbers, convert at boundary).
-- **preload/api.ts:** Defines the typed surface. The renderer imports the type, not the implementation. This prevents accidental coupling to Node APIs in the renderer bundle.
-- **migrations/ inside db/:** Drizzle-kit generates migration files from schema diffs. Committing migrations gives a deterministic upgrade path for users who already have a local database.
+### New vs Modified
 
----
+| Layer | Change Type | What |
+|-------|-------------|------|
+| `schema.ts` | NEW tables | `projects`, `projectBullets` — mirror structure of `jobs`/`jobBullets` |
+| `schema.ts` | MODIFIED | `templateVariantItems` — add nullable `projectId` FK column |
+| `db/index.ts` | MODIFIED | Add `CREATE TABLE IF NOT EXISTS` SQL for both new tables; add `ALTER TABLE template_variant_items ADD COLUMN project_id INTEGER` via `ensureSchema()` |
+| `handlers/projects.ts` | NEW | `projects:list`, `projects:create`, `projects:update`, `projects:delete` |
+| `handlers/projectBullets.ts` | NEW | `projectBullets:create`, `projectBullets:update`, `projectBullets:delete`, `projectBullets:reorder` — identical API shape to `bullets.ts` |
+| `handlers/index.ts` | MODIFIED | Register the two new handler files |
+| `handlers/templates.ts` | MODIFIED | `templates:getBuilderData` — add project query and exclusion logic; `templates:setItemExcluded` — add `itemType === 'project'` branch |
+| `handlers/export.ts` | MODIFIED | `getBuilderDataForVariant()` — add project fetching; DOCX builder — add Projects section |
+| `preload/index.d.ts` | NEW types | `Project`, `ProjectWithBullets`, `BuilderProject`, `BuilderProjectBullet` |
+| `preload/index.d.ts` | MODIFIED types | `BuilderData` — add `projects: BuilderProject[]`; `SubmissionSnapshot` — add `projects: BuilderProject[]` |
+| `preload/index.ts` | NEW namespace | `window.api.projects`, `window.api.projectBullets` |
+| `ExperienceTab.tsx` | MODIFIED | Add "Projects" section after Work History |
+| NEW components | NEW | `ProjectList.tsx`, `ProjectItem.tsx`, `ProjectAddForm.tsx` — mirror `JobList/JobItem/JobAddForm` |
+| `BulletList.tsx`, `BulletItem.tsx` | UNCHANGED | Already generic-enough for reuse IF refactored to accept `jobId`-agnostic props; otherwise copy pattern |
+| `VariantBuilder.tsx` | MODIFIED | Add Projects section below Work History |
+| `ProfessionalLayout.tsx` | MODIFIED | Add Projects section after Skills |
+| `PrintApp.tsx` | MODIFIED | Pass `projects` from `builderData` to `ProfessionalLayout` |
 
-## Architectural Patterns
+### Schema Addition
 
-### Pattern 1: Snapshot on Submission (Immutable Resume Records)
-
-**What:** When a user submits a job application, the resume variant is serialized to JSON and stored as an immutable snapshot column (`resume_snapshot TEXT NOT NULL`) on the `submissions` table. The snapshot captures exactly which experience items were selected and the content at the time of submission.
-
-**When to use:** Every time a submission is logged. The live template can change freely afterward without corrupting historical records.
-
-**Trade-offs:** Snapshots use storage (cheap on desktop). Querying inside a snapshot is harder than normalized rows, but this data is read-only after write and only ever rendered or exported — no filtering inside JSON is needed.
-
-**Example schema:**
 ```typescript
-// schema.ts
-export const submissions = sqliteTable("submissions", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  companyName: text("company_name").notNull(),
-  role: text("role").notNull(),
-  appliedAt: integer("applied_at", { mode: "timestamp" }).notNull(),
-  status: text("status", {
-    enum: ["applied", "interview", "offer", "rejected"]
-  }).notNull().default("applied"),
-  templateVariantId: integer("template_variant_id")
-    .references(() => templateVariants.id),
-  // Frozen copy at time of submission — template can change freely after
-  resumeSnapshot: text("resume_snapshot").notNull(),
-  jobDescriptionRaw: text("job_description_raw"),
-  notes: text("notes"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull().$defaultFn(() => new Date()),
-});
-```
-
-### Pattern 2: Template Variants as Named Configurations (Not Git Branches)
-
-**What:** A template variant is a persisted row in `template_variants` that holds a name, layout preferences, and a join table (`template_variant_items`) mapping which experience items are selected and in what order. Users can clone a variant and tweak it for a specific job without affecting the original.
-
-**When to use:** Everywhere a user wants a "Frontend Focus" variant separate from "Fullstack" or a one-off "job at ACME" clone.
-
-**Trade-offs:** Simpler than git-like branching (no merge semantics). Cannot diff two variants automatically, but that feature is not required. Cloning is an explicit user action, keeping the mental model simple.
-
-**Example schema:**
-```typescript
-export const templateVariants = sqliteTable("template_variants", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  description: text("description"),
-  isBaseTemplate: integer("is_base_template", { mode: "boolean" })
-    .notNull().default(false),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull().$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull().$defaultFn(() => new Date()),
-});
-
-export const templateVariantItems = sqliteTable("template_variant_items", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  variantId: integer("variant_id")
+// schema.ts additions
+export const projects = sqliteTable('projects', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  description: text('description'),
+  startDate: text('start_date'),
+  endDate: text('end_date'),
+  url: text('url'),
+  createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
-    .references(() => templateVariants.id, { onDelete: "cascade" }),
-  experienceItemId: integer("experience_item_id")
+    .$defaultFn(() => new Date()),
+})
+
+export const projectBullets = sqliteTable('project_bullets', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id')
     .notNull()
-    .references(() => experienceItems.id),
-  sortOrder: integer("sort_order").notNull().default(0),
-  // Override visibility without deleting the item from the variant
-  included: integer("included", { mode: "boolean" }).notNull().default(true),
-});
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  text: text('text').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+})
 ```
 
-### Pattern 3: Feature-Grouped IPC Handlers with a Single Registration Point
+`templateVariantItems` needs a new nullable column. Because the existing table was created with `CREATE TABLE IF NOT EXISTS`, adding `projectId` requires an ALTER TABLE in `ensureSchema()`:
 
-**What:** Each domain (experience, templates, submissions, export) owns a file in `src/main/handlers/` that registers its channels via a plain function. A single `registerAllHandlers(ipcMain)` call in `main/index.ts` wires them all. The preload bridge exposes a typed `window.api` namespace that mirrors these channels.
-
-**When to use:** From the first feature. Adding a new domain = add one handler file + one service file + declare channels in `preload/api.ts`.
-
-**Trade-offs:** Slightly more boilerplate than dumping everything in `main/index.ts`, but that file becomes unmaintainable beyond ~3 features. The class-per-channel pattern (LogRocket/electron-ipc articles) is an alternative, but plain functions with explicit channel constants are simpler for a solo developer.
-
-**Example:**
 ```typescript
-// handlers/experience.ts
-import { ipcMain } from 'electron'
-import { ExperienceService } from '../services/ExperienceService'
+// db/index.ts — inside ensureSchema(), after CREATE TABLE statements
+sqlite.exec(`
+  ALTER TABLE template_variant_items ADD COLUMN project_id INTEGER
+    REFERENCES projects(id) ON DELETE CASCADE;
+`)
+```
 
-const svc = new ExperienceService()
+Wrap in a try/catch (or check `PRAGMA table_info`) because `ALTER TABLE ADD COLUMN` throws if the column already exists.
 
-export function registerExperienceHandlers(): void {
-  ipcMain.handle('experience:list', () => svc.list())
-  ipcMain.handle('experience:create', (_, item) => svc.create(item))
-  ipcMain.handle('experience:update', (_, id, patch) => svc.update(id, patch))
-  ipcMain.handle('experience:delete', (_, id) => svc.delete(id))
+### Data Flow: Projects in Builder
+
+```
+VariantBuilder mounts
+    |
+    v
+window.api.templates.getBuilderData(variantId)
+    |
+    v  [MODIFIED handler]
+templates:getBuilderData
+    ├── existing: jobs query + bullets + skills
+    └── NEW: projects query + projectBullets
+    → returns BuilderData { jobs, skills, projects }  [extended type]
+    |
+    v
+VariantBuilder renders Work History + Skills + Projects sections
+Each project checkbox calls setItemExcluded(variantId, 'project', projectId, excluded)
+```
+
+### Resume Section Placement
+
+Projects render at the end of `ProfessionalLayout`, after Skills. This matches jsonresume convention (work, skills, projects) and the project requirement ("displayed at end of resume").
+
+---
+
+## Feature 2: resume.json Import
+
+### What Needs to Exist
+
+The user selects a `resume.json` file from disk. The app parses it and populates existing database tables (jobs, skills, projects, profile). No new tables required — this is a pure write path into existing data.
+
+### resume.json Schema (confirmed)
+
+Relevant sections that map to app tables:
+
+| resume.json section | Maps to | Notes |
+|---------------------|---------|-------|
+| `basics` | `profile` table | name, email, phone, location, linkedin (from `profiles[0].url`) |
+| `work[]` | `jobs` + `jobBullets` | `highlights[]` become bullets |
+| `skills[]` | `skills` | `name` is skill name; `keywords[]` become tags |
+| `projects[]` | `projects` + `projectBullets` | `highlights[]` become bullets; `name`, `description`, `url` map directly |
+
+Fields that have no app equivalent (volunteer, education, awards, certificates, languages, references) are silently ignored during import.
+
+### New vs Modified
+
+| Layer | Change Type | What |
+|-------|-------------|------|
+| `handlers/import.ts` | NEW | `import:resumeJson` handler — dialog.showOpenDialog + fs.readFile + parse + insert |
+| `handlers/index.ts` | MODIFIED | Register import handler |
+| `preload/index.ts` | MODIFIED | Add `window.api.importFile.resumeJson()` |
+| `preload/index.d.ts` | MODIFIED | Add `importFile` namespace to `Api` |
+| `ExperienceTab.tsx` or new Settings area | MODIFIED/NEW | Import button triggers `window.api.importFile.resumeJson()`, shows result toast |
+
+### Import Handler Logic
+
+```
+import:resumeJson handler
+    |
+    v
+dialog.showOpenDialog({ filters: [{ name: 'JSON', extensions: ['json'] }] })
+    |
+    v
+fs.readFile(filePath, 'utf8') → JSON.parse()
+    |
+    v
+Validate: check for 'basics' or 'work' field — if absent, return { error: 'not a resume.json' }
+    |
+    v
+Map basics → profile upsert (UPDATE WHERE id=1)
+Map work[] → insert jobs + insert jobBullets (per highlights[])
+Map skills[] → insert skills (keywords[] as JSON tags)
+Map projects[] → insert projects + insert projectBullets (per highlights[])
+    |
+    v
+Return { imported: { jobs: N, skills: N, projects: N } }
+    |
+    v
+Renderer shows toast: "Imported 5 jobs, 12 skills, 3 projects"
+```
+
+**Transaction requirement:** Wrap all inserts in a `better-sqlite3` synchronous transaction to ensure atomicity. If any insert fails, nothing is committed.
+
+```typescript
+// handlers/import.ts sketch
+const transaction = db.transaction((data: ResumeJson) => {
+  if (data.basics) {
+    db.update(profile).set({ name: data.basics.name, ... }).where(eq(profile.id, 1)).run()
+  }
+  for (const job of data.work ?? []) {
+    const [newJob] = db.insert(jobs).values({ ... }).returning().all()
+    for (const highlight of job.highlights ?? []) {
+      db.insert(jobBullets).values({ jobId: newJob.id, text: highlight, sortOrder: i }).run()
+    }
+  }
+  // same for skills and projects
+})
+transaction(parsedJson)
+```
+
+### No New Tables Needed
+
+Import writes into the same tables as manual CRUD. The import handler is a bulk-write operation, not a new domain. After import, the Experience tab refreshes normally via existing `jobs:list`, `skills:list`, `projects:list` channels.
+
+---
+
+## Feature 3: resume.json Theme Rendering
+
+### What the Theme Contract Is (confirmed)
+
+Every jsonresume-compatible theme is an npm package that exports:
+```javascript
+module.exports = { render: function(resume) { return '<html>...</html>' } }
+```
+The `render` function receives the full resume.json object and returns a self-contained HTML string (no external dependencies — CSS is inlined).
+
+### Integration Approach: Main Process Renders to HTML, Print Window Displays It
+
+This is the critical architectural decision. There are two approaches:
+
+**Approach A: Install theme as npm dependency (static, recommended for v1.1)**
+- Install one or more themes as direct npm dependencies (e.g., `npm install jsonresume-theme-even`)
+- In main process, `require()` the theme, call `theme.render(resumeJsonObject)`, get HTML string
+- Load that HTML string into the hidden BrowserWindow via `win.loadURL('data:text/html,...')` or via a registered protocol
+- Call `printToPDF()` as usual
+
+**Approach B: User-supplied theme file (dynamic, complex)**
+- User provides path to a theme's `index.js`
+- Main process `require()`s it dynamically
+- Security risk: arbitrary code execution; requires explicit user consent UX
+- Out of scope for v1.1
+
+**v1.1 uses Approach A.** One or two curated themes are bundled as npm dev dependencies.
+
+### Loading HTML String into BrowserWindow
+
+`win.loadURL('data:text/html,...')` has a size limit (~2MB URL). The safe approach for arbitrary HTML is a custom protocol or temp file:
+
+```typescript
+// export.ts — theme PDF flow
+const themeHtml = theme.render(buildResumeJsonObject(variantId))
+const tmpPath = path.join(app.getPath('temp'), `resume-theme-${Date.now()}.html`)
+await fs.writeFile(tmpPath, themeHtml, 'utf8')
+await win.loadURL(`file://${tmpPath}`)
+// wait for did-finish-load or a settle delay
+const pdf = await win.webContents.printToPDF({ ... })
+await fs.unlink(tmpPath)  // cleanup
+```
+
+This avoids the data: URL size limit and doesn't require a custom protocol registration.
+
+### Building the resume.json Object from App Data
+
+A new helper function in main process maps app DB data to the resume.json shape:
+
+```typescript
+// handlers/export.ts (or a new helpers/resumeJsonBuilder.ts)
+async function buildResumeJson(variantId: number): Promise<ResumeJson> {
+  const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
+  const builderData = await getBuilderDataForVariant(variantId)  // existing function, extended
+  return {
+    basics: {
+      name: profileRow?.name,
+      email: profileRow?.email,
+      phone: profileRow?.phone,
+      location: { address: profileRow?.location },
+      profiles: profileRow?.linkedin
+        ? [{ network: 'LinkedIn', url: profileRow.linkedin }]
+        : [],
+    },
+    work: builderData.jobs
+      .filter(j => !j.excluded)
+      .map(j => ({
+        name: j.company,
+        position: j.role,
+        startDate: j.startDate,
+        endDate: j.endDate ?? undefined,
+        highlights: j.bullets.filter(b => !b.excluded).map(b => b.text),
+      })),
+    skills: builderData.skills
+      .filter(s => !s.excluded)
+      .map(s => ({ name: s.name, keywords: s.tags })),
+    projects: (builderData.projects ?? [])
+      .filter(p => !p.excluded)
+      .map(p => ({
+        name: p.name,
+        description: p.description ?? undefined,
+        url: p.url ?? undefined,
+        highlights: p.bullets.filter(b => !b.excluded).map(b => b.text),
+      })),
+  }
+}
+```
+
+### New vs Modified
+
+| Layer | Change Type | What |
+|-------|-------------|------|
+| `package.json` | MODIFIED | Add theme package(s) as dependencies (e.g., `jsonresume-theme-even`) |
+| `handlers/export.ts` | MODIFIED | Add `export:pdf:theme` handler variant or extend `export:pdf` with `layoutTemplate` check |
+| `helpers/resumeJsonBuilder.ts` (or inline) | NEW | `buildResumeJson(variantId)` function |
+| `preload/index.ts` | MODIFIED | If a new IPC channel is added for theme export |
+| `VariantEditor.tsx` | MODIFIED | Show theme layout option when `variant.layoutTemplate` is a theme name |
+| `VariantPreview.tsx` | MODIFIED | For theme layouts, call `window.api.templates.renderTheme(variantId)` and display returned HTML in an iframe or dangerouslySetInnerHTML |
+
+### Theme Preview in Renderer
+
+For live preview of a theme layout, the renderer needs to display the rendered HTML. Options:
+
+- **`<iframe srcDoc={html}>`** — sandboxed, safe, works with self-contained theme HTML. Preferred.
+- **`dangerouslySetInnerHTML`** — risks style bleed into app CSS. Avoid.
+
+The renderer calls a new IPC channel that returns the HTML string:
+```
+window.api.templates.renderThemePreview(variantId, themeName)
+→ main: buildResumeJson(variantId) → theme.render(json) → return htmlString
+→ renderer: <iframe srcDoc={htmlString} />
+```
+
+### Template Selection Plumbing
+
+The existing `templateVariants.layoutTemplate` TEXT column (currently `'traditional'`) already holds a layout identifier. Theme names map to this column:
+
+| `layoutTemplate` value | Renders with |
+|------------------------|-------------|
+| `'traditional'` | `ProfessionalLayout` (existing React component) |
+| `'even'` | `jsonresume-theme-even` npm package |
+| `'stackoverflow'` | `jsonresume-theme-stackoverflow` npm package |
+
+No schema change needed. The column already exists. The export and preview handlers switch on this value.
+
+---
+
+## Feature 4: Tag Autocomplete
+
+### Current State
+
+`TagInput.tsx` is a fully self-contained component with no external data. It manages its own `inputValue` state and fires `onChange(tags[])` on commit. It already exposes `onInputChange?: (value: string) => void` as a callback hook — this was clearly designed for future autocomplete integration.
+
+### Integration Point: Pure Renderer, No New IPC
+
+Tag autocomplete does not require a new IPC channel. All existing tags are already available in the renderer:
+- `SkillList` already fetches all skills via `window.api.skills.list()` on mount
+- Each skill has a `tags: string[]` property
+- Flattening and deduplicating these gives the complete tag corpus
+
+The autocomplete data comes from the parent component (SkillList/SkillAddForm), not from a new backend call.
+
+### New vs Modified
+
+| Layer | Change Type | What |
+|-------|-------------|------|
+| `TagInput.tsx` | MODIFIED | Add `suggestions?: string[]` prop; render dropdown when `inputValue.length > 0 && filteredSuggestions.length > 0` |
+| `SkillList.tsx` | MODIFIED | Derive `allTags: string[]` from loaded skills; pass to `SkillAddForm` and `SkillItem` |
+| `SkillAddForm.tsx` | MODIFIED | Accept `suggestions?: string[]` prop; forward to `TagInput` |
+| `SkillItem.tsx` | MODIFIED | Accept `suggestions?: string[]` prop; forward to `TagInput` |
+
+### TagInput Autocomplete Contract
+
+```typescript
+// TagInput.tsx — extended props
+interface TagInputProps {
+  tags: string[]
+  onChange: (tags: string[]) => void
+  onInputChange?: (value: string) => void
+  suggestions?: string[]      // NEW: all known tags from parent
+  className?: string
+}
+```
+
+Internal state additions:
+- `filteredSuggestions`: `suggestions.filter(s => s.toLowerCase().startsWith(inputValue.toLowerCase()) && !tags.includes(s))`
+- `showDropdown`: `inputValue.length > 0 && filteredSuggestions.length > 0`
+- `activeIndex`: for keyboard navigation (ArrowUp/ArrowDown/Enter selects)
+
+Selecting a suggestion calls the existing `addTag(suggestion)` function — no other logic changes.
+
+### Dropdown Positioning
+
+The dropdown must render below the input and above the container boundary. Since `TagInput` is used inside `SkillItem` rows in a scrollable list, use `position: absolute` with `z-index` rather than a portal. The parent container (`.flex.flex-wrap`) becomes `position: relative`.
+
+### Keyboard Flow
+
+- ArrowDown: move `activeIndex` down (wraps)
+- ArrowUp: move `activeIndex` up (wraps)
+- Enter (when dropdown visible): select `filteredSuggestions[activeIndex]`
+- Escape: close dropdown, keep input value
+- Tab: select top suggestion and commit (improves keyboard-only UX)
+
+The existing `handleKeyDown` in `TagInput` is the right place to add these cases.
+
+### Data Flow: Where Tags Come From
+
+```
+SkillList mounts
+    |
+    v
+window.api.skills.list() → skills: Skill[]
+    |
+    v
+allTags = [...new Set(skills.flatMap(s => s.tags))].sort()
+    |
+    v
+<SkillAddForm suggestions={allTags} ... />
+<SkillItem suggestions={allTags} ... />  ← for each skill in list
+    |
+    v
+TagInput receives suggestions, filters on inputValue
+```
+
+No additional IPC calls. The tag corpus is derived from data already loaded.
+
+---
+
+## Cross-Feature: BuilderData Type Extension
+
+All four features converge on `BuilderData`. The existing type must be extended:
+
+```typescript
+// preload/index.d.ts — additions
+
+export interface ProjectBullet {
+  id: number
+  projectId: number
+  text: string
+  sortOrder: number
 }
 
-// handlers/index.ts
-import { registerExperienceHandlers } from './experience'
-import { registerTemplateHandlers } from './templates'
-import { registerSubmissionHandlers } from './submissions'
-import { registerExportHandlers } from './export'
+export interface ProjectWithBullets {
+  id: number
+  name: string
+  description: string | null
+  startDate: string | null
+  endDate: string | null
+  url: string | null
+  createdAt: Date
+  bullets: ProjectBullet[]
+}
 
-export function registerAllHandlers(): void {
-  registerExperienceHandlers()
-  registerTemplateHandlers()
-  registerSubmissionHandlers()
-  registerExportHandlers()
+export interface BuilderProjectBullet {
+  id: number
+  text: string
+  sortOrder: number
+  excluded: boolean
+}
+
+export interface BuilderProject {
+  id: number
+  name: string
+  description: string | null
+  startDate: string | null
+  endDate: string | null
+  url: string | null
+  excluded: boolean
+  bullets: BuilderProjectBullet[]
+}
+
+// MODIFIED — add projects field
+export interface BuilderData {
+  jobs: BuilderJob[]
+  skills: BuilderSkill[]
+  projects: BuilderProject[]   // NEW
+}
+
+// MODIFIED — add projects field to frozen snapshot
+export interface SubmissionSnapshot {
+  layoutTemplate: string
+  jobs: BuilderJob[]
+  skills: BuilderSkill[]
+  projects: BuilderProject[]   // NEW (optional for backward compat with v1.0 snapshots)
 }
 ```
 
-### Pattern 4: AI Matching Runs in Main Process, Returns Item IDs Only
-
-**What:** `AIMatchService` receives a raw job description string and returns an ordered array of `experienceItemId` values with confidence scores. It never returns generated text. The renderer displays the ranked items from the existing database; the user toggles them into a variant.
-
-**When to use:** When the user invokes the AI-assist flow from the Template Builder.
-
-**Trade-offs:** Keeping AI in the main process avoids exposing API keys in the renderer. Returning IDs rather than text keeps the contract simple and enforces the "AI never writes" boundary at the architectural level, not just by convention.
+`SubmissionSnapshot` should treat `projects` as optional (`projects?: BuilderProject[]`) so existing v1.0 snapshots (which have no projects key) remain renderable in `SnapshotViewer`.
 
 ---
 
-## Data Flow
+## Recommended Build Order
 
-### Core Request Flow (IPC invoke/handle pattern)
-
-```
-User action in React component
-    |
-    v
-hook: useExperience() / useTemplates() / useSubmissions()
-    |  calls window.api.experience.list()
-    v
-Preload bridge (window.api)
-    |  contextBridge serializes call to IPC channel 'experience:list'
-    v
-Main process: ipcMain.handle('experience:list', ...)
-    |  handler delegates to ExperienceService.list()
-    v
-ExperienceService
-    |  drizzle query → db.select().from(experienceItems)
-    v
-better-sqlite3 → app.db (SQLite file in userData)
-    |  returns rows
-    v
-Result serialized back through IPC
-    |
-    v
-React component re-renders with data
-```
-
-### Resume Submission Flow (creates snapshot)
+Dependencies determine order. Each feature depends on what comes before it.
 
 ```
-User: "Log this submission"
-    |
-    v
-SubmissionBoard component collects: company, role, variant ID
-    |
-    v
-window.api.submissions.create({ variantId, company, role, ... })
-    |
-    v
-SubmissionService.create()
-    |
-    ├── TemplateService.buildSnapshot(variantId)
-    │       → reads variant + all included items in order
-    │       → serializes to JSON string
-    │
-    └── db.insert(submissions).values({ ..., resumeSnapshot })
-    |
-    v
-Returns new submission row (without snapshot — just metadata)
-```
+Step 1: Projects schema + handlers + basic UI
+  - Add projects + projectBullets tables to schema.ts and ensureSchema()
+  - Add projectId column to templateVariantItems
+  - handlers/projects.ts, handlers/projectBullets.ts
+  - Extend getBuilderData and setItemExcluded in templates.ts
+  - ProjectList, ProjectItem, ProjectAddForm components
+  - ExperienceTab: add Projects section
+  - BuilderData type extended
 
-### AI Match Flow
+  RATIONALE: Projects must exist in DB before any other feature can reference them.
+  Tag autocomplete needs skills only (independent), but themes and import both
+  benefit from projects being ready.
 
-```
-User pastes job description → clicks "Find Matching Experience"
-    |
-    v
-window.api.ai.matchExperience({ jobDescription })
-    |
-    v
-AIMatchService.match(jobDescription)
-    |
-    ├── ExperienceService.listAll()  — fetch all experience items
-    ├── Build prompt (items as structured text + job description)
-    ├── Call AI provider (OpenAI / local model via ollama)
-    └── Parse response → return [{ id, score, reason }]
-    |
-    v
-Renderer receives ranked IDs → highlights items in Template Builder
-User clicks to include/exclude — no AI text ever stored
-```
+Step 2: Tag autocomplete
+  - TagInput.tsx: add suggestions prop + dropdown render
+  - SkillList.tsx: derive allTags, pass down
+  - SkillAddForm.tsx, SkillItem.tsx: forward suggestions
 
-### Export Flow
+  RATIONALE: Pure renderer change. No IPC, no schema. Can be done at any point
+  but placed early because it's low-risk and high-visibility UX polish.
 
-```
-User: "Export as PDF" (from template builder or submission view)
-    |
-    v
-window.api.export.pdf({ variantId }) OR
-window.api.export.pdf({ snapshotJson })  — for historical submissions
-    |
-    v
-ExportService.toPDF()
-    |
-    ├── Resolve content: live variant data OR pre-stored snapshot JSON
-    ├── Render HTML template with experience items injected
-    └── Puppeteer / html-pdf → write file to Downloads or user-chosen path
-    |
-    v
-Return: { filePath }  → renderer opens system file dialog or shows success
+Step 3: ProfessionalLayout + VariantBuilder + PrintApp: projects support
+  - ProfessionalLayout.tsx: add Projects section
+  - VariantBuilder.tsx: add Projects section
+  - PrintApp.tsx: pass projects to ProfessionalLayout
+  - export.ts DOCX: add Projects section to DOCX builder
+
+  RATIONALE: Depends on Step 1 (projects in BuilderData). Must complete before
+  any export (PDF/DOCX) correctly reflects projects.
+
+Step 4: resume.json import
+  - handlers/import.ts: dialog, parse, transaction write
+  - preload bridge: importFile namespace
+  - UI: import button in ExperienceTab
+
+  RATIONALE: Depends on Step 1 (projects table exists to receive imported projects).
+  Import writes to existing tables — no new schema needed beyond Step 1.
+
+Step 5: resume.json theme rendering
+  - npm install chosen theme(s)
+  - helpers/resumeJsonBuilder.ts: buildResumeJson()
+  - export.ts: theme PDF export path (tmp file → BrowserWindow → printToPDF)
+  - VariantPreview.tsx: iframe preview for theme layouts
+  - VariantEditor.tsx: layout selector to set variant.layoutTemplate
+
+  RATIONALE: Depends on Steps 1 and 3 (projects must be in BuilderData for
+  accurate theme rendering). Most complex feature — placed last.
 ```
 
 ---
 
-## Schema Design: Full Picture
-
-The database has five core domains. Order reflects foreign key dependencies:
+## Component Diagram: v1.1 State
 
 ```
-1. experience_items          — raw, user-authored facts (jobs, skills, projects, education)
-2. template_variants         — named resume configurations
-3. template_variant_items    — which experience_items are in each variant (join + order)
-4. submissions               — one logged application per row
-   → references template_variants (soft link — variant can change post-submission)
-   → stores resume_snapshot (hard copy — preserves what was actually sent)
-5. ai_match_sessions         — optional: log of match runs for UX continuity
-                               (user can reopen last AI session without re-pasting JD)
-```
+App.tsx
+  ExperienceTab.tsx
+    ProfileSettings.tsx         (unchanged)
+    JobList.tsx                 (unchanged)
+    ProjectList.tsx             [NEW]
+      ProjectItem.tsx           [NEW]
+      ProjectAddForm.tsx        [NEW]
+        BulletList.tsx          (unchanged — reused)
+    SkillList.tsx               [MODIFIED — derives allTags]
+      SkillItem.tsx             [MODIFIED — forwards suggestions]
+        TagInput.tsx            [MODIFIED — autocomplete dropdown]
+      SkillAddForm.tsx          [MODIFIED — forwards suggestions]
+        TagInput.tsx            [MODIFIED]
 
-Key constraints:
-- `experience_items` content is **never auto-modified by AI**. The `updatedAt` timestamp is only set by user edits.
-- Deleting an `experience_item` must be a soft delete (`deletedAt`) because historical snapshots reference items by content, not ID — but the UI should warn if the item appears in active variants.
-- `submissions.status` is an enum column. State transitions are enforced in `SubmissionService`, not in the database constraint, for cleaner error messages.
+  TemplatesTab.tsx
+    VariantEditor.tsx           [MODIFIED — layout selector for theme]
+      VariantBuilder.tsx        [MODIFIED — projects section]
+      VariantPreview.tsx        [MODIFIED — iframe for theme layouts]
+        ProfessionalLayout.tsx  [MODIFIED — projects section]
 
----
+  SubmissionsTab.tsx            (unchanged)
+    SnapshotViewer.tsx          (unchanged — projects: optional in snapshot)
 
-## Build Order (Dependency Graph)
-
-Features must be built in dependency order to avoid rework:
-
-```
-Phase 1: Database schema + Experience Library
-  → schema.ts with all tables (design now, migrate incrementally)
-  → ExperienceService + experience handlers
-  → Experience Library UI (CRUD for jobs, skills, projects, education)
-  RATIONALE: Everything else reads from experience_items. Must exist first.
-
-Phase 2: Template Variants + Builder UI
-  → TemplateService + template handlers
-  → Template Builder UI (select/order experience items, preview)
-  RATIONALE: Templates compose from Phase 1 data. No submissions without templates.
-
-Phase 3: Submission Tracking
-  → SubmissionService (with snapshot logic) + submission handlers
-  → Submission Board UI (pipeline kanban/list, status transitions)
-  RATIONALE: Snapshots require both experience items AND template variants to exist.
-
-Phase 4: Export (PDF + DOCX)
-  → ExportService
-  → Export triggers in Template Builder and Submission Board
-  RATIONALE: Export reads from templates/snapshots — safe to add after Phase 3.
-
-Phase 5: AI Matching
-  → AIMatchService + ai handlers
-  → AI match UX in Template Builder
-  RATIONALE: Augments Phase 2; no blocking dependencies, safe to build last.
-  NOTE: Requires API key management (store in electron-store, not in db).
+PrintApp.tsx                    [MODIFIED — pass projects]
+  ProfessionalLayout.tsx        [MODIFIED]
 ```
 
 ---
 
-## Anti-Patterns
+## Anti-Patterns to Avoid in v1.1
 
-### Anti-Pattern 1: Database Access in the Renderer
+### Anti-Pattern 1: Fetching Tag Corpus via New IPC Channel
 
-**What people do:** Import `db` or call Drizzle directly from React components by putting the DB in the renderer bundle.
+**What people do:** Add a `tags:list` IPC channel that queries all unique tags from the DB.
 
-**Why it's wrong:** better-sqlite3 is a native Node module — it cannot run in the Chromium renderer context. Attempts will fail at runtime or bundle time. Architectural separation also matters: renderer should not own persistence concerns.
+**Why it's wrong:** The renderer already has all skills loaded. A round trip to main for data the renderer already holds adds latency and complexity.
 
-**Do this instead:** All database access lives in `src/main/services/`. Renderer calls `window.api.*` channels and receives plain serialized data.
+**Do this instead:** Derive `allTags` from the already-loaded `skills` array in `SkillList`. Pass as a prop.
 
-### Anti-Pattern 2: Monolithic IPC Registration in main/index.ts
+### Anti-Pattern 2: Using dangerouslySetInnerHTML for Theme Preview
 
-**What people do:** Add every `ipcMain.handle()` call directly inside `main/index.ts` as features grow.
+**What people do:** Render the theme HTML string directly into the React component tree.
 
-**Why it's wrong:** A single file with 50+ handlers is unnavigable. Related handlers (create, update, delete for one domain) get separated by unrelated code. Testing individual handlers requires importing everything.
+**Why it's wrong:** Theme CSS bleeds into the app's dark UI. Theme JavaScript (if any) executes in the app's context. Theme IDs/classes collide with Tailwind.
 
-**Do this instead:** Feature-grouped handler files under `handlers/`, registered with one `registerAllHandlers()` call. Each handler file imports only its own service.
+**Do this instead:** Render in an `<iframe srcDoc={html}>`. The iframe creates a separate browsing context with its own CSS scope.
 
-### Anti-Pattern 3: Storing AI-Generated Text as Experience Item Content
+### Anti-Pattern 3: Blocking the Main Thread During Import
 
-**What people do:** When AI suggests a rephrased bullet point, save it over the user's original content.
+**What people do:** Parse and insert resume.json synchronously in the IPC handler without `await`.
 
-**Why it's wrong:** This is the core complaint that motivated the project. AI exaggerates. Once AI text is stored, users lose track of what they actually authored. Audit trail is broken.
+**Why it's wrong:** better-sqlite3 IS synchronous, but the IPC handler still runs on the main thread. For large imports (50+ jobs, 200+ bullets), this freezes the UI briefly. More importantly, a missing `transaction()` wrapper means partial imports if any insert fails midway.
 
-**Do this instead:** AI returns experience item IDs and relevance scores only. `AIMatchService` output type must be `{ id: number; score: number; reason: string }[]` — no text field. Enforcing this at the type level makes the constraint impossible to accidentally violate.
+**Do this instead:** Wrap all import inserts in a `db.transaction()`. Even though better-sqlite3 transactions are synchronous, they are atomic — a failure rolls back all inserts, leaving the DB clean.
 
-### Anti-Pattern 4: Mutable Live Snapshots for Historical Submissions
+### Anti-Pattern 4: ALTER TABLE Without Error Handling
 
-**What people do:** Store only a foreign key `template_variant_id` on the submission row, then render the resume from the current live variant when viewing history.
+**What people do:** Call `ALTER TABLE template_variant_items ADD COLUMN project_id INTEGER` in `ensureSchema()` without protecting against "column already exists".
 
-**Why it's wrong:** If the user edits the variant after submitting (which they will — tweaking for the next job), the displayed "what was sent" view no longer matches reality. This destroys the core value proposition of submission tracking.
+**Why it's wrong:** SQLite throws `table X already has column Y` if the column exists. On any app start after first migration, this crashes `ensureSchema()`.
 
-**Do this instead:** `SubmissionService.create()` always calls `TemplateService.buildSnapshot()` and stores the serialized JSON on the submission row before inserting. The variant FK is kept as a soft reference for UX (show variant name), but rendering always uses the snapshot.
+**Do this instead:** Wrap the ALTER TABLE in a try/catch, or check `PRAGMA table_info(template_variant_items)` first and skip if the column exists.
 
-### Anti-Pattern 5: IPC Channel Names as Magic Strings in Both Processes
+```typescript
+// Safe ALTER TABLE pattern
+try {
+  sqlite.exec(`ALTER TABLE template_variant_items ADD COLUMN project_id INTEGER
+    REFERENCES projects(id) ON DELETE CASCADE`)
+} catch {
+  // Column already exists — normal on subsequent starts
+}
+```
 
-**What people do:** Hardcode `'experience:list'` in both the handler file and the preload bridge separately.
+### Anti-Pattern 5: Duplicating getBuilderDataForVariant
 
-**Why it's wrong:** Renaming a channel requires finding both occurrences. TypeScript will not catch mismatches between the two processes.
+**What people do:** Copy the function from `templates.ts` into `export.ts` and maintain two separate implementations.
 
-**Do this instead:** Define channel name constants in `src/shared/types.ts` (or `preload/api.ts` if only two processes need them). Both the handler registration and the preload bridge import the same constant.
+**Why it's wrong:** v1.0 already has this duplication — `getBuilderDataForVariant` is defined in both `handlers/export.ts` and `handlers/templates.ts` with identical logic. When projects are added, both copies must be updated, and the second one will be missed.
 
----
-
-## Integration Points
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| Renderer ↔ Main | IPC `invoke`/`handle` (async request-response) | Use `invoke` everywhere — never one-way `send` for data requests |
-| Main ↔ Database | Drizzle ORM synchronous calls (better-sqlite3 is sync) | Synchronous is fine for desktop; no connection pooling needed |
-| TemplateService ↔ SubmissionService | Direct function call within main process | SubmissionService calls `TemplateService.buildSnapshot()` — not via IPC |
-| AIMatchService ↔ ExperienceService | Direct function call | AI service reads experience; never writes |
-| ExportService ↔ TemplateService | Direct function call | Export reads snapshot or live variant |
-
-### External Services
-
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| OpenAI API (or compatible) | HTTPS from main process via `node-fetch` or `openai` SDK | API key stored in `electron-store` (encrypted, userData path), never in db or renderer |
-| PDF generation (Puppeteer or html-pdf) | Node.js only, invoked in main process ExportService | Puppeteer bundles Chromium — large install size; `html-pdf` uses system print, smaller but less reliable on Windows |
-| DOCX generation (docx npm package) | Pure Node.js, main process | `docx` library is pure JS, no native deps — straightforward to bundle |
-| Local AI (Ollama) | HTTP to localhost from main process | Optional alternative to cloud AI; same AIMatchService contract, different provider |
+**Do this instead:** Extract `getBuilderDataForVariant` to a shared helper file (e.g., `main/helpers/builderData.ts`) and import it in both handlers. This is the correct fix for the existing v1.0 duplication too.
 
 ---
 
-## Scaling Considerations
+## Integration Points Summary
 
-This is a single-user desktop app. Scaling in the conventional sense does not apply. Relevant considerations:
-
-| Concern | Reality | Approach |
-|---------|---------|----------|
-| Experience item count | 50-200 items (one developer's career) | SQLite in-process handles this trivially; no query optimization needed |
-| Submission history | 100-500 submissions over a job search | Same — trivial for SQLite |
-| Snapshot storage size | ~5-20KB JSON per submission | Negligible; even 1000 submissions = ~20MB total |
-| Export speed | PDF via Puppeteer: 1-3 seconds | Acceptable for single-user; show a loading indicator |
-| AI response latency | 1-10 seconds depending on provider | Long-running IPC; use `invoke` with a loading state in renderer; do NOT block the main thread with synchronous AI calls |
-
-The only non-trivial performance concern is Puppeteer startup time for PDF export. Mitigation: keep the Puppeteer browser instance alive (singleton) for the app session rather than launching per export.
+| Feature | New IPC Channels | Modified IPC Channels | New DB Tables | Modified DB Tables | New Components | Modified Components |
+|---------|-----------------|----------------------|---------------|-------------------|----------------|---------------------|
+| Projects CRUD | `projects:*`, `projectBullets:*` | `templates:getBuilderData`, `templates:setItemExcluded`, `export:docx` | `projects`, `projectBullets` | `templateVariantItems` (+projectId col) | `ProjectList`, `ProjectItem`, `ProjectAddForm` | `ExperienceTab`, `VariantBuilder`, `ProfessionalLayout`, `PrintApp` |
+| resume.json import | `import:resumeJson` | — | — | — | import button in ExperienceTab | `ExperienceTab` |
+| Theme rendering | `templates:renderThemePreview` | `export:pdf` (theme path) | — | — | — | `VariantEditor`, `VariantPreview` |
+| Tag autocomplete | — | — | — | — | — | `TagInput`, `SkillList`, `SkillItem`, `SkillAddForm` |
 
 ---
 
 ## Sources
 
-- Existing codebase: `src/main/db/`, `src/main/index.ts`, `src/preload/index.ts` (confirmed structure)
-- [Electron IPC Response/Request Architecture with TypeScript — LogRocket](https://blog.logrocket.com/electron-ipc-response-request-architecture-with-typescript/) — handler class pattern (MEDIUM confidence — adapted to function pattern for simplicity)
-- [Type-safe IPC in Electron — heckmann.app](https://heckmann.app/en/blog/electron-ipc-architecture/) — typed channel constants pattern
-- [Inter-Process Communication — Electron Official Docs](https://www.electronjs.org/docs/latest/tutorial/ipc) — invoke/handle vs send/on distinction (HIGH confidence)
-- [Drizzle ORM Schema Documentation](https://orm.drizzle.team/docs/sql-schema-declaration) — schema-first approach, foreign keys (HIGH confidence)
-- [Designing a Database for a Recruitment System — Red Gate](https://www.red-gate.com/blog/designing-a-database-for-a-recruitment-system/) — domain modeling reference for application tracking (MEDIUM confidence — adapted for personal-use vs enterprise scope)
-- SQLite snapshot semantics: schema design for immutable historical records is a well-established pattern; no single definitive source needed
+- Existing codebase (confirmed via inspection): `src/main/db/schema.ts`, `src/main/db/index.ts`, `src/main/handlers/*.ts`, `src/preload/index.ts`, `src/preload/index.d.ts`, all renderer components
+- [JSON Resume schema — docs.jsonresume.org](https://docs.jsonresume.org/schema) — projects section structure (HIGH confidence)
+- [JSON Resume theme development contract — jsonresume.org](https://jsonresume.org/theme-development) — render function signature confirmed: `module.exports = { render(resume) { return htmlString } }` (HIGH confidence)
+- [jsonresume-theme-boilerplate — GitHub](https://github.com/jsonresume/jsonresume-theme-boilerplate) — export shape confirmation (HIGH confidence)
+- better-sqlite3 transaction docs — synchronous transaction wrapper confirmed (HIGH confidence, from existing code patterns in codebase)
 
 ---
 
-*Architecture research for: ResumeHelper (Electron + React + Drizzle ORM + SQLite)*
-*Researched: 2026-03-13*
+*Architecture research for: ResumeHelper v1.1 integration (projects, import, themes, tag autocomplete)*
+*Researched: 2026-03-14*
