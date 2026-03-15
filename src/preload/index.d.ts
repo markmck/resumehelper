@@ -68,6 +68,23 @@ export interface SubmissionSnapshot {
   skills: BuilderSkill[]
 }
 
+export interface Project {
+  id: number
+  name: string
+  sortOrder: number
+}
+
+export interface ProjectBullet {
+  id: number
+  projectId: number
+  text: string
+  sortOrder: number
+}
+
+export interface ProjectWithBullets extends Project {
+  bullets: ProjectBullet[]
+}
+
 export interface Profile {
   id: number
   name: string
@@ -166,6 +183,18 @@ export interface Api {
   exportFile: {
     pdf: (variantId: number, defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string }>
     docx: (variantId: number, defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string }>
+  }
+  projects: {
+    list: () => Promise<ProjectWithBullets[]>
+    create: (data: { name: string }) => Promise<Project>
+    update: (id: number, data: { name?: string }) => Promise<Project>
+    delete: (id: number) => Promise<void>
+  }
+  projectBullets: {
+    create: (data: { projectId: number; text: string; sortOrder: number }) => Promise<ProjectBullet>
+    update: (id: number, data: { text?: string }) => Promise<ProjectBullet>
+    delete: (id: number) => Promise<void>
+    reorder: (projectId: number, orderedIds: number[]) => Promise<void>
   }
 }
 

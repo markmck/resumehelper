@@ -82,6 +82,20 @@ function ensureSchema(): void {
       \`linkedin\` text NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS \`projects\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`name\` text NOT NULL,
+      \`sort_order\` integer DEFAULT 0 NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS \`project_bullets\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`project_id\` integer NOT NULL,
+      \`text\` text NOT NULL,
+      \`sort_order\` integer DEFAULT 0 NOT NULL,
+      FOREIGN KEY (\`project_id\`) REFERENCES \`projects\`(\`id\`) ON DELETE cascade
+    );
+
     INSERT OR IGNORE INTO \`profile\` (\`id\`) VALUES (1);
   `)
 

@@ -35,6 +35,21 @@ export const templateVariants = sqliteTable('template_variants', {
     .$defaultFn(() => new Date()),
 })
 
+export const projects = sqliteTable('projects', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+})
+
+export const projectBullets = sqliteTable('project_bullets', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id')
+    .notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  text: text('text').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+})
+
 export const templateVariantItems = sqliteTable('template_variant_items', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   variantId: integer('variant_id')
@@ -44,6 +59,8 @@ export const templateVariantItems = sqliteTable('template_variant_items', {
   bulletId: integer('bullet_id').references(() => jobBullets.id, { onDelete: 'cascade' }),
   skillId: integer('skill_id').references(() => skills.id, { onDelete: 'cascade' }),
   jobId: integer('job_id').references(() => jobs.id, { onDelete: 'cascade' }),
+  projectId: integer('project_id').references(() => projects.id, { onDelete: 'cascade' }),
+  projectBulletId: integer('project_bullet_id').references(() => projectBullets.id, { onDelete: 'cascade' }),
   excluded: integer('excluded', { mode: 'boolean' }).notNull().default(false),
 })
 

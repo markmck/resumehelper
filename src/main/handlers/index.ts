@@ -5,6 +5,7 @@ import { registerTemplateHandlers } from './templates'
 import { registerSubmissionHandlers } from './submissions'
 import { registerProfileHandlers } from './profile'
 import { registerExportHandlers } from './export'
+import { registerProjectHandlers } from './projects'
 
 export function registerAllHandlers(): void {
   registerJobHandlers()
@@ -14,4 +15,5 @@ export function registerAllHandlers(): void {
   registerSubmissionHandlers()
   registerProfileHandlers()
   registerExportHandlers()
+  registerProjectHandlers()
 }

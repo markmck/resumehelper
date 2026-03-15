@@ -83,6 +83,20 @@ const api = {
     docx: (variantId: number, defaultFilename: string) =>
       ipcRenderer.invoke('export:docx', variantId, defaultFilename),
   },
+  projects: {
+    list: () => ipcRenderer.invoke('projects:list'),
+    create: (data: { name: string }) => ipcRenderer.invoke('projects:create', data),
+    update: (id: number, data: { name?: string }) => ipcRenderer.invoke('projects:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('projects:delete', id),
+  },
+  projectBullets: {
+    create: (data: { projectId: number; text: string; sortOrder: number }) =>
+      ipcRenderer.invoke('projectBullets:create', data),
+    update: (id: number, data: { text?: string }) => ipcRenderer.invoke('projectBullets:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('projectBullets:delete', id),
+    reorder: (projectId: number, orderedIds: number[]) =>
+      ipcRenderer.invoke('projectBullets:reorder', projectId, orderedIds),
+  },
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to
