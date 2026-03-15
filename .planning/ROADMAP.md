@@ -1,23 +1,14 @@
 # Roadmap: ResumeHelper
 
-## Overview
+## Milestones
 
-Build a local-first Electron desktop app for managing structured resume content. The work follows strict dependency ordering: the experience database is the root of everything — templates reference it, submissions snapshot it, and exports render from it. Four phases deliver a complete v1: a populated experience library, named template variants for quick tailoring, a submission log for pipeline visibility, and PDF/DOCX export to actually apply.
+- ✅ **v1.0 MVP** - Phases 1-4 (shipped 2026-03-14)
+- 🚧 **v1.1 Enhancements** - Phases 5-7 (in progress)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
-
-- [x] **Phase 1: Foundation** - Database schema + Experience Library CRUD (completed 2026-03-14)
-- [x] **Phase 2: Template Variants** - Named resume variants with experience item toggling (completed 2026-03-14)
-- [x] **Phase 3: Submissions** - Submission log with pipeline tracking (completed 2026-03-14)
-- [x] **Phase 4: Export** - PDF and DOCX export from variants and snapshots (completed 2026-03-14)
-
-## Phase Details
+<details>
+<summary>✅ v1.0 MVP (Phases 1-4) - SHIPPED 2026-03-14</summary>
 
 ### Phase 1: Foundation
 **Goal**: Users can store and manage all professional experience in a structured local database, and the Electron IPC + Drizzle infrastructure is established correctly for all subsequent phases
@@ -31,9 +22,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 01-01-PLAN.md — Database schema (all 5 tables), Drizzle migration runner, IPC handlers, preload bridge
+- [x] 01-01-PLAN.md — Database schema (all 5 tables), Drizzle migration runner, IPC handlers, preload bridge
 - [x] 01-02-PLAN.md — App shell, dark theme, Work History CRUD UI with inline editing and bullet drag-reorder
-- [ ] 01-03-PLAN.md — Skills CRUD UI with freeform tag input and tag-grouped display
+- [x] 01-03-PLAN.md — Skills CRUD UI with freeform tag input and tag-grouped display
 
 ### Phase 2: Template Variants
 **Goal**: Users can create named resume variants that compose experience items from the database, and quickly customize a variant for a specific job application
@@ -47,8 +38,8 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 02-01-PLAN.md — Schema migration (discriminator model + layoutTemplate), IPC handlers, preload bridge
-- [ ] 02-02-PLAN.md — Template Builder UI: tab routing, sidebar, builder with checkboxes, resume preview
+- [x] 02-01-PLAN.md — Schema migration (discriminator model + layoutTemplate), IPC handlers, preload bridge
+- [x] 02-02-PLAN.md — Template Builder UI: tab routing, sidebar, builder with checkboxes, resume preview
 
 ### Phase 3: Submissions
 **Goal**: Users can log every job application with a frozen snapshot of the exact resume sent, and view all submissions in a scannable list with inline editing and snapshot viewing
@@ -60,8 +51,8 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 03-01-PLAN.md — Schema migration (url + notes columns), IPC handlers with snapshot capture, preload bridge
-- [ ] 03-02-PLAN.md — Submissions tab UI: add form, table with inline editing, frozen snapshot viewer modal
+- [x] 03-01-PLAN.md — Schema migration (url + notes columns), IPC handlers with snapshot capture, preload bridge
+- [x] 03-02-PLAN.md — Submissions tab UI: add form, table with inline editing, frozen snapshot viewer modal
 
 ### Phase 4: Export
 **Goal**: Users can export any template variant as a properly formatted PDF or DOCX file ready to submit to employers
@@ -73,17 +64,69 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 04-01-PLAN.md — Profile table, ProfessionalLayout component, UI refactor (replace 3 layouts with 1 polished layout)
-- [ ] 04-02-PLAN.md — PDF export via printToPDF, DOCX export via docx library, export buttons on Preview tab
+- [x] 04-01-PLAN.md — Profile table, ProfessionalLayout component, UI refactor (replace 3 layouts with 1 polished layout)
+- [x] 04-02-PLAN.md — PDF export via printToPDF, DOCX export via docx library, export buttons on Preview tab
+
+</details>
+
+### 🚧 v1.1 Enhancements (In Progress)
+
+**Milestone Goal:** Extend the experience database with projects, add tag autocomplete, support resume.json data import, and enable resume.json theme rendering for additional layout templates.
+
+#### Phase 5: Projects and Tag Autocomplete
+**Goal**: Users can manage projects in the Experience tab with toggleable bullets, and tag input fields suggest existing tags as they type
+**Depends on**: Phase 4
+**Requirements**: PROJ-01, PROJ-02, TAG-01
+**Success Criteria** (what must be TRUE):
+  1. User can add a project with a name and one or more bullet points, and the project appears in the Experience tab
+  2. User can edit a project's name and bullets, and delete a project
+  3. Tag input on skill entries shows a dropdown of existing tags as the user types, and clicking or pressing Enter on a suggestion inserts it
+**Plans**: 2 plans
+
+Plans:
+- [ ] 05-01: Projects schema, CRUD handlers, IPC bridge, and Experience tab UI (ProjectList/ProjectItem/ProjectAddForm)
+- [ ] 05-02: Tag autocomplete — extend TagInput with suggestions prop, portal dropdown, keyboard navigation
+
+#### Phase 6: Projects in Export Pipeline and resume.json Import
+**Goal**: Projects appear in template variants, resume preview, and all export formats; users can import existing resume data from a resume.json file
+**Depends on**: Phase 5
+**Requirements**: PROJ-03, PROJ-04, IMP-01, IMP-02
+**Success Criteria** (what must be TRUE):
+  1. User can toggle projects in or out of a template variant using the checkbox builder, and the selection persists
+  2. Projects section appears in the resume preview and in exported PDF and DOCX files when projects are included in the variant
+  3. User can import a resume.json file and see their existing jobs, skills, projects, and profile mapped into the app
+  4. Import shows a summary of what will be replaced and requires confirmation before overwriting existing data
+**Plans**: TBD
+
+Plans:
+- [ ] 06-01: Extend VariantBuilder, getBuilderDataForVariant (extract to shared helper), ProfessionalLayout, and DOCX builder with projects support
+- [ ] 06-02: resume.json import handler (dialog, schema validation, replace-with-confirmation transaction, result toast)
+
+#### Phase 7: resume.json Theme Rendering
+**Goal**: Users can select from bundled resume.json themes to preview and export their resume with alternative layouts
+**Depends on**: Phase 6
+**Requirements**: THM-01, THM-02, THM-03
+**Success Criteria** (what must be TRUE):
+  1. User can select a bundled theme (e.g., "Even", "Class") from a layout selector in the variant editor
+  2. The variant preview renders the selected theme's HTML layout inside an iframe in the Preview sub-tab
+  3. PDF export uses the selected theme's HTML rendering when a theme layout is active, producing a correctly formatted file
+**Plans**: TBD
+
+Plans:
+- [ ] 07-01: Install and configure jsonresume-theme-even and jsonresume-theme-class (asarUnpack, ESM/CJS verification), buildResumeJson() mapper, layout selector in VariantEditor
+- [ ] 07-02: Theme preview (iframe srcdoc), theme PDF export path (temp file + win.loadFile + printToPDF), packaged binary test
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Foundation | 3/3 | Complete    | 2026-03-14 |
-| 2. Template Variants | 2/2 | Complete    | 2026-03-14 |
-| 3. Submissions | 2/2 | Complete    | 2026-03-14 |
-| 4. Export | 2/2 | Complete   | 2026-03-14 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Foundation | v1.0 | 3/3 | Complete | 2026-03-14 |
+| 2. Template Variants | v1.0 | 2/2 | Complete | 2026-03-14 |
+| 3. Submissions | v1.0 | 2/2 | Complete | 2026-03-14 |
+| 4. Export | v1.0 | 2/2 | Complete | 2026-03-14 |
+| 5. Projects and Tag Autocomplete | v1.1 | 0/2 | Not started | - |
+| 6. Projects in Export Pipeline and Import | v1.1 | 0/2 | Not started | - |
+| 7. resume.json Theme Rendering | v1.1 | 0/2 | Not started | - |
