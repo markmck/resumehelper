@@ -99,6 +99,15 @@ function ensureSchema(): void {
     INSERT OR IGNORE INTO \`profile\` (\`id\`) VALUES (1);
   `)
 
+  // Add columns that may be missing on existing databases
+  const alterStatements = [
+    'ALTER TABLE `template_variant_items` ADD COLUMN `project_id` integer REFERENCES `projects`(`id`) ON DELETE cascade',
+    'ALTER TABLE `template_variant_items` ADD COLUMN `project_bullet_id` integer REFERENCES `project_bullets`(`id`) ON DELETE cascade',
+  ]
+  for (const sql of alterStatements) {
+    try { sqlite.exec(sql) } catch { /* column already exists */ }
+  }
+
   // Also run file-based migrations for any ALTER TABLE statements
   // that add columns to existing tables
   const migrationsFolder = app.isPackaged

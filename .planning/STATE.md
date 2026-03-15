@@ -1,65 +1,36 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: executing
-stopped_at: Completed 04-export/04-02-PLAN.md
-last_updated: "2026-03-14T22:46:09.650Z"
-last_activity: 2026-03-13 — Plans 01-01 and 01-02 complete; human verified Work History CRUD
+milestone: v1.1
+milestone_name: Enhancements
+status: planning
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-15T02:16:34.224Z"
+last_activity: 2026-03-14 — Roadmap created for v1.1 (phases 5-7)
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 9
-  completed_plans: 9
-  percent: 67
+  total_phases: 7
+  completed_phases: 5
+  total_plans: 11
+  completed_plans: 11
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-13)
+See: .planning/PROJECT.md (updated 2026-03-14)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 1 — Foundation
+**Current focus:** Milestone v1.1 — Phase 5: Projects and Tag Autocomplete
 
 ## Current Position
 
-Phase: 1 of 4 (Foundation)
-Plan: 3 of 3 in current phase (next: 01-03-PLAN.md — Skills CRUD UI)
-Status: In progress
-Last activity: 2026-03-13 — Plans 01-01 and 01-02 complete; human verified Work History CRUD
+Phase: 5 of 7 (Projects and Tag Autocomplete)
+Plan: 0 of 2 in current phase
+Status: Ready to plan
+Last activity: 2026-03-14 — Roadmap created for v1.1 (phases 5-7)
 
-Progress: [███████░░░] 67%
-
-## Performance Metrics
-
-**Velocity:**
-- Total plans completed: 0
-- Average duration: —
-- Total execution time: —
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| - | - | - | - |
-
-**Recent Trend:**
-- Last 5 plans: —
-- Trend: —
-
-*Updated after each plan completion*
-| Phase 01-foundation P01 | 3 | 2 tasks | 11 files |
-| Phase 01-foundation P02 | 3 | 2 tasks | 11 files |
-| Phase 01-foundation P03 | 10 | 2 tasks | 5 files |
-| Phase 02-template-variants P01 | 3 | 2 tasks | 8 files |
-| Phase 02-template-variants P02 | 5 | 1 tasks | 6 files |
-| Phase 02-template-variants P02 | 95 | 2 tasks | 17 files |
-| Phase 03-submissions P01 | 2m | 2 tasks | 7 files |
-| Phase 03-submissions P02 | 20 | 3 tasks | 4 files |
-| Phase 04-export P01 | 12 | 2 tasks | 14 files |
-| Phase 04-export P02 | 20 | 2 tasks | 8 files |
+Progress: [░░░░░░░░░░] 0%
 
 ## Accumulated Context
 
@@ -68,32 +39,17 @@ Progress: [███████░░░] 67%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [Phase 1]: Design all 5 schema tables upfront (experience_items, template_variants, template_variant_items, submissions, ai_match_sessions) — even if only experience_items is active in Phase 1. Retrofitting snapshot column or ID-reference pattern later is high-cost.
-- [Phase 1]: SQLite packaging must be set up correctly now: asarUnpack for better-sqlite3, userData path for DB file, migrate() called at app startup before any query.
-- [Phase 3]: Submissions store a frozen JSON snapshot of resume content at insert time (resume_snapshot TEXT NOT NULL). The live template variant must remain freely editable without corrupting historical submission records.
-- [Phase 4]: Use webContents.printToPDF() for PDF (no Puppeteer), use docx library code-first API for DOCX (not docxtemplater or HTML-to-DOCX converters).
-- [Phase 01-foundation]: Deleted placeholder users migration and regenerated schema from scratch — new project with no production data
-- [Phase 01-foundation]: skills.tags stored as JSON string in SQLite column, parsed to string[] at IPC handler boundary
-- [Phase 01-foundation]: Group/group-hover Tailwind pattern for contextual controls (delete buttons, drag handles) — only appear on row hover
-- [Phase 01-foundation]: Date editing uses native month inputs rather than InlineEdit — month picker requires browser native input type
-- [Phase 01-foundation]: SVG 6-dot grip icon inline in BulletItem — avoids icon library dependency for single icon
-- [Phase 01-foundation]: TagInput exposes onInputChange callback so parent forms can capture pending uncommitted text at Save time — avoids silently dropping typed tag text when user clicks Save without pressing Enter
-- [Phase 02-template-variants]: Discriminator model for templateVariantItems: itemType column with nullable bulletId/skillId/jobId — supports bullet, skill, and job exclusions in one table
-- [Phase 02-template-variants]: Explicit-exclusion semantics: absence of row means included, excluded=true row means excluded — no backfill needed for new experience items
-- [Phase 02-template-variants]: Job toggle cascades to all child bullets: setItemExcluded for itemType=job also inserts/deletes exclusion rows for all bullets in that job
-- [Phase 02-template-variants]: Optimistic updates for checkbox toggles: update local state immediately then IPC async — avoids visible lag
-- [Phase 02-template-variants]: Layout template selector uses button group (not dropdown) to match minimal zinc aesthetic
-- [Phase 02-template-variants]: Layout template selector placed on Preview sub-tab only — reduces noise on Builder, contextually meaningful
-- [Phase 02-template-variants]: better-sqlite3 duplicate transaction must be synchronous — async/await inside .transaction() silently prevents row insertion
-- [Phase 02-template-variants]: Migration wrapped in try-catch for resilience — app restarts cleanly when tables already exist
-- [Phase 03-submissions]: Snapshot captures layoutTemplate alongside jobs+skills so renderer can reconstruct exact resume layout without the variant
-- [Phase 03-submissions]: submissions:update intentionally excludes resumeSnapshot to enforce snapshot immutability at IPC boundary
-- [Phase 03-submissions]: buildSnapshotForVariant duplicated from getBuilderData (not extracted) since snapshot version adds layoutTemplate and may diverge independently
-- [Phase 03-submissions]: SnapshotViewer duplicates layout sub-components from VariantPreview for full self-containment — decoupled from VariantPreview live data lifecycle
-- [Phase 03-submissions]: Date column in submissions table is display-only — text editing of dates is error-prone in table cells
-- [Phase 04-export]: ProfessionalLayout uses exclusively inline styles — Tailwind print: variants do not work reliably in Electron printToPDF() hidden window
-- [Phase 04-export]: exportFile preload property name avoids JS reserved word 'export'; profile table uses single-row id=1 upsert pattern
-- [Phase 04-export]: print:ready IPC handshake uses ipcMain.once with 3s safety timeout; DOCX query logic duplicated from templates.ts; printToPDF margins set to 0 since ProfessionalLayout already has 0.5in inline padding
+- [v1.0]: CREATE TABLE IF NOT EXISTS for schema management — new columns need ALTER TABLE ADD COLUMN in try/catch
+- [v1.0]: Inline styles for spacing (Tailwind v4 unreliable)
+- [v1.0]: better-sqlite3 transactions must be synchronous
+- [v1.1]: Projects have toggleable bullets like jobs — mirror jobs/bullets pattern exactly
+- [v1.1]: resume.json themes for importable templates — leverage existing ecosystem
+- [v1.1]: Import uses replace strategy (not merge) — confirm with user, delete existing, re-import in transaction
+- [Phase 05-projects-and-tag-autocomplete]: createPortal to document.body for dropdown to avoid overflow clipping
+- [Phase 05-projects-and-tag-autocomplete]: onMouseDown preventDefault on dropdown items prevents blur-before-click race condition
+- [Phase 05-projects-and-tag-autocomplete]: allTags computed at SkillList level via Set deduplication, threaded through SkillItem as suggestions prop
+- [Phase 05-projects-and-tag-autocomplete]: ProjectBulletList is a copy of BulletList (not generalized) — avoids coupling and keeps pattern explicit
+- [Phase 05-projects-and-tag-autocomplete]: templateVariantItems FK columns for projects added via ALTER TABLE migration (not ensureSchema) for existing DB compatibility
 
 ### Pending Todos
 
@@ -101,11 +57,12 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 4]: electron-vite multi-page config for hidden PDF renderer BrowserWindow needs validation. Tailwind CSS 4 print: variant behavior in printToPDF() context is not fully documented — test with edge-case content volumes (single item, 20+ items).
-- [Phase 4]: Confirm docx library vs docxtemplater approach during Phase 4 planning and document as decision record.
+- [Phase 5]: Must test ALTER TABLE ADD COLUMN (projectId on templateVariantItems) against a v1.0 database, not just fresh install
+- [Phase 7]: jsonresume-theme-class module format (ESM vs CJS) unconfirmed — verify with require() test immediately after install
+- [Phase 7]: Theme packages must be asarUnpack'd in electron-builder config — test packaged binary early, not at the end
 
 ## Session Continuity
 
-Last session: 2026-03-14T22:46:09.649Z
-Stopped at: Completed 04-export/04-02-PLAN.md
+Last session: 2026-03-15T02:16:34.222Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None
