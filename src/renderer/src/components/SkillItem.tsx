@@ -9,11 +9,12 @@ interface Skill {
 
 interface SkillItemProps {
   skill: Skill
+  allTags: string[]
   onUpdate: (id: number, data: { name?: string; tags?: string[] }) => void
   onDelete: (id: number) => void
 }
 
-function SkillItem({ skill, onUpdate, onDelete }: SkillItemProps): React.JSX.Element {
+function SkillItem({ skill, allTags, onUpdate, onDelete }: SkillItemProps): React.JSX.Element {
   return (
     <div className="group flex items-center gap-2 hover:bg-zinc-800/40 rounded px-2 py-1.5 -mx-2 transition-colors">
       {/* Skill name — inline editable */}
@@ -31,6 +32,7 @@ function SkillItem({ skill, onUpdate, onDelete }: SkillItemProps): React.JSX.Ele
         <TagInput
           tags={skill.tags}
           onChange={(newTags) => onUpdate(skill.id, { tags: newTags })}
+          suggestions={allTags}
         />
       </div>
 

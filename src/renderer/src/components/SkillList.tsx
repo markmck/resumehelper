@@ -63,6 +63,7 @@ function SkillList(): React.JSX.Element {
   }
 
   const groups = computeGroups()
+  const allTags = [...new Set(skills.flatMap((s) => s.tags))]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -109,6 +110,7 @@ function SkillList(): React.JSX.Element {
                   <SkillItem
                     key={skill.id}
                     skill={skill}
+                    allTags={allTags}
                     onUpdate={handleUpdateSkill}
                     onDelete={handleDeleteSkill}
                   />
