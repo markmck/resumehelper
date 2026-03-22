@@ -1,16 +1,53 @@
-import { BuilderJob, BuilderProject, BuilderSkill } from '../../../preload/index.d'
+import {
+  BuilderJob,
+  BuilderProject,
+  BuilderSkill,
+  BuilderEducation,
+  BuilderVolunteer,
+  BuilderAward,
+  BuilderPublication,
+  BuilderLanguage,
+  BuilderInterest,
+  BuilderReference,
+} from '../../../preload/index.d'
 
 interface ProfessionalLayoutProps {
   profile?: { name: string; email: string; phone: string; location: string; linkedin: string }
   jobs: BuilderJob[]
   skills: BuilderSkill[]
   projects?: BuilderProject[]
+  education?: BuilderEducation[]
+  volunteer?: BuilderVolunteer[]
+  awards?: BuilderAward[]
+  publications?: BuilderPublication[]
+  languages?: BuilderLanguage[]
+  interests?: BuilderInterest[]
+  references?: BuilderReference[]
 }
 
-function ProfessionalLayout({ profile, jobs, skills, projects }: ProfessionalLayoutProps): React.JSX.Element {
+function ProfessionalLayout({
+  profile,
+  jobs,
+  skills,
+  projects,
+  education,
+  volunteer,
+  awards,
+  publications,
+  languages,
+  interests,
+  references,
+}: ProfessionalLayoutProps): React.JSX.Element {
   const includedJobs = jobs.filter((j) => !j.excluded)
   const includedSkills = skills.filter((s) => !s.excluded)
   const includedProjects = (projects ?? []).filter((p) => !p.excluded)
+  const includedEducation = (education ?? []).filter((e) => !e.excluded)
+  const includedVolunteer = (volunteer ?? []).filter((v) => !v.excluded)
+  const includedAwards = (awards ?? []).filter((a) => !a.excluded)
+  const includedPublications = (publications ?? []).filter((p) => !p.excluded)
+  const includedLanguages = (languages ?? []).filter((l) => !l.excluded)
+  const includedInterests = (interests ?? []).filter((i) => !i.excluded)
+  const includedReferences = (references ?? []).filter((r) => !r.excluded)
 
   // Group skills by first tag
   const skillGroups = includedSkills.reduce<Record<string, BuilderSkill[]>>((acc, skill) => {
@@ -41,6 +78,18 @@ function ProfessionalLayout({ profile, jobs, skills, projects }: ProfessionalLay
     marginBottom: '10px',
     marginTop: '18px',
   }
+
+  const hasAnyContent =
+    includedJobs.length > 0 ||
+    Object.keys(skillGroups).length > 0 ||
+    includedProjects.length > 0 ||
+    includedEducation.length > 0 ||
+    includedVolunteer.length > 0 ||
+    includedAwards.length > 0 ||
+    includedPublications.length > 0 ||
+    includedLanguages.length > 0 ||
+    includedInterests.length > 0 ||
+    includedReferences.length > 0
 
   return (
     <div
@@ -244,7 +293,217 @@ function ProfessionalLayout({ profile, jobs, skills, projects }: ProfessionalLay
         </section>
       )}
 
-      {includedJobs.length === 0 && Object.keys(skillGroups).length === 0 && includedProjects.length === 0 && (
+      {/* Education */}
+      {includedEducation.length > 0 && (
+        <section>
+          <h2 style={sectionHeadingStyle}>Education</h2>
+          <div>
+            {includedEducation.map((edu) => (
+              <div
+                key={edu.id}
+                style={{ pageBreakInside: 'avoid', marginBottom: '14px' }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'baseline',
+                    marginBottom: '2px',
+                  }}
+                >
+                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1a1a1a' }}>
+                    {edu.studyType && edu.area
+                      ? `${edu.studyType} in ${edu.area}`
+                      : edu.studyType || edu.area || edu.institution}
+                    {edu.studyType || edu.area ? ` — ${edu.institution}` : ''}
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#666666' }}>
+                    {edu.startDate}{edu.startDate ? ' — ' : ''}{edu.endDate || 'Present'}
+                  </span>
+                </div>
+                {edu.score && (
+                  <div style={{ fontSize: '11px', color: '#666666', marginBottom: '2px' }}>
+                    Score: {edu.score}
+                  </div>
+                )}
+                {edu.courses.length > 0 && (
+                  <div style={{ fontSize: '11px', color: '#666666' }}>
+                    Courses: {edu.courses.join(', ')}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Volunteer Experience */}
+      {includedVolunteer.length > 0 && (
+        <section>
+          <h2 style={sectionHeadingStyle}>Volunteer Experience</h2>
+          <div>
+            {includedVolunteer.map((vol) => (
+              <div
+                key={vol.id}
+                style={{ pageBreakInside: 'avoid', marginBottom: '14px' }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'baseline',
+                    marginBottom: '2px',
+                  }}
+                >
+                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1a1a1a' }}>
+                    {vol.position}
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#666666' }}>
+                    {vol.startDate}{vol.startDate ? ' — ' : ''}{vol.endDate || 'Present'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '11px', color: '#666666', marginBottom: '4px' }}>
+                  {vol.organization}
+                </div>
+                {vol.summary && (
+                  <div style={{ fontSize: '11px', color: '#1a1a1a', marginBottom: '4px' }}>
+                    {vol.summary}
+                  </div>
+                )}
+                {vol.highlights.length > 0 && (
+                  <ul style={{ listStyleType: 'disc', paddingLeft: '1.2em', margin: 0 }}>
+                    {vol.highlights.map((h, i) => (
+                      <li
+                        key={i}
+                        style={{ fontSize: '11px', color: '#1a1a1a', lineHeight: '1.5', marginBottom: '2px' }}
+                      >
+                        {h}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Awards */}
+      {includedAwards.length > 0 && (
+        <section>
+          <h2 style={sectionHeadingStyle}>Awards</h2>
+          <div>
+            {includedAwards.map((award) => (
+              <div
+                key={award.id}
+                style={{ pageBreakInside: 'avoid', marginBottom: '10px' }}
+              >
+                <div style={{ fontSize: '12px', color: '#1a1a1a', marginBottom: '2px' }}>
+                  <span style={{ fontWeight: 'bold' }}>{award.title}</span>
+                  {award.awarder && (
+                    <span style={{ color: '#666666' }}> — {award.awarder}</span>
+                  )}
+                  {award.date && (
+                    <span style={{ color: '#666666' }}> ({award.date})</span>
+                  )}
+                </div>
+                {award.summary && (
+                  <div style={{ fontSize: '11px', color: '#555555' }}>{award.summary}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Publications */}
+      {includedPublications.length > 0 && (
+        <section>
+          <h2 style={sectionHeadingStyle}>Publications</h2>
+          <div>
+            {includedPublications.map((pub) => (
+              <div
+                key={pub.id}
+                style={{ pageBreakInside: 'avoid', marginBottom: '10px' }}
+              >
+                <div style={{ fontSize: '12px', color: '#1a1a1a', marginBottom: '2px' }}>
+                  <span style={{ fontWeight: 'bold' }}>{pub.name}</span>
+                  {pub.publisher && (
+                    <span style={{ color: '#666666' }}> — {pub.publisher}</span>
+                  )}
+                  {pub.releaseDate && (
+                    <span style={{ color: '#666666' }}> ({pub.releaseDate})</span>
+                  )}
+                </div>
+                {pub.url && (
+                  <div style={{ fontSize: '11px', color: '#555555', marginBottom: '2px' }}>
+                    {pub.url}
+                  </div>
+                )}
+                {pub.summary && (
+                  <div style={{ fontSize: '11px', color: '#555555' }}>{pub.summary}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Languages */}
+      {includedLanguages.length > 0 && (
+        <section>
+          <h2 style={sectionHeadingStyle}>Languages</h2>
+          <div style={{ fontSize: '11px', color: '#1a1a1a' }}>
+            {includedLanguages
+              .map((l) => `${l.language}${l.fluency ? ` (${l.fluency})` : ''}`)
+              .join(', ')}
+          </div>
+        </section>
+      )}
+
+      {/* Interests */}
+      {includedInterests.length > 0 && (
+        <section>
+          <h2 style={sectionHeadingStyle}>Interests</h2>
+          <div>
+            {includedInterests.map((interest) => (
+              <div
+                key={interest.id}
+                style={{ fontSize: '11px', color: '#1a1a1a', marginBottom: '4px' }}
+              >
+                <span style={{ fontWeight: 'bold' }}>{interest.name}</span>
+                {interest.keywords.length > 0 && (
+                  <span>: {interest.keywords.join(', ')}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* References */}
+      {includedReferences.length > 0 && (
+        <section>
+          <h2 style={sectionHeadingStyle}>References</h2>
+          <div>
+            {includedReferences.map((ref) => (
+              <div
+                key={ref.id}
+                style={{ pageBreakInside: 'avoid', marginBottom: '10px' }}
+              >
+                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1a1a1a', marginBottom: '2px' }}>
+                  {ref.name}
+                </div>
+                {ref.reference && (
+                  <div style={{ fontSize: '11px', color: '#555555' }}>{ref.reference}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!hasAnyContent && (
         <p
           style={{
             fontSize: '12px',

@@ -51,7 +51,18 @@ function SnapshotViewer({ snapshot, onClose }: SnapshotViewerProps): React.JSX.E
 
         {/* Modal body — rendered layout */}
         <div>
-          <ProfessionalLayout jobs={snapshot.jobs} skills={skills} projects={snapshot.projects ?? []} />
+          <ProfessionalLayout
+            jobs={snapshot.jobs}
+            skills={skills}
+            projects={snapshot.projects ?? []}
+            education={snapshot.education ?? []}
+            volunteer={snapshot.volunteer ?? []}
+            awards={snapshot.awards ?? []}
+            publications={snapshot.publications ?? []}
+            languages={snapshot.languages ?? []}
+            interests={snapshot.interests ?? []}
+            references={snapshot.references ?? []}
+          />
         </div>
       </div>
     </div>

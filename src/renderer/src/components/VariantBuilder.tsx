@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react'
-import { BuilderData, BuilderJob, BuilderProject, BuilderSkill } from '../../../preload/index.d'
+import {
+  BuilderData,
+  BuilderJob,
+  BuilderProject,
+  BuilderSkill,
+  BuilderEducation,
+  BuilderVolunteer,
+  BuilderAward,
+  BuilderPublication,
+  BuilderLanguage,
+  BuilderInterest,
+  BuilderReference,
+} from '../../../preload/index.d'
 
 interface VariantBuilderProps {
   variantId: number
@@ -119,6 +131,104 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
     await window.api.templates.setItemExcluded(variantId, 'projectBullet', bulletId, newExcluded)
   }
 
+  const handleEducationToggle = async (edu: BuilderEducation): Promise<void> => {
+    const newExcluded = !edu.excluded
+    setBuilderData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        education: (prev.education ?? []).map((e) =>
+          e.id === edu.id ? { ...e, excluded: newExcluded } : e,
+        ),
+      }
+    })
+    await window.api.templates.setItemExcluded(variantId, 'education', edu.id, newExcluded)
+  }
+
+  const handleVolunteerToggle = async (vol: BuilderVolunteer): Promise<void> => {
+    const newExcluded = !vol.excluded
+    setBuilderData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        volunteer: (prev.volunteer ?? []).map((v) =>
+          v.id === vol.id ? { ...v, excluded: newExcluded } : v,
+        ),
+      }
+    })
+    await window.api.templates.setItemExcluded(variantId, 'volunteer', vol.id, newExcluded)
+  }
+
+  const handleAwardToggle = async (award: BuilderAward): Promise<void> => {
+    const newExcluded = !award.excluded
+    setBuilderData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        awards: (prev.awards ?? []).map((a) =>
+          a.id === award.id ? { ...a, excluded: newExcluded } : a,
+        ),
+      }
+    })
+    await window.api.templates.setItemExcluded(variantId, 'award', award.id, newExcluded)
+  }
+
+  const handlePublicationToggle = async (pub: BuilderPublication): Promise<void> => {
+    const newExcluded = !pub.excluded
+    setBuilderData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        publications: (prev.publications ?? []).map((p) =>
+          p.id === pub.id ? { ...p, excluded: newExcluded } : p,
+        ),
+      }
+    })
+    await window.api.templates.setItemExcluded(variantId, 'publication', pub.id, newExcluded)
+  }
+
+  const handleLanguageToggle = async (lang: BuilderLanguage): Promise<void> => {
+    const newExcluded = !lang.excluded
+    setBuilderData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        languages: (prev.languages ?? []).map((l) =>
+          l.id === lang.id ? { ...l, excluded: newExcluded } : l,
+        ),
+      }
+    })
+    await window.api.templates.setItemExcluded(variantId, 'language', lang.id, newExcluded)
+  }
+
+  const handleInterestToggle = async (interest: BuilderInterest): Promise<void> => {
+    const newExcluded = !interest.excluded
+    setBuilderData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        interests: (prev.interests ?? []).map((i) =>
+          i.id === interest.id ? { ...i, excluded: newExcluded } : i,
+        ),
+      }
+    })
+    await window.api.templates.setItemExcluded(variantId, 'interest', interest.id, newExcluded)
+  }
+
+  const handleReferenceToggle = async (ref: BuilderReference): Promise<void> => {
+    const newExcluded = !ref.excluded
+    setBuilderData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        references: (prev.references ?? []).map((r) =>
+          r.id === ref.id ? { ...r, excluded: newExcluded } : r,
+        ),
+      }
+    })
+    await window.api.templates.setItemExcluded(variantId, 'reference', ref.id, newExcluded)
+  }
+
   if (!builderData) {
     return (
       <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
@@ -134,6 +244,14 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
     acc[groupKey].push(skill)
     return acc
   }, {})
+
+  const educationList = builderData.education ?? []
+  const volunteerList = builderData.volunteer ?? []
+  const awardsList = builderData.awards ?? []
+  const publicationsList = builderData.publications ?? []
+  const languagesList = builderData.languages ?? []
+  const interestsList = builderData.interests ?? []
+  const referencesList = builderData.references ?? []
 
   return (
     <div className="overflow-y-auto h-full px-6 py-4 space-y-8">
@@ -302,6 +420,194 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
           </div>
         )}
       </section>
+
+      {/* Education section */}
+      {educationList.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wider">
+            Education
+          </h3>
+          <div className="space-y-2">
+            {educationList.map((edu) => (
+              <label key={edu.id} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!edu.excluded}
+                  onChange={() => handleEducationToggle(edu)}
+                  className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-indigo-500 cursor-pointer"
+                />
+                <span
+                  className={`text-sm ${edu.excluded ? 'text-zinc-600 line-through' : 'text-zinc-200'}`}
+                >
+                  {edu.institution}
+                  {edu.area ? ` — ${edu.area}` : ''}
+                  {edu.studyType ? ` (${edu.studyType})` : ''}
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Volunteer section */}
+      {volunteerList.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wider">
+            Volunteer
+          </h3>
+          <div className="space-y-2">
+            {volunteerList.map((vol) => (
+              <label key={vol.id} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!vol.excluded}
+                  onChange={() => handleVolunteerToggle(vol)}
+                  className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-indigo-500 cursor-pointer"
+                />
+                <span
+                  className={`text-sm ${vol.excluded ? 'text-zinc-600 line-through' : 'text-zinc-200'}`}
+                >
+                  {vol.organization}
+                  {vol.position ? ` — ${vol.position}` : ''}
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Awards section */}
+      {awardsList.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wider">
+            Awards
+          </h3>
+          <div className="space-y-2">
+            {awardsList.map((award) => (
+              <label key={award.id} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!award.excluded}
+                  onChange={() => handleAwardToggle(award)}
+                  className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-indigo-500 cursor-pointer"
+                />
+                <span
+                  className={`text-sm ${award.excluded ? 'text-zinc-600 line-through' : 'text-zinc-200'}`}
+                >
+                  {award.title}
+                  {award.awarder ? ` — ${award.awarder}` : ''}
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Publications section */}
+      {publicationsList.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wider">
+            Publications
+          </h3>
+          <div className="space-y-2">
+            {publicationsList.map((pub) => (
+              <label key={pub.id} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!pub.excluded}
+                  onChange={() => handlePublicationToggle(pub)}
+                  className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-indigo-500 cursor-pointer"
+                />
+                <span
+                  className={`text-sm ${pub.excluded ? 'text-zinc-600 line-through' : 'text-zinc-200'}`}
+                >
+                  {pub.name}
+                  {pub.publisher ? ` — ${pub.publisher}` : ''}
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Languages section */}
+      {languagesList.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wider">
+            Languages
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {languagesList.map((lang) => (
+              <label key={lang.id} className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!lang.excluded}
+                  onChange={() => handleLanguageToggle(lang)}
+                  className="w-3.5 h-3.5 rounded border-zinc-600 bg-zinc-800 text-indigo-500 cursor-pointer"
+                />
+                <span
+                  className={`text-sm ${lang.excluded ? 'text-zinc-600 line-through' : 'text-zinc-300'}`}
+                >
+                  {lang.language}
+                  {lang.fluency ? ` (${lang.fluency})` : ''}
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Interests section */}
+      {interestsList.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wider">
+            Interests
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {interestsList.map((interest) => (
+              <label key={interest.id} className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!interest.excluded}
+                  onChange={() => handleInterestToggle(interest)}
+                  className="w-3.5 h-3.5 rounded border-zinc-600 bg-zinc-800 text-indigo-500 cursor-pointer"
+                />
+                <span
+                  className={`text-sm ${interest.excluded ? 'text-zinc-600 line-through' : 'text-zinc-300'}`}
+                >
+                  {interest.name}
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* References section */}
+      {referencesList.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wider">
+            References
+          </h3>
+          <div className="space-y-2">
+            {referencesList.map((ref) => (
+              <label key={ref.id} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!ref.excluded}
+                  onChange={() => handleReferenceToggle(ref)}
+                  className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-indigo-500 cursor-pointer"
+                />
+                <span
+                  className={`text-sm ${ref.excluded ? 'text-zinc-600 line-through' : 'text-zinc-200'}`}
+                >
+                  {ref.name}
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
