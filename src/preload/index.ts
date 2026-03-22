@@ -200,6 +200,10 @@ const api = {
       ipcRenderer.invoke('references:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('references:delete', id),
   },
+  import_: {
+    parse: () => ipcRenderer.invoke('import:parseResumeJson'),
+    confirmReplace: (data: unknown) => ipcRenderer.invoke('import:confirmReplace', data),
+  },
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

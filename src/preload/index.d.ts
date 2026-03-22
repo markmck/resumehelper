@@ -444,6 +444,15 @@ export interface Api {
     update: (id: number, data: { name?: string; reference?: string }) => Promise<Reference>
     delete: (id: number) => Promise<void>
   }
+  import_: {
+    parse: () => Promise<{
+      canceled: boolean
+      error?: string
+      counts?: Record<string, number>
+      data?: unknown
+    }>
+    confirmReplace: (data: unknown) => Promise<{ success: boolean }>
+  }
 }
 
 declare global {

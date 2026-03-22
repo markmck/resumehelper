@@ -13,6 +13,7 @@ import { registerPublicationHandlers } from './publications'
 import { registerLanguageHandlers } from './languages'
 import { registerInterestHandlers } from './interests'
 import { registerReferenceHandlers } from './references'
+import { registerImportHandlers } from './import'
 
 export function registerAllHandlers(): void {
   registerJobHandlers()
@@ -30,4 +31,5 @@ export function registerAllHandlers(): void {
   registerLanguageHandlers()
   registerInterestHandlers()
   registerReferenceHandlers()
+  registerImportHandlers()
 }

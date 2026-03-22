@@ -11,6 +11,7 @@ const sqlite = new Database(dbPath)
 sqlite.pragma('journal_mode = WAL')
 
 export const db = drizzle(sqlite, { schema })
+export { sqlite }
 
 // Ensure all tables exist using CREATE TABLE IF NOT EXISTS
 // This is more reliable than file-based migrations for a local desktop app
