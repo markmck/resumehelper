@@ -88,7 +88,7 @@ Plans:
 - [ ] 05-02: Tag autocomplete — extend TagInput with suggestions prop, portal dropdown, keyboard navigation
 
 #### Phase 6: Projects in Export Pipeline and resume.json Import
-**Goal**: Projects appear in template variants, resume preview, and all export formats; users can import existing resume data from a resume.json file
+**Goal**: Projects appear in template variants, resume preview, and all export formats; all resume.json entity types (education, volunteer, awards, publications, languages, interests, references) get full DB + UI + builder + export support; users can import existing resume data from a resume.json file
 **Depends on**: Phase 5
 **Requirements**: PROJ-03, PROJ-04, IMP-01, IMP-02
 **Success Criteria** (what must be TRUE):
@@ -96,11 +96,14 @@ Plans:
   2. Projects section appears in the resume preview and in exported PDF and DOCX files when projects are included in the variant
   3. User can import a resume.json file and see their existing jobs, skills, projects, and profile mapped into the app
   4. Import shows a summary of what will be replaced and requires confirmation before overwriting existing data
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 06-01: Extend VariantBuilder, getBuilderDataForVariant (extract to shared helper), ProfessionalLayout, and DOCX builder with projects support
-- [ ] 06-02: resume.json import handler (dialog, schema validation, replace-with-confirmation transaction, result toast)
+- [ ] 06-01-PLAN.md — Wire projects into builder, preview, PDF/DOCX export, and submission snapshots
+- [ ] 06-02-PLAN.md — DB schema, IPC handlers, and preload bridge for 7 new resume.json entities (education, volunteer, awards, publications, languages, interests, references)
+- [ ] 06-03-PLAN.md — Experience tab collapsible sections + CRUD UI components for all 7 new entities
+- [ ] 06-04-PLAN.md — Wire all 7 new entities into builder toggles, preview rendering, DOCX export, and snapshots
+- [ ] 06-05-PLAN.md — resume.json import: file picker, confirmation modal, atomic replace-all transaction
 
 #### Phase 7: resume.json Theme Rendering
 **Goal**: Users can select from bundled resume.json themes to preview and export their resume with alternative layouts
@@ -127,6 +130,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Template Variants | v1.0 | 2/2 | Complete | 2026-03-14 |
 | 3. Submissions | v1.0 | 2/2 | Complete | 2026-03-14 |
 | 4. Export | v1.0 | 2/2 | Complete | 2026-03-14 |
-| 5. Projects and Tag Autocomplete | 2/2 | Complete   | 2026-03-15 | - |
-| 6. Projects in Export Pipeline and Import | v1.1 | 0/2 | Not started | - |
+| 5. Projects and Tag Autocomplete | v1.1 | 2/2 | Complete | 2026-03-15 |
+| 6. Projects in Export Pipeline and Import | v1.1 | 0/5 | Not started | - |
 | 7. resume.json Theme Rendering | v1.1 | 0/2 | Not started | - |

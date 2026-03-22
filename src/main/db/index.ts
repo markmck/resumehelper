@@ -97,12 +97,75 @@ function ensureSchema(): void {
     );
 
     INSERT OR IGNORE INTO \`profile\` (\`id\`) VALUES (1);
+
+    CREATE TABLE IF NOT EXISTS \`education\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`institution\` text NOT NULL,
+      \`area\` text NOT NULL DEFAULT '',
+      \`study_type\` text NOT NULL DEFAULT '',
+      \`start_date\` text NOT NULL DEFAULT '',
+      \`end_date\` text,
+      \`score\` text DEFAULT '',
+      \`courses\` text NOT NULL DEFAULT '[]'
+    );
+
+    CREATE TABLE IF NOT EXISTS \`volunteer\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`organization\` text NOT NULL,
+      \`position\` text NOT NULL DEFAULT '',
+      \`start_date\` text NOT NULL DEFAULT '',
+      \`end_date\` text,
+      \`summary\` text NOT NULL DEFAULT '',
+      \`highlights\` text NOT NULL DEFAULT '[]'
+    );
+
+    CREATE TABLE IF NOT EXISTS \`awards\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`title\` text NOT NULL,
+      \`date\` text,
+      \`awarder\` text NOT NULL DEFAULT '',
+      \`summary\` text NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS \`publications\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`name\` text NOT NULL,
+      \`publisher\` text NOT NULL DEFAULT '',
+      \`release_date\` text,
+      \`url\` text NOT NULL DEFAULT '',
+      \`summary\` text NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS \`languages\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`language\` text NOT NULL,
+      \`fluency\` text NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS \`interests\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`name\` text NOT NULL,
+      \`keywords\` text NOT NULL DEFAULT '[]'
+    );
+
+    CREATE TABLE IF NOT EXISTS \`references\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`name\` text NOT NULL,
+      \`reference\` text NOT NULL DEFAULT ''
+    );
   `)
 
   // Add columns that may be missing on existing databases
   const alterStatements = [
     'ALTER TABLE `template_variant_items` ADD COLUMN `project_id` integer REFERENCES `projects`(`id`) ON DELETE cascade',
     'ALTER TABLE `template_variant_items` ADD COLUMN `project_bullet_id` integer REFERENCES `project_bullets`(`id`) ON DELETE cascade',
+    'ALTER TABLE `template_variant_items` ADD COLUMN `education_id` integer REFERENCES `education`(`id`) ON DELETE cascade',
+    'ALTER TABLE `template_variant_items` ADD COLUMN `volunteer_id` integer REFERENCES `volunteer`(`id`) ON DELETE cascade',
+    'ALTER TABLE `template_variant_items` ADD COLUMN `award_id` integer REFERENCES `awards`(`id`) ON DELETE cascade',
+    'ALTER TABLE `template_variant_items` ADD COLUMN `publication_id` integer REFERENCES `publications`(`id`) ON DELETE cascade',
+    'ALTER TABLE `template_variant_items` ADD COLUMN `language_id` integer REFERENCES `languages`(`id`) ON DELETE cascade',
+    'ALTER TABLE `template_variant_items` ADD COLUMN `interest_id` integer REFERENCES `interests`(`id`) ON DELETE cascade',
+    'ALTER TABLE `template_variant_items` ADD COLUMN `reference_id` integer REFERENCES `references`(`id`) ON DELETE cascade',
   ]
   for (const sql of alterStatements) {
     try { sqlite.exec(sql) } catch { /* column already exists */ }

@@ -50,6 +50,62 @@ export const projectBullets = sqliteTable('project_bullets', {
   sortOrder: integer('sort_order').notNull().default(0),
 })
 
+export const education = sqliteTable('education', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  institution: text('institution').notNull(),
+  area: text('area').notNull().default(''),
+  studyType: text('study_type').notNull().default(''),
+  startDate: text('start_date').notNull().default(''),
+  endDate: text('end_date'),
+  score: text('score').default(''),
+  courses: text('courses').notNull().default('[]'),
+})
+
+export const volunteer = sqliteTable('volunteer', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  organization: text('organization').notNull(),
+  position: text('position').notNull().default(''),
+  startDate: text('start_date').notNull().default(''),
+  endDate: text('end_date'),
+  summary: text('summary').notNull().default(''),
+  highlights: text('highlights').notNull().default('[]'),
+})
+
+export const awards = sqliteTable('awards', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  title: text('title').notNull(),
+  date: text('date'),
+  awarder: text('awarder').notNull().default(''),
+  summary: text('summary').notNull().default(''),
+})
+
+export const publications = sqliteTable('publications', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  publisher: text('publisher').notNull().default(''),
+  releaseDate: text('release_date'),
+  url: text('url').notNull().default(''),
+  summary: text('summary').notNull().default(''),
+})
+
+export const languages = sqliteTable('languages', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  language: text('language').notNull(),
+  fluency: text('fluency').notNull().default(''),
+})
+
+export const interests = sqliteTable('interests', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  keywords: text('keywords').notNull().default('[]'),
+})
+
+export const referenceEntries = sqliteTable('references', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  reference: text('reference').notNull().default(''),
+})
+
 export const templateVariantItems = sqliteTable('template_variant_items', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   variantId: integer('variant_id')
@@ -61,6 +117,13 @@ export const templateVariantItems = sqliteTable('template_variant_items', {
   jobId: integer('job_id').references(() => jobs.id, { onDelete: 'cascade' }),
   projectId: integer('project_id').references(() => projects.id, { onDelete: 'cascade' }),
   projectBulletId: integer('project_bullet_id').references(() => projectBullets.id, { onDelete: 'cascade' }),
+  educationId: integer('education_id').references(() => education.id, { onDelete: 'cascade' }),
+  volunteerId: integer('volunteer_id').references(() => volunteer.id, { onDelete: 'cascade' }),
+  awardId: integer('award_id').references(() => awards.id, { onDelete: 'cascade' }),
+  publicationId: integer('publication_id').references(() => publications.id, { onDelete: 'cascade' }),
+  languageId: integer('language_id').references(() => languages.id, { onDelete: 'cascade' }),
+  interestId: integer('interest_id').references(() => interests.id, { onDelete: 'cascade' }),
+  referenceId: integer('reference_id').references(() => referenceEntries.id, { onDelete: 'cascade' }),
   excluded: integer('excluded', { mode: 'boolean' }).notNull().default(false),
 })
 
