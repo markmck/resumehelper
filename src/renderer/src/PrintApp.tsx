@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import ProfessionalLayout from './components/ProfessionalLayout'
-import { BuilderJob, BuilderSkill, Profile } from '../../preload/index.d'
+import { BuilderJob, BuilderProject, BuilderSkill, Profile } from '../../preload/index.d'
 
 interface PrintData {
   profile: Profile
   jobs: BuilderJob[]
   skills: BuilderSkill[]
+  projects: BuilderProject[]
 }
 
 function PrintApp(): React.JSX.Element {
@@ -18,7 +19,7 @@ function PrintApp(): React.JSX.Element {
 
     Promise.all([window.api.profile.get(), window.api.templates.getBuilderData(variantId)]).then(
       ([profileData, builderData]) => {
-        setData({ profile: profileData, jobs: builderData.jobs, skills: builderData.skills })
+        setData({ profile: profileData, jobs: builderData.jobs, skills: builderData.skills, projects: builderData.projects })
       }
     )
   }, [])
@@ -43,6 +44,7 @@ function PrintApp(): React.JSX.Element {
       profile={data.profile}
       jobs={data.jobs}
       skills={data.skills}
+      projects={data.projects}
     />
   )
 }

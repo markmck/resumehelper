@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BuilderData, BuilderJob, BuilderSkill } from '../../../preload/index.d'
+import { BuilderData, BuilderJob, BuilderProject, BuilderSkill } from '../../../preload/index.d'
 
 interface VariantBuilderProps {
   variantId: number
@@ -71,6 +71,52 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
       }
     })
     await window.api.templates.setItemExcluded(variantId, 'skill', skill.id, newExcluded)
+  }
+
+  const handleProjectToggle = async (project: BuilderProject): Promise<void> => {
+    const newExcluded = !project.excluded
+    // Optimistic update
+    setBuilderData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        projects: prev.projects.map((p) =>
+          p.id === project.id
+            ? {
+                ...p,
+                excluded: newExcluded,
+              }
+            : p,
+        ),
+      }
+    })
+    await window.api.templates.setItemExcluded(variantId, 'project', project.id, newExcluded)
+  }
+
+  const handleProjectBulletToggle = async (
+    projectId: number,
+    bulletId: number,
+    currentExcluded: boolean,
+  ): Promise<void> => {
+    const newExcluded = !currentExcluded
+    // Optimistic update
+    setBuilderData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        projects: prev.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                bullets: p.bullets.map((b) =>
+                  b.id === bulletId ? { ...b, excluded: newExcluded } : b,
+                ),
+              }
+            : p,
+        ),
+      }
+    })
+    await window.api.templates.setItemExcluded(variantId, 'projectBullet', bulletId, newExcluded)
   }
 
   if (!builderData) {
@@ -188,6 +234,69 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
                     </label>
                   ))}
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Projects section */}
+      <section>
+        <h3 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wider">
+          Projects
+        </h3>
+        {builderData.projects.length === 0 ? (
+          <p className="text-sm text-zinc-600">No projects yet. Add projects in the Experience tab.</p>
+        ) : (
+          <div className="space-y-4">
+            {builderData.projects.map((project) => (
+              <div key={project.id} className="rounded-md border border-zinc-800 bg-zinc-900 p-3">
+                {/* Project row */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!project.excluded}
+                    onChange={() => handleProjectToggle(project)}
+                    className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-indigo-500 cursor-pointer"
+                  />
+                  <span
+                    className={`text-sm font-medium ${project.excluded ? 'text-zinc-600 line-through' : 'text-zinc-200'}`}
+                  >
+                    {project.name}
+                  </span>
+                </label>
+
+                {/* Bullets */}
+                {project.bullets.length > 0 && (
+                  <div className="mt-2 ml-6 space-y-1">
+                    {project.bullets.map((bullet) => (
+                      <label
+                        key={bullet.id}
+                        className={`flex items-start gap-2 ${project.excluded ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!bullet.excluded}
+                          disabled={project.excluded}
+                          onChange={() =>
+                            !project.excluded &&
+                            handleProjectBulletToggle(project.id, bullet.id, bullet.excluded)
+                          }
+                          className="mt-0.5 w-3.5 h-3.5 rounded border-zinc-600 bg-zinc-800 text-indigo-500 cursor-pointer disabled:cursor-not-allowed"
+                        />
+                        <span
+                          className={`text-xs leading-relaxed ${
+                            project.excluded || bullet.excluded
+                              ? 'text-zinc-600 line-through'
+                              : 'text-zinc-400'
+                          }`}
+                        >
+                          {bullet.text}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>

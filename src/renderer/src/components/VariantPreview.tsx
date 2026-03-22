@@ -35,6 +35,7 @@ function VariantPreview({ variantId }: VariantPreviewProps): React.JSX.Element {
         profile={profileData ?? undefined}
         jobs={builderData.jobs}
         skills={builderData.skills}
+        projects={builderData.projects}
       />
     </div>
   )

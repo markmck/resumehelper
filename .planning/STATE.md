@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Enhancements
 status: planning
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-03-15T02:16:34.224Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-03-22T19:48:16.684Z"
 last_activity: 2026-03-14 — Roadmap created for v1.1 (phases 5-7)
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 16
+  completed_plans: 12
   percent: 0
 ---
 
@@ -50,6 +50,8 @@ Recent decisions affecting current work:
 - [Phase 05-projects-and-tag-autocomplete]: allTags computed at SkillList level via Set deduplication, threaded through SkillItem as suggestions prop
 - [Phase 05-projects-and-tag-autocomplete]: ProjectBulletList is a copy of BulletList (not generalized) — avoids coupling and keeps pattern explicit
 - [Phase 05-projects-and-tag-autocomplete]: templateVariantItems FK columns for projects added via ALTER TABLE migration (not ensureSchema) for existing DB compatibility
+- [Phase 06-projects-in-export-pipeline-and-resume-json-import]: referenceEntries used as JS variable name for references SQLite table to avoid reserved word confusion
+- [Phase 06-projects-in-export-pipeline-and-resume-json-import]: Array fields (courses, highlights, keywords) stored as JSON TEXT strings in SQLite, parsed on read
 
 ### Pending Todos
 
@@ -63,6 +65,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T02:16:34.222Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-03-22T19:48:16.682Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None

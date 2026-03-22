@@ -131,5 +131,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Submissions | v1.0 | 2/2 | Complete | 2026-03-14 |
 | 4. Export | v1.0 | 2/2 | Complete | 2026-03-14 |
 | 5. Projects and Tag Autocomplete | v1.1 | 2/2 | Complete | 2026-03-15 |
-| 6. Projects in Export Pipeline and Import | v1.1 | 0/5 | Not started | - |
+| 6. Projects in Export Pipeline and Import | 1/5 | In Progress|  | - |
 | 7. resume.json Theme Rendering | v1.1 | 0/2 | Not started | - |

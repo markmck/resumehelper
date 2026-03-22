@@ -1,14 +1,16 @@
-import { BuilderJob, BuilderSkill } from '../../../preload/index.d'
+import { BuilderJob, BuilderProject, BuilderSkill } from '../../../preload/index.d'
 
 interface ProfessionalLayoutProps {
   profile?: { name: string; email: string; phone: string; location: string; linkedin: string }
   jobs: BuilderJob[]
   skills: BuilderSkill[]
+  projects?: BuilderProject[]
 }
 
-function ProfessionalLayout({ profile, jobs, skills }: ProfessionalLayoutProps): React.JSX.Element {
+function ProfessionalLayout({ profile, jobs, skills, projects }: ProfessionalLayoutProps): React.JSX.Element {
   const includedJobs = jobs.filter((j) => !j.excluded)
   const includedSkills = skills.filter((s) => !s.excluded)
+  const includedProjects = (projects ?? []).filter((p) => !p.excluded)
 
   // Group skills by first tag
   const skillGroups = includedSkills.reduce<Record<string, BuilderSkill[]>>((acc, skill) => {
@@ -187,7 +189,62 @@ function ProfessionalLayout({ profile, jobs, skills }: ProfessionalLayoutProps):
         </section>
       )}
 
-      {includedJobs.length === 0 && Object.keys(skillGroups).length === 0 && (
+      {/* Projects */}
+      {includedProjects.length > 0 && (
+        <section>
+          <h2 style={sectionHeadingStyle}>Projects</h2>
+          <div>
+            {includedProjects.map((project) => {
+              const bullets = project.bullets.filter((b) => !b.excluded)
+              return (
+                <div
+                  key={project.id}
+                  style={{
+                    pageBreakInside: 'avoid',
+                    marginBottom: '14px',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      color: '#1a1a1a',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {project.name}
+                  </div>
+                  {bullets.length > 0 && (
+                    <ul
+                      style={{
+                        listStyleType: 'disc',
+                        paddingLeft: '1.2em',
+                        margin: 0,
+                      }}
+                    >
+                      {bullets.map((b) => (
+                        <li
+                          key={b.id}
+                          style={{
+                            fontSize: '11px',
+                            color: '#1a1a1a',
+                            lineHeight: '1.5',
+                            marginBottom: '2px',
+                          }}
+                        >
+                          {b.text}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {includedJobs.length === 0 && Object.keys(skillGroups).length === 0 && includedProjects.length === 0 && (
         <p
           style={{
             fontSize: '12px',

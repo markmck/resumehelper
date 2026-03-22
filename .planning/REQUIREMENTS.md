@@ -20,7 +20,7 @@ Requirements for milestone v1.1. Each maps to roadmap phases.
 
 ### resume.json Import
 
-- [ ] **IMP-01**: User can import resume data from a resume.json file (maps to jobs, skills, projects, profile)
+- [x] **IMP-01**: User can import resume data from a resume.json file (maps to jobs, skills, projects, profile)
 - [ ] **IMP-02**: Import shows a confirmation before overwriting existing data
 
 ### resume.json Themes
@@ -58,7 +58,7 @@ Previously shipped and confirmed valuable.
 | PROJ-03 | Phase 6 | Pending |
 | PROJ-04 | Phase 6 | Pending |
 | TAG-01 | Phase 5 | Complete |
-| IMP-01 | Phase 6 | Pending |
+| IMP-01 | Phase 6 | Complete |
 | IMP-02 | Phase 6 | Pending |
 | THM-01 | Phase 7 | Pending |
 | THM-02 | Phase 7 | Pending |
