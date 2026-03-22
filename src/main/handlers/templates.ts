@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { db } from '../db'
-import { templateVariants, templateVariantItems, jobs, jobBullets, skills } from '../db/schema'
+import { templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets } from '../db/schema'
 import { eq, and, asc, desc, inArray } from 'drizzle-orm'
 
 export function registerTemplateHandlers(): void {
@@ -55,6 +55,8 @@ export function registerTemplateHandlers(): void {
             bulletId: item.bulletId,
             skillId: item.skillId,
             jobId: item.jobId,
+            projectId: item.projectId,
+            projectBulletId: item.projectBulletId,
             excluded: item.excluded,
           })),
         )
@@ -80,6 +82,10 @@ export function registerTemplateHandlers(): void {
 
     const allSkills = await db.select().from(skills)
 
+    const allProjects = await db.select().from(projects).orderBy(asc(projects.sortOrder))
+
+    const allProjectBullets = await db.select().from(projectBullets).orderBy(asc(projectBullets.sortOrder))
+
     const exclusionItems = await db
       .select()
       .from(templateVariantItems)
@@ -88,18 +94,28 @@ export function registerTemplateHandlers(): void {
     const excludedJobIds = new Set<number>()
     const excludedBulletIds = new Set<number>()
     const excludedSkillIds = new Set<number>()
+    const excludedProjectIds = new Set<number>()
+    const excludedProjectBulletIds = new Set<number>()
 
     for (const item of exclusionItems) {
       if (!item.excluded) continue
       if (item.itemType === 'job' && item.jobId != null) excludedJobIds.add(item.jobId)
       if (item.itemType === 'bullet' && item.bulletId != null) excludedBulletIds.add(item.bulletId)
       if (item.itemType === 'skill' && item.skillId != null) excludedSkillIds.add(item.skillId)
+      if (item.itemType === 'project' && item.projectId != null) excludedProjectIds.add(item.projectId)
+      if (item.itemType === 'projectBullet' && item.projectBulletId != null) excludedProjectBulletIds.add(item.projectBulletId)
     }
 
     const bulletsByJobId = new Map<number, typeof allBullets>()
     for (const bullet of allBullets) {
       if (!bulletsByJobId.has(bullet.jobId)) bulletsByJobId.set(bullet.jobId, [])
       bulletsByJobId.get(bullet.jobId)!.push(bullet)
+    }
+
+    const projectBulletsByProjectId = new Map<number, typeof allProjectBullets>()
+    for (const bullet of allProjectBullets) {
+      if (!projectBulletsByProjectId.has(bullet.projectId)) projectBulletsByProjectId.set(bullet.projectId, [])
+      projectBulletsByProjectId.get(bullet.projectId)!.push(bullet)
     }
 
     const jobsWithBullets = allJobs.map((job) => ({
@@ -124,7 +140,19 @@ export function registerTemplateHandlers(): void {
       excluded: excludedSkillIds.has(skill.id),
     }))
 
-    return { jobs: jobsWithBullets, skills: skillsWithExcluded }
+    const projectsWithBullets = allProjects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      excluded: excludedProjectIds.has(project.id),
+      bullets: (projectBulletsByProjectId.get(project.id) ?? []).map((b) => ({
+        id: b.id,
+        text: b.text,
+        sortOrder: b.sortOrder,
+        excluded: excludedProjectBulletIds.has(b.id),
+      })),
+    }))
+
+    return { jobs: jobsWithBullets, skills: skillsWithExcluded, projects: projectsWithBullets }
   })
 
   ipcMain.handle(
@@ -213,6 +241,72 @@ export function registerTemplateHandlers(): void {
               })),
             )
           }
+        }
+      } else if (itemType === 'project') {
+        // Toggle the project exclusion row
+        await db
+          .delete(templateVariantItems)
+          .where(
+            and(
+              eq(templateVariantItems.variantId, variantId),
+              eq(templateVariantItems.itemType, 'project'),
+              eq(templateVariantItems.projectId, itemId),
+            ),
+          )
+        if (excluded) {
+          await db.insert(templateVariantItems).values({
+            variantId,
+            itemType: 'project',
+            projectId: itemId,
+            excluded: true,
+          })
+        }
+
+        // Cascade: toggle all bullets belonging to this project
+        const projectBulletRows = await db
+          .select({ id: projectBullets.id })
+          .from(projectBullets)
+          .where(eq(projectBullets.projectId, itemId))
+        const projectBulletIds = projectBulletRows.map((b) => b.id)
+
+        if (projectBulletIds.length > 0) {
+          await db
+            .delete(templateVariantItems)
+            .where(
+              and(
+                eq(templateVariantItems.variantId, variantId),
+                eq(templateVariantItems.itemType, 'projectBullet'),
+                inArray(templateVariantItems.projectBulletId, projectBulletIds),
+              ),
+            )
+          if (excluded) {
+            await db.insert(templateVariantItems).values(
+              projectBulletIds.map((projectBulletId) => ({
+                variantId,
+                itemType: 'projectBullet',
+                projectBulletId,
+                excluded: true,
+              })),
+            )
+          }
+        }
+      } else if (itemType === 'projectBullet') {
+        await db
+          .delete(templateVariantItems)
+          .where(
+            and(
+              eq(templateVariantItems.variantId, variantId),
+              eq(templateVariantItems.itemType, 'projectBullet'),
+              eq(templateVariantItems.projectBulletId, itemId),
+            ),
+          )
+        if (excluded) {
+          await db.insert(templateVariantItems).values({
+            variantId,
+            itemType: 'projectBullet',
+            projectBulletId: itemId,
+            excluded: true,
+          })
         }
       }
     },

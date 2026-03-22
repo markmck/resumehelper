@@ -13,19 +13,22 @@ import {
   TabStopPosition
 } from 'docx'
 import { db } from '../db'
-import { profile, jobs, jobBullets, skills, templateVariantItems } from '../db/schema'
+import { profile, jobs, jobBullets, skills, projects, projectBullets, templateVariantItems } from '../db/schema'
 import { eq, asc, desc } from 'drizzle-orm'
-import { BuilderJob, BuilderSkill } from '../../preload/index.d'
+import { BuilderJob, BuilderSkill, BuilderProject } from '../../preload/index.d'
 
 interface BuilderData {
   jobs: BuilderJob[]
   skills: BuilderSkill[]
+  projects: BuilderProject[]
 }
 
 async function getBuilderDataForVariant(variantId: number): Promise<BuilderData> {
   const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
   const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
   const allSkills = await db.select().from(skills)
+  const allProjects = await db.select().from(projects).orderBy(asc(projects.sortOrder))
+  const allProjectBullets = await db.select().from(projectBullets).orderBy(asc(projectBullets.sortOrder))
   const exclusionItems = await db
     .select()
     .from(templateVariantItems)
@@ -34,18 +37,28 @@ async function getBuilderDataForVariant(variantId: number): Promise<BuilderData>
   const excludedJobIds = new Set<number>()
   const excludedBulletIds = new Set<number>()
   const excludedSkillIds = new Set<number>()
+  const excludedProjectIds = new Set<number>()
+  const excludedProjectBulletIds = new Set<number>()
 
   for (const item of exclusionItems) {
     if (!item.excluded) continue
     if (item.itemType === 'job' && item.jobId != null) excludedJobIds.add(item.jobId)
     if (item.itemType === 'bullet' && item.bulletId != null) excludedBulletIds.add(item.bulletId)
     if (item.itemType === 'skill' && item.skillId != null) excludedSkillIds.add(item.skillId)
+    if (item.itemType === 'project' && item.projectId != null) excludedProjectIds.add(item.projectId)
+    if (item.itemType === 'projectBullet' && item.projectBulletId != null) excludedProjectBulletIds.add(item.projectBulletId)
   }
 
   const bulletsByJobId = new Map<number, typeof allBullets>()
   for (const bullet of allBullets) {
     if (!bulletsByJobId.has(bullet.jobId)) bulletsByJobId.set(bullet.jobId, [])
     bulletsByJobId.get(bullet.jobId)!.push(bullet)
+  }
+
+  const projectBulletsByProjectId = new Map<number, typeof allProjectBullets>()
+  for (const bullet of allProjectBullets) {
+    if (!projectBulletsByProjectId.has(bullet.projectId)) projectBulletsByProjectId.set(bullet.projectId, [])
+    projectBulletsByProjectId.get(bullet.projectId)!.push(bullet)
   }
 
   const jobsWithBullets: BuilderJob[] = allJobs.map((job) => ({
@@ -70,7 +83,19 @@ async function getBuilderDataForVariant(variantId: number): Promise<BuilderData>
     excluded: excludedSkillIds.has(skill.id),
   }))
 
-  return { jobs: jobsWithBullets, skills: skillsWithExcluded }
+  const projectsWithBullets: BuilderProject[] = allProjects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    excluded: excludedProjectIds.has(project.id),
+    bullets: (projectBulletsByProjectId.get(project.id) ?? []).map((b) => ({
+      id: b.id,
+      text: b.text,
+      sortOrder: b.sortOrder,
+      excluded: excludedProjectBulletIds.has(b.id),
+    })),
+  }))
+
+  return { jobs: jobsWithBullets, skills: skillsWithExcluded, projects: projectsWithBullets }
 }
 
 export function registerExportHandlers(): void {
@@ -144,6 +169,7 @@ export function registerExportHandlers(): void {
 
     const includedJobs = builderData.jobs.filter((j) => !j.excluded)
     const includedSkills = builderData.skills.filter((s) => !s.excluded)
+    const includedProjects = builderData.projects.filter((p) => !p.excluded)
 
     // 3. Build DOCX document
     const doc = new Document({
@@ -279,6 +305,48 @@ export function registerExportHandlers(): void {
                         spacing: { after: 60 },
                       })
                   ),
+                ]
+              : []),
+            // PROJECTS section
+            ...(includedProjects.length > 0
+              ? [
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: 'PROJECTS',
+                        bold: true,
+                        size: 22,
+                        font: 'Calibri',
+                        color: '333333',
+                      }),
+                    ],
+                    border: {
+                      bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' },
+                    },
+                    spacing: { before: 240, after: 120 },
+                  }),
+                  ...includedProjects.flatMap((project) => {
+                    const bullets = project.bullets.filter((b) => !b.excluded)
+                    return [
+                      new Paragraph({
+                        children: [
+                          new TextRun({ text: project.name, bold: true, size: 22, font: 'Calibri' }),
+                        ],
+                        spacing: { after: 60 },
+                      }),
+                      ...bullets.map(
+                        (b) =>
+                          new Paragraph({
+                            children: [
+                              new TextRun({ text: b.text, size: 22, font: 'Calibri' }),
+                            ],
+                            bullet: { level: 0 },
+                            spacing: { after: 40 },
+                          })
+                      ),
+                      new Paragraph({ spacing: { after: 120 } }),
+                    ]
+                  }),
                 ]
               : []),
           ],
