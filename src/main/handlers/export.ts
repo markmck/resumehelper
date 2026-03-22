@@ -13,14 +13,21 @@ import {
   TabStopPosition
 } from 'docx'
 import { db } from '../db'
-import { profile, jobs, jobBullets, skills, projects, projectBullets, templateVariantItems } from '../db/schema'
+import { profile, jobs, jobBullets, skills, projects, projectBullets, templateVariantItems, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
 import { eq, asc, desc } from 'drizzle-orm'
-import { BuilderJob, BuilderSkill, BuilderProject } from '../../preload/index.d'
+import { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
 
 interface BuilderData {
   jobs: BuilderJob[]
   skills: BuilderSkill[]
   projects: BuilderProject[]
+  education: BuilderEducation[]
+  volunteer: BuilderVolunteer[]
+  awards: BuilderAward[]
+  publications: BuilderPublication[]
+  languages: BuilderLanguage[]
+  interests: BuilderInterest[]
+  references: BuilderReference[]
 }
 
 async function getBuilderDataForVariant(variantId: number): Promise<BuilderData> {
@@ -29,6 +36,13 @@ async function getBuilderDataForVariant(variantId: number): Promise<BuilderData>
   const allSkills = await db.select().from(skills)
   const allProjects = await db.select().from(projects).orderBy(asc(projects.sortOrder))
   const allProjectBullets = await db.select().from(projectBullets).orderBy(asc(projectBullets.sortOrder))
+  const allEducation = await db.select().from(education)
+  const allVolunteer = await db.select().from(volunteer)
+  const allAwards = await db.select().from(awards)
+  const allPublications = await db.select().from(publications)
+  const allLanguages = await db.select().from(languages)
+  const allInterests = await db.select().from(interests)
+  const allReferences = await db.select().from(referenceEntries)
   const exclusionItems = await db
     .select()
     .from(templateVariantItems)
@@ -39,6 +53,13 @@ async function getBuilderDataForVariant(variantId: number): Promise<BuilderData>
   const excludedSkillIds = new Set<number>()
   const excludedProjectIds = new Set<number>()
   const excludedProjectBulletIds = new Set<number>()
+  const excludedEducationIds = new Set<number>()
+  const excludedVolunteerIds = new Set<number>()
+  const excludedAwardIds = new Set<number>()
+  const excludedPublicationIds = new Set<number>()
+  const excludedLanguageIds = new Set<number>()
+  const excludedInterestIds = new Set<number>()
+  const excludedReferenceIds = new Set<number>()
 
   for (const item of exclusionItems) {
     if (!item.excluded) continue
@@ -47,6 +68,13 @@ async function getBuilderDataForVariant(variantId: number): Promise<BuilderData>
     if (item.itemType === 'skill' && item.skillId != null) excludedSkillIds.add(item.skillId)
     if (item.itemType === 'project' && item.projectId != null) excludedProjectIds.add(item.projectId)
     if (item.itemType === 'projectBullet' && item.projectBulletId != null) excludedProjectBulletIds.add(item.projectBulletId)
+    if (item.itemType === 'education' && item.educationId != null) excludedEducationIds.add(item.educationId)
+    if (item.itemType === 'volunteer' && item.volunteerId != null) excludedVolunteerIds.add(item.volunteerId)
+    if (item.itemType === 'award' && item.awardId != null) excludedAwardIds.add(item.awardId)
+    if (item.itemType === 'publication' && item.publicationId != null) excludedPublicationIds.add(item.publicationId)
+    if (item.itemType === 'language' && item.languageId != null) excludedLanguageIds.add(item.languageId)
+    if (item.itemType === 'interest' && item.interestId != null) excludedInterestIds.add(item.interestId)
+    if (item.itemType === 'reference' && item.referenceId != null) excludedReferenceIds.add(item.referenceId)
   }
 
   const bulletsByJobId = new Map<number, typeof allBullets>()
@@ -95,7 +123,81 @@ async function getBuilderDataForVariant(variantId: number): Promise<BuilderData>
     })),
   }))
 
-  return { jobs: jobsWithBullets, skills: skillsWithExcluded, projects: projectsWithBullets }
+  const educationMapped: BuilderEducation[] = allEducation.map((e) => ({
+    id: e.id,
+    institution: e.institution,
+    area: e.area,
+    studyType: e.studyType,
+    startDate: e.startDate,
+    endDate: e.endDate,
+    score: e.score ?? '',
+    courses: JSON.parse(e.courses) as string[],
+    excluded: excludedEducationIds.has(e.id),
+  }))
+
+  const volunteerMapped: BuilderVolunteer[] = allVolunteer.map((v) => ({
+    id: v.id,
+    organization: v.organization,
+    position: v.position,
+    startDate: v.startDate,
+    endDate: v.endDate,
+    summary: v.summary,
+    highlights: JSON.parse(v.highlights) as string[],
+    excluded: excludedVolunteerIds.has(v.id),
+  }))
+
+  const awardsMapped: BuilderAward[] = allAwards.map((a) => ({
+    id: a.id,
+    title: a.title,
+    date: a.date,
+    awarder: a.awarder,
+    summary: a.summary,
+    excluded: excludedAwardIds.has(a.id),
+  }))
+
+  const publicationsMapped: BuilderPublication[] = allPublications.map((p) => ({
+    id: p.id,
+    name: p.name,
+    publisher: p.publisher,
+    releaseDate: p.releaseDate,
+    url: p.url,
+    summary: p.summary,
+    excluded: excludedPublicationIds.has(p.id),
+  }))
+
+  const languagesMapped: BuilderLanguage[] = allLanguages.map((l) => ({
+    id: l.id,
+    language: l.language,
+    fluency: l.fluency,
+    excluded: excludedLanguageIds.has(l.id),
+  }))
+
+  const interestsMapped: BuilderInterest[] = allInterests.map((i) => ({
+    id: i.id,
+    name: i.name,
+    keywords: JSON.parse(i.keywords) as string[],
+    excluded: excludedInterestIds.has(i.id),
+  }))
+
+  const referencesMapped: BuilderReference[] = allReferences.map((r) => ({
+    id: r.id,
+    name: r.name,
+    reference: r.reference,
+    excluded: excludedReferenceIds.has(r.id),
+  }))
+
+  return {
+    jobs: jobsWithBullets,
+    skills: skillsWithExcluded,
+    projects: projectsWithBullets,
+    education: educationMapped,
+    volunteer: volunteerMapped,
+    awards: awardsMapped,
+    publications: publicationsMapped,
+    languages: languagesMapped,
+    interests: interestsMapped,
+    references: referencesMapped,
+  }
 }
 
 export function registerExportHandlers(): void {
@@ -170,6 +272,13 @@ export function registerExportHandlers(): void {
     const includedJobs = builderData.jobs.filter((j) => !j.excluded)
     const includedSkills = builderData.skills.filter((s) => !s.excluded)
     const includedProjects = builderData.projects.filter((p) => !p.excluded)
+    const includedEducation = builderData.education.filter((e) => !e.excluded)
+    const includedVolunteer = builderData.volunteer.filter((v) => !v.excluded)
+    const includedAwards = builderData.awards.filter((a) => !a.excluded)
+    const includedPublications = builderData.publications.filter((p) => !p.excluded)
+    const includedLanguages = builderData.languages.filter((l) => !l.excluded)
+    const includedInterests = builderData.interests.filter((i) => !i.excluded)
+    const includedReferences = builderData.references.filter((r) => !r.excluded)
 
     // 3. Build DOCX document
     const doc = new Document({
@@ -347,6 +456,237 @@ export function registerExportHandlers(): void {
                       new Paragraph({ spacing: { after: 120 } }),
                     ]
                   }),
+                ]
+              : []),
+            // EDUCATION section
+            ...(includedEducation.length > 0
+              ? [
+                  new Paragraph({
+                    children: [
+                      new TextRun({ text: 'EDUCATION', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                    ],
+                    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
+                    spacing: { before: 240, after: 120 },
+                  }),
+                  ...includedEducation.flatMap((edu) => [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: `${edu.studyType}${edu.studyType && edu.area ? ' in ' : ''}${edu.area}${edu.institution ? ` \u2014 ${edu.institution}` : ''}`,
+                          bold: true,
+                          size: 22,
+                          font: 'Calibri',
+                        }),
+                        new TextRun({
+                          text: `\t${edu.startDate}${edu.startDate ? ' \u2014 ' : ''}${edu.endDate || 'Present'}`,
+                          size: 20,
+                          font: 'Calibri',
+                          color: '555555',
+                        }),
+                      ],
+                      tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+                    }),
+                    ...(edu.score
+                      ? [new Paragraph({
+                          children: [new TextRun({ text: `Score: ${edu.score}`, size: 20, font: 'Calibri', color: '555555' })],
+                          spacing: { after: 40 },
+                        })]
+                      : []),
+                    ...(edu.courses.length > 0
+                      ? [new Paragraph({
+                          children: [new TextRun({ text: `Courses: ${edu.courses.join(', ')}`, size: 20, font: 'Calibri', color: '555555' })],
+                          spacing: { after: 40 },
+                        })]
+                      : []),
+                    new Paragraph({ spacing: { after: 120 } }),
+                  ]),
+                ]
+              : []),
+            // VOLUNTEER EXPERIENCE section
+            ...(includedVolunteer.length > 0
+              ? [
+                  new Paragraph({
+                    children: [
+                      new TextRun({ text: 'VOLUNTEER EXPERIENCE', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                    ],
+                    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
+                    spacing: { before: 240, after: 120 },
+                  }),
+                  ...includedVolunteer.flatMap((vol) => [
+                    new Paragraph({
+                      children: [
+                        new TextRun({ text: vol.position, bold: true, size: 22, font: 'Calibri' }),
+                        new TextRun({
+                          text: `\t${vol.startDate}${vol.startDate ? ' \u2014 ' : ''}${vol.endDate || 'Present'}`,
+                          size: 20,
+                          font: 'Calibri',
+                          color: '555555',
+                        }),
+                      ],
+                      tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+                    }),
+                    new Paragraph({
+                      children: [new TextRun({ text: vol.organization, size: 20, font: 'Calibri', color: '555555' })],
+                      spacing: { after: 60 },
+                    }),
+                    ...(vol.summary
+                      ? [new Paragraph({
+                          children: [new TextRun({ text: vol.summary, size: 22, font: 'Calibri' })],
+                          spacing: { after: 40 },
+                        })]
+                      : []),
+                    ...vol.highlights.map(
+                      (h) => new Paragraph({
+                        children: [new TextRun({ text: h, size: 22, font: 'Calibri' })],
+                        bullet: { level: 0 },
+                        spacing: { after: 40 },
+                      })
+                    ),
+                    new Paragraph({ spacing: { after: 120 } }),
+                  ]),
+                ]
+              : []),
+            // AWARDS section
+            ...(includedAwards.length > 0
+              ? [
+                  new Paragraph({
+                    children: [
+                      new TextRun({ text: 'AWARDS', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                    ],
+                    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
+                    spacing: { before: 240, after: 120 },
+                  }),
+                  ...includedAwards.flatMap((award) => [
+                    new Paragraph({
+                      children: [
+                        new TextRun({ text: award.title, bold: true, size: 22, font: 'Calibri' }),
+                        new TextRun({
+                          text: ` \u2014 ${award.awarder}${award.date ? ` (${award.date})` : ''}`,
+                          size: 20,
+                          font: 'Calibri',
+                          color: '555555',
+                        }),
+                      ],
+                      spacing: { after: 40 },
+                    }),
+                    ...(award.summary
+                      ? [new Paragraph({
+                          children: [new TextRun({ text: award.summary, size: 20, font: 'Calibri', color: '555555' })],
+                          spacing: { after: 40 },
+                        })]
+                      : []),
+                    new Paragraph({ spacing: { after: 120 } }),
+                  ]),
+                ]
+              : []),
+            // PUBLICATIONS section
+            ...(includedPublications.length > 0
+              ? [
+                  new Paragraph({
+                    children: [
+                      new TextRun({ text: 'PUBLICATIONS', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                    ],
+                    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
+                    spacing: { before: 240, after: 120 },
+                  }),
+                  ...includedPublications.flatMap((pub) => [
+                    new Paragraph({
+                      children: [
+                        new TextRun({ text: pub.name, bold: true, size: 22, font: 'Calibri' }),
+                        new TextRun({
+                          text: ` \u2014 ${pub.publisher}${pub.releaseDate ? ` (${pub.releaseDate})` : ''}`,
+                          size: 20,
+                          font: 'Calibri',
+                          color: '555555',
+                        }),
+                      ],
+                      spacing: { after: 40 },
+                    }),
+                    ...(pub.url
+                      ? [new Paragraph({
+                          children: [new TextRun({ text: pub.url, size: 20, font: 'Calibri', color: '555555' })],
+                          spacing: { after: 40 },
+                        })]
+                      : []),
+                    ...(pub.summary
+                      ? [new Paragraph({
+                          children: [new TextRun({ text: pub.summary, size: 20, font: 'Calibri', color: '555555' })],
+                          spacing: { after: 40 },
+                        })]
+                      : []),
+                    new Paragraph({ spacing: { after: 120 } }),
+                  ]),
+                ]
+              : []),
+            // LANGUAGES section
+            ...(includedLanguages.length > 0
+              ? [
+                  new Paragraph({
+                    children: [
+                      new TextRun({ text: 'LANGUAGES', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                    ],
+                    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
+                    spacing: { before: 240, after: 120 },
+                  }),
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: includedLanguages.map((l) => `${l.language}${l.fluency ? ` (${l.fluency})` : ''}`).join(', '),
+                        size: 22,
+                        font: 'Calibri',
+                      }),
+                    ],
+                    spacing: { after: 120 },
+                  }),
+                ]
+              : []),
+            // INTERESTS section
+            ...(includedInterests.length > 0
+              ? [
+                  new Paragraph({
+                    children: [
+                      new TextRun({ text: 'INTERESTS', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                    ],
+                    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
+                    spacing: { before: 240, after: 120 },
+                  }),
+                  ...includedInterests.map(
+                    (interest) =>
+                      new Paragraph({
+                        children: [
+                          new TextRun({ text: `${interest.name}`, bold: true, size: 22, font: 'Calibri' }),
+                          ...(interest.keywords.length > 0
+                            ? [new TextRun({ text: `: ${interest.keywords.join(', ')}`, size: 22, font: 'Calibri' })]
+                            : []),
+                        ],
+                        spacing: { after: 60 },
+                      })
+                  ),
+                ]
+              : []),
+            // REFERENCES section
+            ...(includedReferences.length > 0
+              ? [
+                  new Paragraph({
+                    children: [
+                      new TextRun({ text: 'REFERENCES', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                    ],
+                    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
+                    spacing: { before: 240, after: 120 },
+                  }),
+                  ...includedReferences.flatMap((ref) => [
+                    new Paragraph({
+                      children: [new TextRun({ text: ref.name, bold: true, size: 22, font: 'Calibri' })],
+                      spacing: { after: 40 },
+                    }),
+                    ...(ref.reference
+                      ? [new Paragraph({
+                          children: [new TextRun({ text: ref.reference, size: 20, font: 'Calibri', color: '555555' })],
+                          spacing: { after: 40 },
+                        })]
+                      : []),
+                    new Paragraph({ spacing: { after: 120 } }),
+                  ]),
                 ]
               : []),
           ],

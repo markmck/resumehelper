@@ -64,10 +64,80 @@ export interface BuilderProject {
   bullets: BuilderBullet[]
 }
 
+export interface BuilderEducation {
+  id: number
+  institution: string
+  area: string
+  studyType: string
+  startDate: string
+  endDate: string | null
+  score: string
+  courses: string[]
+  excluded: boolean
+}
+
+export interface BuilderVolunteer {
+  id: number
+  organization: string
+  position: string
+  startDate: string
+  endDate: string | null
+  summary: string
+  highlights: string[]
+  excluded: boolean
+}
+
+export interface BuilderAward {
+  id: number
+  title: string
+  date: string | null
+  awarder: string
+  summary: string
+  excluded: boolean
+}
+
+export interface BuilderPublication {
+  id: number
+  name: string
+  publisher: string
+  releaseDate: string | null
+  url: string
+  summary: string
+  excluded: boolean
+}
+
+export interface BuilderLanguage {
+  id: number
+  language: string
+  fluency: string
+  excluded: boolean
+}
+
+export interface BuilderInterest {
+  id: number
+  name: string
+  keywords: string[]
+  excluded: boolean
+}
+
+export interface BuilderReference {
+  id: number
+  name: string
+  reference: string
+  excluded: boolean
+}
+
 export interface BuilderData {
   jobs: BuilderJob[]
   skills: BuilderSkill[]
   projects: BuilderProject[]
+  education?: BuilderEducation[]
+  volunteer?: BuilderVolunteer[]
+  awards?: BuilderAward[]
+  publications?: BuilderPublication[]
+  languages?: BuilderLanguage[]
+  interests?: BuilderInterest[]
+  references?: BuilderReference[]
 }
 
 export interface SubmissionSnapshot {
@@ -75,6 +145,13 @@ export interface SubmissionSnapshot {
   jobs: BuilderJob[]
   skills: BuilderSkill[]
   projects: BuilderProject[]
+  education?: BuilderEducation[]
+  volunteer?: BuilderVolunteer[]
+  awards?: BuilderAward[]
+  publications?: BuilderPublication[]
+  languages?: BuilderLanguage[]
+  interests?: BuilderInterest[]
+  references?: BuilderReference[]
 }
 
 export interface Project {

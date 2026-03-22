@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { db } from '../db'
-import { templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets } from '../db/schema'
+import { templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
 import { eq, and, asc, desc, inArray } from 'drizzle-orm'
 
 export function registerTemplateHandlers(): void {
@@ -57,6 +57,13 @@ export function registerTemplateHandlers(): void {
             jobId: item.jobId,
             projectId: item.projectId,
             projectBulletId: item.projectBulletId,
+            educationId: item.educationId,
+            volunteerId: item.volunteerId,
+            awardId: item.awardId,
+            publicationId: item.publicationId,
+            languageId: item.languageId,
+            interestId: item.interestId,
+            referenceId: item.referenceId,
             excluded: item.excluded,
           })),
         )
@@ -86,6 +93,14 @@ export function registerTemplateHandlers(): void {
 
     const allProjectBullets = await db.select().from(projectBullets).orderBy(asc(projectBullets.sortOrder))
 
+    const allEducation = await db.select().from(education)
+    const allVolunteer = await db.select().from(volunteer)
+    const allAwards = await db.select().from(awards)
+    const allPublications = await db.select().from(publications)
+    const allLanguages = await db.select().from(languages)
+    const allInterests = await db.select().from(interests)
+    const allReferences = await db.select().from(referenceEntries)
+
     const exclusionItems = await db
       .select()
       .from(templateVariantItems)
@@ -96,6 +111,13 @@ export function registerTemplateHandlers(): void {
     const excludedSkillIds = new Set<number>()
     const excludedProjectIds = new Set<number>()
     const excludedProjectBulletIds = new Set<number>()
+    const excludedEducationIds = new Set<number>()
+    const excludedVolunteerIds = new Set<number>()
+    const excludedAwardIds = new Set<number>()
+    const excludedPublicationIds = new Set<number>()
+    const excludedLanguageIds = new Set<number>()
+    const excludedInterestIds = new Set<number>()
+    const excludedReferenceIds = new Set<number>()
 
     for (const item of exclusionItems) {
       if (!item.excluded) continue
@@ -104,6 +126,13 @@ export function registerTemplateHandlers(): void {
       if (item.itemType === 'skill' && item.skillId != null) excludedSkillIds.add(item.skillId)
       if (item.itemType === 'project' && item.projectId != null) excludedProjectIds.add(item.projectId)
       if (item.itemType === 'projectBullet' && item.projectBulletId != null) excludedProjectBulletIds.add(item.projectBulletId)
+      if (item.itemType === 'education' && item.educationId != null) excludedEducationIds.add(item.educationId)
+      if (item.itemType === 'volunteer' && item.volunteerId != null) excludedVolunteerIds.add(item.volunteerId)
+      if (item.itemType === 'award' && item.awardId != null) excludedAwardIds.add(item.awardId)
+      if (item.itemType === 'publication' && item.publicationId != null) excludedPublicationIds.add(item.publicationId)
+      if (item.itemType === 'language' && item.languageId != null) excludedLanguageIds.add(item.languageId)
+      if (item.itemType === 'interest' && item.interestId != null) excludedInterestIds.add(item.interestId)
+      if (item.itemType === 'reference' && item.referenceId != null) excludedReferenceIds.add(item.referenceId)
     }
 
     const bulletsByJobId = new Map<number, typeof allBullets>()
@@ -152,7 +181,81 @@ export function registerTemplateHandlers(): void {
       })),
     }))
 
-    return { jobs: jobsWithBullets, skills: skillsWithExcluded, projects: projectsWithBullets }
+    const educationWithExcluded = allEducation.map((e) => ({
+      id: e.id,
+      institution: e.institution,
+      area: e.area,
+      studyType: e.studyType,
+      startDate: e.startDate,
+      endDate: e.endDate,
+      score: e.score ?? '',
+      courses: JSON.parse(e.courses) as string[],
+      excluded: excludedEducationIds.has(e.id),
+    }))
+
+    const volunteerWithExcluded = allVolunteer.map((v) => ({
+      id: v.id,
+      organization: v.organization,
+      position: v.position,
+      startDate: v.startDate,
+      endDate: v.endDate,
+      summary: v.summary,
+      highlights: JSON.parse(v.highlights) as string[],
+      excluded: excludedVolunteerIds.has(v.id),
+    }))
+
+    const awardsWithExcluded = allAwards.map((a) => ({
+      id: a.id,
+      title: a.title,
+      date: a.date,
+      awarder: a.awarder,
+      summary: a.summary,
+      excluded: excludedAwardIds.has(a.id),
+    }))
+
+    const publicationsWithExcluded = allPublications.map((p) => ({
+      id: p.id,
+      name: p.name,
+      publisher: p.publisher,
+      releaseDate: p.releaseDate,
+      url: p.url,
+      summary: p.summary,
+      excluded: excludedPublicationIds.has(p.id),
+    }))
+
+    const languagesWithExcluded = allLanguages.map((l) => ({
+      id: l.id,
+      language: l.language,
+      fluency: l.fluency,
+      excluded: excludedLanguageIds.has(l.id),
+    }))
+
+    const interestsWithExcluded = allInterests.map((i) => ({
+      id: i.id,
+      name: i.name,
+      keywords: JSON.parse(i.keywords) as string[],
+      excluded: excludedInterestIds.has(i.id),
+    }))
+
+    const referencesWithExcluded = allReferences.map((r) => ({
+      id: r.id,
+      name: r.name,
+      reference: r.reference,
+      excluded: excludedReferenceIds.has(r.id),
+    }))
+
+    return {
+      jobs: jobsWithBullets,
+      skills: skillsWithExcluded,
+      projects: projectsWithBullets,
+      education: educationWithExcluded,
+      volunteer: volunteerWithExcluded,
+      awards: awardsWithExcluded,
+      publications: publicationsWithExcluded,
+      languages: languagesWithExcluded,
+      interests: interestsWithExcluded,
+      references: referencesWithExcluded,
+    }
   })
 
   ipcMain.handle(
@@ -305,6 +408,132 @@ export function registerTemplateHandlers(): void {
             variantId,
             itemType: 'projectBullet',
             projectBulletId: itemId,
+            excluded: true,
+          })
+        }
+      } else if (itemType === 'education') {
+        await db
+          .delete(templateVariantItems)
+          .where(
+            and(
+              eq(templateVariantItems.variantId, variantId),
+              eq(templateVariantItems.itemType, 'education'),
+              eq(templateVariantItems.educationId, itemId),
+            ),
+          )
+        if (excluded) {
+          await db.insert(templateVariantItems).values({
+            variantId,
+            itemType: 'education',
+            educationId: itemId,
+            excluded: true,
+          })
+        }
+      } else if (itemType === 'volunteer') {
+        await db
+          .delete(templateVariantItems)
+          .where(
+            and(
+              eq(templateVariantItems.variantId, variantId),
+              eq(templateVariantItems.itemType, 'volunteer'),
+              eq(templateVariantItems.volunteerId, itemId),
+            ),
+          )
+        if (excluded) {
+          await db.insert(templateVariantItems).values({
+            variantId,
+            itemType: 'volunteer',
+            volunteerId: itemId,
+            excluded: true,
+          })
+        }
+      } else if (itemType === 'award') {
+        await db
+          .delete(templateVariantItems)
+          .where(
+            and(
+              eq(templateVariantItems.variantId, variantId),
+              eq(templateVariantItems.itemType, 'award'),
+              eq(templateVariantItems.awardId, itemId),
+            ),
+          )
+        if (excluded) {
+          await db.insert(templateVariantItems).values({
+            variantId,
+            itemType: 'award',
+            awardId: itemId,
+            excluded: true,
+          })
+        }
+      } else if (itemType === 'publication') {
+        await db
+          .delete(templateVariantItems)
+          .where(
+            and(
+              eq(templateVariantItems.variantId, variantId),
+              eq(templateVariantItems.itemType, 'publication'),
+              eq(templateVariantItems.publicationId, itemId),
+            ),
+          )
+        if (excluded) {
+          await db.insert(templateVariantItems).values({
+            variantId,
+            itemType: 'publication',
+            publicationId: itemId,
+            excluded: true,
+          })
+        }
+      } else if (itemType === 'language') {
+        await db
+          .delete(templateVariantItems)
+          .where(
+            and(
+              eq(templateVariantItems.variantId, variantId),
+              eq(templateVariantItems.itemType, 'language'),
+              eq(templateVariantItems.languageId, itemId),
+            ),
+          )
+        if (excluded) {
+          await db.insert(templateVariantItems).values({
+            variantId,
+            itemType: 'language',
+            languageId: itemId,
+            excluded: true,
+          })
+        }
+      } else if (itemType === 'interest') {
+        await db
+          .delete(templateVariantItems)
+          .where(
+            and(
+              eq(templateVariantItems.variantId, variantId),
+              eq(templateVariantItems.itemType, 'interest'),
+              eq(templateVariantItems.interestId, itemId),
+            ),
+          )
+        if (excluded) {
+          await db.insert(templateVariantItems).values({
+            variantId,
+            itemType: 'interest',
+            interestId: itemId,
+            excluded: true,
+          })
+        }
+      } else if (itemType === 'reference') {
+        await db
+          .delete(templateVariantItems)
+          .where(
+            and(
+              eq(templateVariantItems.variantId, variantId),
+              eq(templateVariantItems.itemType, 'reference'),
+              eq(templateVariantItems.referenceId, itemId),
+            ),
+          )
+        if (excluded) {
+          await db.insert(templateVariantItems).values({
+            variantId,
+            itemType: 'reference',
+            referenceId: itemId,
             excluded: true,
           })
         }
