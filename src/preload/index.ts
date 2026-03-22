@@ -97,6 +97,109 @@ const api = {
     reorder: (projectId: number, orderedIds: number[]) =>
       ipcRenderer.invoke('projectBullets:reorder', projectId, orderedIds),
   },
+  education: {
+    list: () => ipcRenderer.invoke('education:list'),
+    create: (data: {
+      institution: string
+      area?: string
+      studyType?: string
+      startDate?: string
+      endDate?: string
+      score?: string
+      courses?: string[]
+    }) => ipcRenderer.invoke('education:create', data),
+    update: (
+      id: number,
+      data: {
+        institution?: string
+        area?: string
+        studyType?: string
+        startDate?: string
+        endDate?: string | null
+        score?: string
+        courses?: string[]
+      },
+    ) => ipcRenderer.invoke('education:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('education:delete', id),
+  },
+  volunteer: {
+    list: () => ipcRenderer.invoke('volunteer:list'),
+    create: (data: {
+      organization: string
+      position?: string
+      startDate?: string
+      endDate?: string
+      summary?: string
+      highlights?: string[]
+    }) => ipcRenderer.invoke('volunteer:create', data),
+    update: (
+      id: number,
+      data: {
+        organization?: string
+        position?: string
+        startDate?: string
+        endDate?: string | null
+        summary?: string
+        highlights?: string[]
+      },
+    ) => ipcRenderer.invoke('volunteer:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('volunteer:delete', id),
+  },
+  awards: {
+    list: () => ipcRenderer.invoke('awards:list'),
+    create: (data: { title: string; date?: string; awarder?: string; summary?: string }) =>
+      ipcRenderer.invoke('awards:create', data),
+    update: (
+      id: number,
+      data: { title?: string; date?: string | null; awarder?: string; summary?: string },
+    ) => ipcRenderer.invoke('awards:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('awards:delete', id),
+  },
+  publications: {
+    list: () => ipcRenderer.invoke('publications:list'),
+    create: (data: {
+      name: string
+      publisher?: string
+      releaseDate?: string
+      url?: string
+      summary?: string
+    }) => ipcRenderer.invoke('publications:create', data),
+    update: (
+      id: number,
+      data: {
+        name?: string
+        publisher?: string
+        releaseDate?: string | null
+        url?: string
+        summary?: string
+      },
+    ) => ipcRenderer.invoke('publications:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('publications:delete', id),
+  },
+  languages: {
+    list: () => ipcRenderer.invoke('languages:list'),
+    create: (data: { language: string; fluency?: string }) =>
+      ipcRenderer.invoke('languages:create', data),
+    update: (id: number, data: { language?: string; fluency?: string }) =>
+      ipcRenderer.invoke('languages:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('languages:delete', id),
+  },
+  interests: {
+    list: () => ipcRenderer.invoke('interests:list'),
+    create: (data: { name: string; keywords?: string[] }) =>
+      ipcRenderer.invoke('interests:create', data),
+    update: (id: number, data: { name?: string; keywords?: string[] }) =>
+      ipcRenderer.invoke('interests:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('interests:delete', id),
+  },
+  references: {
+    list: () => ipcRenderer.invoke('references:list'),
+    create: (data: { name: string; reference?: string }) =>
+      ipcRenderer.invoke('references:create', data),
+    update: (id: number, data: { name?: string; reference?: string }) =>
+      ipcRenderer.invoke('references:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('references:delete', id),
+  },
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

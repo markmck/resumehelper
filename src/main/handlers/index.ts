@@ -6,6 +6,13 @@ import { registerSubmissionHandlers } from './submissions'
 import { registerProfileHandlers } from './profile'
 import { registerExportHandlers } from './export'
 import { registerProjectHandlers } from './projects'
+import { registerEducationHandlers } from './education'
+import { registerVolunteerHandlers } from './volunteer'
+import { registerAwardHandlers } from './awards'
+import { registerPublicationHandlers } from './publications'
+import { registerLanguageHandlers } from './languages'
+import { registerInterestHandlers } from './interests'
+import { registerReferenceHandlers } from './references'
 
 export function registerAllHandlers(): void {
   registerJobHandlers()
@@ -16,4 +23,11 @@ export function registerAllHandlers(): void {
   registerProfileHandlers()
   registerExportHandlers()
   registerProjectHandlers()
+  registerEducationHandlers()
+  registerVolunteerHandlers()
+  registerAwardHandlers()
+  registerPublicationHandlers()
+  registerLanguageHandlers()
+  registerInterestHandlers()
+  registerReferenceHandlers()
 }

@@ -57,15 +57,24 @@ export interface BuilderSkill {
   excluded: boolean
 }
 
+export interface BuilderProject {
+  id: number
+  name: string
+  excluded: boolean
+  bullets: BuilderBullet[]
+}
+
 export interface BuilderData {
   jobs: BuilderJob[]
   skills: BuilderSkill[]
+  projects: BuilderProject[]
 }
 
 export interface SubmissionSnapshot {
   layoutTemplate: string
   jobs: BuilderJob[]
   skills: BuilderSkill[]
+  projects: BuilderProject[]
 }
 
 export interface Project {
@@ -92,6 +101,62 @@ export interface Profile {
   phone: string
   location: string
   linkedin: string
+}
+
+export interface Education {
+  id: number
+  institution: string
+  area: string
+  studyType: string
+  startDate: string
+  endDate: string | null
+  score: string | null
+  courses: string[]
+}
+
+export interface Volunteer {
+  id: number
+  organization: string
+  position: string
+  startDate: string
+  endDate: string | null
+  summary: string
+  highlights: string[]
+}
+
+export interface Award {
+  id: number
+  title: string
+  date: string | null
+  awarder: string
+  summary: string
+}
+
+export interface Publication {
+  id: number
+  name: string
+  publisher: string
+  releaseDate: string | null
+  url: string
+  summary: string
+}
+
+export interface Language {
+  id: number
+  language: string
+  fluency: string
+}
+
+export interface Interest {
+  id: number
+  name: string
+  keywords: string[]
+}
+
+export interface Reference {
+  id: number
+  name: string
+  reference: string
 }
 
 export interface Submission {
@@ -195,6 +260,112 @@ export interface Api {
     update: (id: number, data: { text?: string }) => Promise<ProjectBullet>
     delete: (id: number) => Promise<void>
     reorder: (projectId: number, orderedIds: number[]) => Promise<void>
+  }
+  education: {
+    list: () => Promise<Education[]>
+    create: (data: {
+      institution: string
+      area?: string
+      studyType?: string
+      startDate?: string
+      endDate?: string
+      score?: string
+      courses?: string[]
+    }) => Promise<Education>
+    update: (
+      id: number,
+      data: {
+        institution?: string
+        area?: string
+        studyType?: string
+        startDate?: string
+        endDate?: string | null
+        score?: string
+        courses?: string[]
+      },
+    ) => Promise<Education>
+    delete: (id: number) => Promise<void>
+  }
+  volunteer: {
+    list: () => Promise<Volunteer[]>
+    create: (data: {
+      organization: string
+      position?: string
+      startDate?: string
+      endDate?: string
+      summary?: string
+      highlights?: string[]
+    }) => Promise<Volunteer>
+    update: (
+      id: number,
+      data: {
+        organization?: string
+        position?: string
+        startDate?: string
+        endDate?: string | null
+        summary?: string
+        highlights?: string[]
+      },
+    ) => Promise<Volunteer>
+    delete: (id: number) => Promise<void>
+  }
+  awards: {
+    list: () => Promise<Award[]>
+    create: (data: {
+      title: string
+      date?: string
+      awarder?: string
+      summary?: string
+    }) => Promise<Award>
+    update: (
+      id: number,
+      data: {
+        title?: string
+        date?: string | null
+        awarder?: string
+        summary?: string
+      },
+    ) => Promise<Award>
+    delete: (id: number) => Promise<void>
+  }
+  publications: {
+    list: () => Promise<Publication[]>
+    create: (data: {
+      name: string
+      publisher?: string
+      releaseDate?: string
+      url?: string
+      summary?: string
+    }) => Promise<Publication>
+    update: (
+      id: number,
+      data: {
+        name?: string
+        publisher?: string
+        releaseDate?: string | null
+        url?: string
+        summary?: string
+      },
+    ) => Promise<Publication>
+    delete: (id: number) => Promise<void>
+  }
+  languages: {
+    list: () => Promise<Language[]>
+    create: (data: { language: string; fluency?: string }) => Promise<Language>
+    update: (id: number, data: { language?: string; fluency?: string }) => Promise<Language>
+    delete: (id: number) => Promise<void>
+  }
+  interests: {
+    list: () => Promise<Interest[]>
+    create: (data: { name: string; keywords?: string[] }) => Promise<Interest>
+    update: (id: number, data: { name?: string; keywords?: string[] }) => Promise<Interest>
+    delete: (id: number) => Promise<void>
+  }
+  references: {
+    list: () => Promise<Reference[]>
+    create: (data: { name: string; reference?: string }) => Promise<Reference>
+    update: (id: number, data: { name?: string; reference?: string }) => Promise<Reference>
+    delete: (id: number) => Promise<void>
   }
 }
 
