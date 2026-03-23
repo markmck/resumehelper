@@ -211,6 +211,30 @@ const api = {
       ipcRenderer.invoke('themes:renderSnapshotHtml', themeKey, snapshotData),
     list: () => ipcRenderer.invoke('themes:list'),
   },
+  settings: {
+    getAi: () => ipcRenderer.invoke('settings:getAi'),
+    setAi: (data: { provider: string; model: string; apiKey: string }) =>
+      ipcRenderer.invoke('settings:setAi', data),
+    testAi: () => ipcRenderer.invoke('settings:testAi'),
+  },
+  ai: {
+    analyze: (jobPostingId: number, variantId: number) =>
+      ipcRenderer.invoke('ai:analyze', jobPostingId, variantId),
+    onProgress: (cb: (phase: string, pct: number) => void) =>
+      ipcRenderer.on('ai:progress', (_, phase, pct) => cb(phase, pct)),
+    offProgress: () => ipcRenderer.removeAllListeners('ai:progress'),
+    acceptSuggestion: (analysisId: number, bulletId: number, text: string) =>
+      ipcRenderer.invoke('ai:acceptSuggestion', analysisId, bulletId, text),
+    dismissSuggestion: (analysisId: number, bulletId: number) =>
+      ipcRenderer.invoke('ai:dismissSuggestion', analysisId, bulletId),
+  },
+  jobPostings: {
+    list: () => ipcRenderer.invoke('jobPostings:list'),
+    create: (data: { company: string; role: string; rawText: string }) =>
+      ipcRenderer.invoke('jobPostings:create', data),
+    delete: (id: number) => ipcRenderer.invoke('jobPostings:delete', id),
+    getAnalysis: (id: number) => ipcRenderer.invoke('jobPostings:getAnalysis', id),
+  },
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

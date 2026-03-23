@@ -15,6 +15,9 @@ import { registerInterestHandlers } from './interests'
 import { registerReferenceHandlers } from './references'
 import { registerImportHandlers } from './import'
 import { registerThemeHandlers } from './themes'
+import { registerSettingsHandlers } from './settings'
+import { registerAiHandlers } from './ai'
+import { registerJobPostingHandlers } from './jobPostings'
 
 export function registerAllHandlers(): void {
   registerJobHandlers()
@@ -34,4 +37,7 @@ export function registerAllHandlers(): void {
   registerReferenceHandlers()
   registerImportHandlers()
   registerThemeHandlers()
+  registerSettingsHandlers()
+  registerAiHandlers()
+  registerJobPostingHandlers()
 }
