@@ -154,10 +154,48 @@ function ensureSchema(): void {
       \`name\` text NOT NULL,
       \`reference\` text NOT NULL DEFAULT ''
     );
+
+    CREATE TABLE IF NOT EXISTS \`ai_settings\` (
+      \`id\` integer PRIMARY KEY NOT NULL,
+      \`provider\` text NOT NULL DEFAULT 'openai',
+      \`model\` text NOT NULL DEFAULT '',
+      \`api_key\` text NOT NULL DEFAULT ''
+    );
+
+    INSERT OR IGNORE INTO \`ai_settings\` (\`id\`) VALUES (1);
+
+    CREATE TABLE IF NOT EXISTS \`job_postings\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`company\` text NOT NULL,
+      \`role\` text NOT NULL,
+      \`raw_text\` text NOT NULL DEFAULT '',
+      \`parsed_skills\` text NOT NULL DEFAULT '[]',
+      \`parsed_keywords\` text NOT NULL DEFAULT '[]',
+      \`parsed_requirements\` text NOT NULL DEFAULT '[]',
+      \`created_at\` integer NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE TABLE IF NOT EXISTS \`analysis_results\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`job_posting_id\` integer NOT NULL,
+      \`variant_id\` integer,
+      \`match_score\` integer NOT NULL DEFAULT 0,
+      \`keyword_hits\` text NOT NULL DEFAULT '[]',
+      \`keyword_misses\` text NOT NULL DEFAULT '[]',
+      \`gap_skills\` text NOT NULL DEFAULT '[]',
+      \`suggestions\` text NOT NULL DEFAULT '[]',
+      \`ats_flags\` text NOT NULL DEFAULT '[]',
+      \`raw_llm_response\` text NOT NULL DEFAULT '',
+      \`created_at\` integer NOT NULL DEFAULT (unixepoch()),
+      FOREIGN KEY (\`job_posting_id\`) REFERENCES \`job_postings\`(\`id\`) ON DELETE cascade,
+      FOREIGN KEY (\`variant_id\`) REFERENCES \`template_variants\`(\`id\`) ON DELETE set null
+    );
   `)
 
   // Add columns that may be missing on existing databases
   const alterStatements = [
+    'ALTER TABLE `submissions` ADD COLUMN `status` text DEFAULT \'applied\'',
+    'ALTER TABLE `submissions` ADD COLUMN `job_posting_id` integer REFERENCES `job_postings`(`id`)',
     'ALTER TABLE `template_variant_items` ADD COLUMN `project_id` integer REFERENCES `projects`(`id`) ON DELETE cascade',
     'ALTER TABLE `template_variant_items` ADD COLUMN `project_bullet_id` integer REFERENCES `project_bullets`(`id`) ON DELETE cascade',
     'ALTER TABLE `template_variant_items` ADD COLUMN `education_id` integer REFERENCES `education`(`id`) ON DELETE cascade',

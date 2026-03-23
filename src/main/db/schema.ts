@@ -136,6 +136,8 @@ export const submissions = sqliteTable('submissions', {
   resumeSnapshot: text('resume_snapshot').notNull().default('{}'),
   url: text('url'),
   notes: text('notes'),
+  status: text('status').default('applied'),
+  jobPostingId: integer('job_posting_id'),
 })
 
 export const profile = sqliteTable('profile', {
@@ -145,4 +147,42 @@ export const profile = sqliteTable('profile', {
   phone: text('phone').notNull().default(''),
   location: text('location').notNull().default(''),
   linkedin: text('linkedin').notNull().default(''),
+})
+
+export const aiSettings = sqliteTable('ai_settings', {
+  id: integer('id').primaryKey(),
+  provider: text('provider').notNull().default('openai'),
+  model: text('model').notNull().default(''),
+  apiKey: text('api_key').notNull().default(''),
+})
+
+export const jobPostings = sqliteTable('job_postings', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  company: text('company').notNull(),
+  role: text('role').notNull(),
+  rawText: text('raw_text').notNull().default(''),
+  parsedSkills: text('parsed_skills').notNull().default('[]'),
+  parsedKeywords: text('parsed_keywords').notNull().default('[]'),
+  parsedRequirements: text('parsed_requirements').notNull().default('[]'),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
+export const analysisResults = sqliteTable('analysis_results', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  jobPostingId: integer('job_posting_id')
+    .notNull()
+    .references(() => jobPostings.id, { onDelete: 'cascade' }),
+  variantId: integer('variant_id').references(() => templateVariants.id, { onDelete: 'set null' }),
+  matchScore: integer('match_score').notNull().default(0),
+  keywordHits: text('keyword_hits').notNull().default('[]'),
+  keywordMisses: text('keyword_misses').notNull().default('[]'),
+  gapSkills: text('gap_skills').notNull().default('[]'),
+  suggestions: text('suggestions').notNull().default('[]'),
+  atsFlags: text('ats_flags').notNull().default('[]'),
+  rawLlmResponse: text('raw_llm_response').notNull().default(''),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
 })
