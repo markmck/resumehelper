@@ -2,47 +2,40 @@ import { useState } from 'react'
 import ExperienceTab from './components/ExperienceTab'
 import TemplatesTab from './components/TemplatesTab'
 import SubmissionsTab from './components/SubmissionsTab'
+import AnalysisTab from './components/AnalysisTab'
+import { Sidebar } from './components/Sidebar'
+import type { Tab } from './components/Sidebar'
 import { ToastProvider } from './components/Toast'
-
-type Tab = 'experience' | 'templates' | 'submissions'
-
-const tabs: { id: Tab; label: string; enabled: boolean }[] = [
-  { id: 'experience', label: 'Experience', enabled: true },
-  { id: 'templates', label: 'Templates', enabled: true },
-  { id: 'submissions', label: 'Submissions', enabled: true },
-]
 
 function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('experience')
 
   return (
     <ToastProvider>
-      <div className="flex flex-col min-h-screen bg-zinc-950 text-zinc-100">
-        {/* Tab Bar */}
-        <header className="fixed top-0 left-0 right-0 z-50 h-12 bg-zinc-900 border-b border-zinc-800 flex items-center px-4 gap-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              disabled={!tab.enabled}
-              onClick={() => tab.enabled && setActiveTab(tab.id)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab.enabled && activeTab === tab.id
-                  ? 'bg-zinc-700 text-zinc-100'
-                  : tab.enabled
-                    ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
-                    : 'text-zinc-600 opacity-50 cursor-not-allowed'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </header>
-
-        {/* Tab Content */}
-        <main className="pt-12 flex-1">
+      <div
+        style={{
+          display: 'flex',
+          minHeight: '100vh',
+          backgroundColor: 'var(--color-bg-base)',
+        }}
+      >
+        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <main style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
           {activeTab === 'experience' && <ExperienceTab />}
-          {activeTab === 'templates' && <TemplatesTab />}
+          {activeTab === 'variants' && <TemplatesTab />}
+          {activeTab === 'analysis' && <AnalysisTab />}
           {activeTab === 'submissions' && <SubmissionsTab />}
+          {activeTab === 'settings' && (
+            <div
+              style={{
+                padding: 'var(--space-6)',
+                color: 'var(--color-text-secondary)',
+                fontSize: 'var(--font-size-base)',
+              }}
+            >
+              Settings page coming in next plan
+            </div>
+          )}
         </main>
       </div>
     </ToastProvider>
