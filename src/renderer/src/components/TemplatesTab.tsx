@@ -1,33 +1,43 @@
 import { useEffect, useState } from 'react'
 import { TemplateVariant } from '../../../preload/index.d'
 import VariantEditor from './VariantEditor'
-import VariantList from './VariantList'
 
-function TemplatesTab(): React.JSX.Element {
+interface TemplatesTabProps {
+  selectedVariantId: number | null
+  onVariantsLoaded: (variants: Array<{ id: number; name: string }>) => void
+  onSelectedChange: (id: number | null) => void
+}
+
+function TemplatesTab({ selectedVariantId, onVariantsLoaded, onSelectedChange }: TemplatesTabProps): React.JSX.Element {
   const [variants, setVariants] = useState<TemplateVariant[]>([])
-  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   useEffect(() => {
     window.api.templates.list().then((list) => {
       setVariants(list)
-      if (list.length > 0) {
-        setSelectedId(list[0].id)
+      onVariantsLoaded(list.map((v) => ({ id: v.id, name: v.name })))
+      if (list.length > 0 && selectedVariantId === null) {
+        onSelectedChange(list[0].id)
       }
     })
   }, [])
 
   const handleCreate = async (): Promise<void> => {
     const newVariant = await window.api.templates.create({ name: 'Untitled Variant' })
-    setVariants((prev) => [...prev, newVariant])
-    setSelectedId(newVariant.id)
+    setVariants((prev) => {
+      const updated = [...prev, newVariant]
+      onVariantsLoaded(updated.map((v) => ({ id: v.id, name: v.name })))
+      return updated
+    })
+    onSelectedChange(newVariant.id)
   }
 
   const handleDelete = async (id: number): Promise<void> => {
     await window.api.templates.delete(id)
     setVariants((prev) => {
       const updated = prev.filter((v) => v.id !== id)
-      if (selectedId === id) {
-        setSelectedId(updated.length > 0 ? updated[0].id : null)
+      onVariantsLoaded(updated.map((v) => ({ id: v.id, name: v.name })))
+      if (selectedVariantId === id) {
+        onSelectedChange(updated.length > 0 ? updated[0].id : null)
       }
       return updated
     })
@@ -35,41 +45,27 @@ function TemplatesTab(): React.JSX.Element {
 
   const handleDuplicate = async (id: number): Promise<void> => {
     const copy = await window.api.templates.duplicate(id)
-    setVariants((prev) => [...prev, copy])
-    setSelectedId(copy.id)
+    setVariants((prev) => {
+      const updated = [...prev, copy]
+      onVariantsLoaded(updated.map((v) => ({ id: v.id, name: v.name })))
+      return updated
+    })
+    onSelectedChange(copy.id)
   }
 
   const handleRename = async (id: number, newName: string): Promise<void> => {
     const updated = await window.api.templates.rename(id, newName)
-    setVariants((prev) => prev.map((v) => (v.id === id ? updated : v)))
+    setVariants((prev) => {
+      const list = prev.map((v) => (v.id === id ? updated : v))
+      onVariantsLoaded(list.map((v) => ({ id: v.id, name: v.name })))
+      return list
+    })
   }
 
-  const selectedVariant = variants.find((v) => v.id === selectedId) ?? null
+  const selectedVariant = variants.find((v) => v.id === selectedVariantId) ?? null
 
   return (
     <div style={{ display: 'flex', height: '100vh' }}>
-      {/* Variant list sidebar */}
-      <aside
-        style={{
-          width: 220,
-          flexShrink: 0,
-          backgroundColor: 'var(--color-bg-surface)',
-          borderRight: '1px solid var(--color-border-subtle)',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <VariantList
-          variants={variants}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          onCreate={handleCreate}
-          onDelete={handleDelete}
-          onDuplicate={handleDuplicate}
-        />
-      </aside>
-
-      {/* Editor area */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {selectedVariant ? (
           <VariantEditor

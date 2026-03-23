@@ -8,11 +8,6 @@ interface NavItem {
   icon: React.ReactNode
 }
 
-interface SidebarProps {
-  activeTab: Tab
-  onTabChange: (tab: Tab) => void
-}
-
 function BriefcaseIcon(): React.JSX.Element {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -78,18 +73,84 @@ function ChevronRightIcon(): React.JSX.Element {
   )
 }
 
-const navItems: NavItem[] = [
+const mainNavItems: NavItem[] = [
   { id: 'experience', label: 'Experience', icon: <BriefcaseIcon /> },
   { id: 'variants', label: 'Variants', icon: <LayersIcon /> },
   { id: 'analysis', label: 'Analysis', icon: <ChartBarIcon /> },
   { id: 'submissions', label: 'Submissions', icon: <SendIcon /> },
+]
+
+const bottomNavItems: NavItem[] = [
   { id: 'settings', label: 'Settings', icon: <GearIcon /> },
 ]
 
-export function Sidebar({ activeTab, onTabChange }: SidebarProps): React.JSX.Element {
+interface VariantInfo {
+  id: number
+  name: string
+}
+
+interface SidebarProps {
+  activeTab: Tab
+  onTabChange: (tab: Tab) => void
+  variants?: VariantInfo[]
+  selectedVariantId?: number | null
+  onVariantSelect?: (id: number) => void
+  onVariantCreate?: () => void
+}
+
+export function Sidebar({ activeTab, onTabChange, variants, selectedVariantId, onVariantSelect, onVariantCreate }: SidebarProps): React.JSX.Element {
   const [collapsed, setCollapsed] = useState(false)
 
   const sidebarWidth = collapsed ? 48 : 240
+
+  const renderNavButton = (item: NavItem): React.JSX.Element => {
+    const isActive = activeTab === item.id
+    return (
+      <button
+        key={item.id}
+        title={collapsed ? item.label : undefined}
+        onClick={() => onTabChange(item.id)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-3)',
+          padding: '8px 12px',
+          borderRadius: 'var(--radius-md)',
+          border: 'none',
+          cursor: 'pointer',
+          backgroundColor: isActive ? 'var(--color-bg-raised)' : 'transparent',
+          color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+          fontWeight: isActive ? 500 : 400,
+          fontSize: 'var(--font-size-base)',
+          fontFamily: 'var(--font-sans)',
+          textAlign: 'left',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          width: '100%',
+          transition: 'background-color 0.15s ease, color 0.15s ease',
+        }}
+        onMouseEnter={(e) => {
+          if (!isActive) {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--color-bg-raised)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isActive) {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
+          }
+        }}
+      >
+        <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+          {item.icon}
+        </span>
+        {!collapsed && (
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {item.label}
+          </span>
+        )}
+      </button>
+    )
+  }
 
   return (
     <aside
@@ -105,72 +166,111 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps): React.JSX.Ele
         overflow: 'hidden',
       }}
     >
-      {/* Nav Items */}
+      {/* Brand */}
+      {!collapsed && (
+        <div style={{ padding: '12px 16px 4px', fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-sans)' }}>
+          ResumeHelper
+        </div>
+      )}
+
+      {/* Main Nav Items */}
       <nav
         style={{
-          flex: 1,
           padding: 'var(--space-2)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 'var(--space-1)',
-          paddingTop: 'var(--space-3)',
+          gap: 2,
         }}
       >
-        {navItems.map((item) => {
-          const isActive = activeTab === item.id
-          return (
+        {mainNavItems.map(renderNavButton)}
+      </nav>
+
+      {/* Variant sub-list when on Variants tab */}
+      {activeTab === 'variants' && !collapsed && variants && (
+        <div style={{ padding: '0 var(--space-2)', flex: 1, overflow: 'auto' }}>
+          <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', margin: '4px 0 8px' }} />
+          <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: 'var(--color-text-muted)', padding: '4px 12px 4px' }}>
+            Variants
+          </div>
+          {variants.map((v) => {
+            const isSelected = selectedVariantId === v.id
+            return (
+              <button
+                key={v.id}
+                onClick={() => onVariantSelect?.(v.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '6px 12px 6px 24px',
+                  borderRadius: 'var(--radius-md)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: isSelected ? 'var(--color-accent-bg)' : 'transparent',
+                  color: isSelected ? 'var(--color-accent-light)' : 'var(--color-text-tertiary)',
+                  fontSize: 'var(--font-size-sm)',
+                  fontFamily: 'var(--font-sans)',
+                  textAlign: 'left',
+                  width: '100%',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  marginBottom: 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--color-bg-raised)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-tertiary)'
+                  }
+                }}
+              >
+                {v.name}
+              </button>
+            )
+          })}
+          <div style={{ padding: '8px 12px' }}>
             <button
-              key={item.id}
-              title={collapsed ? item.label : undefined}
-              onClick={() => onTabChange(item.id)}
+              onClick={onVariantCreate}
               style={{
+                width: '100%',
+                padding: '4px 10px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border-default)',
+                backgroundColor: 'transparent',
+                color: 'var(--color-text-secondary)',
+                fontSize: 'var(--font-size-xs)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+                height: 28,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 'var(--space-3)',
-                padding: '8px 12px',
-                borderRadius: 'var(--radius-md)',
-                border: 'none',
-                cursor: 'pointer',
-                backgroundColor: isActive ? 'var(--color-bg-raised)' : 'transparent',
-                color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                fontWeight: isActive ? 500 : 400,
-                fontSize: 'var(--font-size-sm)',
-                fontFamily: 'var(--font-sans)',
-                textAlign: 'left',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                width: '100%',
-                transition: 'background-color 0.15s ease, color 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--color-bg-raised)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
-                }
+                justifyContent: 'center',
               }}
             >
-              <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                {item.icon}
-              </span>
-              {!collapsed && (
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {item.label}
-                </span>
-              )}
+              + New variant
             </button>
-          )
-        })}
-      </nav>
+          </div>
+        </div>
+      )}
+
+      {/* Spacer */}
+      <div style={{ flex: activeTab === 'variants' && !collapsed ? 0 : 1 }} />
+
+      {/* Divider + Settings */}
+      <div style={{ padding: '0 var(--space-2)' }}>
+        <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', margin: '4px 0' }} />
+        {bottomNavItems.map(renderNavButton)}
+      </div>
 
       {/* Collapse Toggle */}
       <div
         style={{
           padding: 'var(--space-2)',
-          borderTop: '1px solid var(--color-border-subtle)',
         }}
       >
         <button

@@ -23,12 +23,10 @@ function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Ele
   )
   const { showToast } = useToast()
 
-  // Fetch theme list on mount
   useEffect(() => {
     window.api.themes.list().then(setThemes)
   }, [])
 
-  // Sync layoutTemplate when variant changes
   useEffect(() => {
     const tpl = variant.layoutTemplate
     setLayoutTemplate(tpl && tpl !== 'traditional' ? tpl : 'professional')
@@ -72,12 +70,33 @@ function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Ele
     }
   }
 
+  const subTabStyle = (tab: SubTab): React.CSSProperties => ({
+    padding: '4px 10px',
+    fontSize: 'var(--font-size-sm)',
+    fontWeight: 500,
+    borderRadius: 'var(--radius-sm)',
+    border: 'none',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-sans)',
+    textTransform: 'capitalize' as const,
+    backgroundColor: activeSubTab === tab ? 'var(--color-bg-raised)' : 'transparent',
+    color: activeSubTab === tab ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+    transition: 'background-color 0.15s ease, color 0.15s ease',
+  })
+
   return (
-    <div className="flex flex-col h-full">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Editor header */}
-      <div className="flex-shrink-0 border-b border-zinc-800 px-6 py-3">
-        {/* Variant name — inline editable */}
-        <div className="mb-2">
+      <div
+        style={{
+          flexShrink: 0,
+          borderBottom: '1px solid var(--color-border-subtle)',
+          padding: '12px 20px',
+          backgroundColor: 'var(--color-bg-surface)',
+        }}
+      >
+        {/* Variant name */}
+        <div style={{ marginBottom: 'var(--space-2)' }}>
           <InlineEdit
             value={variant.name}
             onSave={(name) => onRename(variant.id, name)}
@@ -86,32 +105,33 @@ function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Ele
           />
         </div>
 
-        {/* Sub-tab bar + theme selector + export buttons */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex gap-1">
+        {/* Sub-tab bar + theme + export */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
             {(['builder', 'preview'] as SubTab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveSubTab(tab)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors capitalize ${
-                  activeSubTab === tab
-                    ? 'bg-zinc-700 text-zinc-100'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
-                }`}
-              >
+              <button key={tab} onClick={() => setActiveSubTab(tab)} style={subTabStyle(tab)}>
                 {tab}
               </button>
             ))}
           </div>
 
-          {/* Theme selector + export buttons — only shown on preview sub-tab */}
           {activeSubTab === 'preview' && (
-            <div className="flex items-center gap-2">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
               {themes.length > 0 && (
                 <select
                   value={layoutTemplate}
                   onChange={(e) => handleThemeChange(e.target.value)}
-                  className="px-2 py-1.5 text-sm font-medium rounded-md bg-zinc-800 text-zinc-200 border border-zinc-700 hover:border-zinc-500 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--color-bg-input)',
+                    border: '1px solid var(--color-border-default)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '4px 8px',
+                    fontSize: 'var(--font-size-xs)',
+                    color: 'var(--color-text-secondary)',
+                    height: 28,
+                    outline: 'none',
+                    fontFamily: 'var(--font-sans)',
+                  }}
                 >
                   {themes.map((t) => (
                     <option key={t.key} value={t.key}>
@@ -123,16 +143,45 @@ function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Ele
               <button
                 onClick={handleExportPdf}
                 disabled={exporting !== null}
-                className="px-3 py-1.5 text-sm font-medium rounded-md transition-colors bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 'var(--font-size-xs)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--color-border-default)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--color-text-secondary)',
+                  cursor: exporting ? 'not-allowed' : 'pointer',
+                  opacity: exporting ? 0.5 : 1,
+                  height: 28,
+                  fontFamily: 'var(--font-sans)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-1)',
+                }}
               >
-                {exporting === 'pdf' ? 'Exporting…' : 'Export PDF'}
+                {exporting === 'pdf' ? 'Exporting...' : 'PDF'}
               </button>
               <button
                 onClick={handleExportDocx}
                 disabled={exporting !== null}
-                className="px-3 py-1.5 text-sm font-medium rounded-md transition-colors bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 'var(--font-size-xs)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: 'none',
+                  backgroundColor: 'var(--color-success)',
+                  color: '#fff',
+                  cursor: exporting ? 'not-allowed' : 'pointer',
+                  opacity: exporting ? 0.5 : 1,
+                  height: 28,
+                  fontFamily: 'var(--font-sans)',
+                  fontWeight: 500,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-1)',
+                }}
               >
-                {exporting === 'docx' ? 'Exporting…' : 'Export DOCX'}
+                {exporting === 'docx' ? 'Exporting...' : 'DOCX'}
               </button>
             </div>
           )}
@@ -140,7 +189,7 @@ function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Ele
       </div>
 
       {/* Sub-tab content */}
-      <div className="flex-1 overflow-hidden">
+      <div style={{ flex: 1, overflow: 'hidden' }}>
         {activeSubTab === 'builder' && <VariantBuilder variantId={variant.id} />}
         {activeSubTab === 'preview' && (
           <VariantPreview variantId={variant.id} layoutTemplate={layoutTemplate} />
