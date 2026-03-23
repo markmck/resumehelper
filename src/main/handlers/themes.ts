@@ -20,4 +20,27 @@ export function registerThemeHandlers(): void {
       return { error: message }
     }
   })
+
+  ipcMain.handle('themes:renderSnapshotHtml', async (_, themeKey: string, snapshotData: Record<string, unknown>) => {
+    try {
+      const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
+      const resumeJson = buildResumeJson(profileRow, {
+        jobs: (snapshotData.jobs as never[]) ?? [],
+        skills: (snapshotData.skills as never[]) ?? [],
+        projects: (snapshotData.projects as never[]) ?? [],
+        education: (snapshotData.education as never[]) ?? [],
+        volunteer: (snapshotData.volunteer as never[]) ?? [],
+        awards: (snapshotData.awards as never[]) ?? [],
+        publications: (snapshotData.publications as never[]) ?? [],
+        languages: (snapshotData.languages as never[]) ?? [],
+        interests: (snapshotData.interests as never[]) ?? [],
+        references: (snapshotData.references as never[]) ?? [],
+      })
+      const html = await renderThemeHtml(themeKey, resumeJson)
+      return html
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { error: message }
+    }
+  })
 }

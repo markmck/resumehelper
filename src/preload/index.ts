@@ -207,6 +207,8 @@ const api = {
   themes: {
     renderHtml: (variantId: number, themeKey: string) =>
       ipcRenderer.invoke('themes:renderHtml', variantId, themeKey),
+    renderSnapshotHtml: (themeKey: string, snapshotData: unknown) =>
+      ipcRenderer.invoke('themes:renderSnapshotHtml', themeKey, snapshotData),
     list: () => ipcRenderer.invoke('themes:list'),
   },
 }

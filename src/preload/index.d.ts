@@ -455,6 +455,7 @@ export interface Api {
   }
   themes: {
     renderHtml: (variantId: number, themeKey: string) => Promise<string | { error: string }>
+    renderSnapshotHtml: (themeKey: string, snapshotData: SubmissionSnapshot) => Promise<string | { error: string }>
     list: () => Promise<Array<{ key: string; displayName: string }>>
   }
 }
