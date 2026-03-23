@@ -26,10 +26,13 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@jsonresume/jsonresume-theme-class": "^0.6.0",
     "better-sqlite3": "^12.8.0",
     "docx": "^9.6.1",
     "drizzle-orm": "^0.45.1",
-    "electron-updater": "^6.3.9"
+    "electron-updater": "^6.3.9",
+    "jsonresume-theme-elegant": "^1.16.1",
+    "jsonresume-theme-even": "^0.26.1"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",

@@ -69,7 +69,7 @@ Plans:
 
 </details>
 
-### 🚧 v1.1 Enhancements (In Progress)
+### v1.1 Enhancements (In Progress)
 
 **Milestone Goal:** Extend the experience database with projects, add tag autocomplete, support resume.json data import, and enable resume.json theme rendering for additional layout templates.
 
@@ -113,11 +113,11 @@ Plans:
   1. User can select a bundled theme (e.g., "Even", "Class") from a layout selector in the variant editor
   2. The variant preview renders the selected theme's HTML layout inside an iframe in the Preview sub-tab
   3. PDF export uses the selected theme's HTML rendering when a theme layout is active, producing a correctly formatted file
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 07-01: Install and configure jsonresume-theme-even and jsonresume-theme-class (asarUnpack, ESM/CJS verification), buildResumeJson() mapper, layout selector in VariantEditor
-- [ ] 07-02: Theme preview (iframe srcdoc), theme PDF export path (temp file + win.loadFile + printToPDF), packaged binary test
+- [ ] 07-01-PLAN.md — Install theme packages, configure bundling (externalizeDeps + asarUnpack), themeRegistry + buildResumeJson mapper, IPC handler, theme dropdown in VariantEditor
+- [ ] 07-02-PLAN.md — Theme preview (iframe srcdoc in VariantPreview), themed PDF export (temp file + did-finish-load), theme-aware SnapshotViewer
 
 ## Progress
 
@@ -131,5 +131,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Submissions | v1.0 | 2/2 | Complete | 2026-03-14 |
 | 4. Export | v1.0 | 2/2 | Complete | 2026-03-14 |
 | 5. Projects and Tag Autocomplete | v1.1 | 2/2 | Complete | 2026-03-15 |
-| 6. Projects in Export Pipeline and Import | 1/5 | In Progress|  | - |
+| 6. Projects in Export Pipeline and Import | v1.1 | 2/5 | In Progress | - |
 | 7. resume.json Theme Rendering | v1.1 | 0/2 | Not started | - |
