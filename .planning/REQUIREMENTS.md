@@ -11,8 +11,8 @@ Requirements for milestone v1.1. Each maps to roadmap phases.
 
 - [x] **PROJ-01**: User can add projects with name and toggleable bullet points
 - [x] **PROJ-02**: User can edit and delete projects
-- [ ] **PROJ-03**: User can toggle projects in/out of template variants (checkbox builder)
-- [ ] **PROJ-04**: Projects appear in resume preview and PDF/DOCX export
+- [x] **PROJ-03**: User can toggle projects in/out of template variants (checkbox builder)
+- [x] **PROJ-04**: Projects appear in resume preview and PDF/DOCX export
 
 ### Tag Autocomplete
 
@@ -25,7 +25,7 @@ Requirements for milestone v1.1. Each maps to roadmap phases.
 
 ### resume.json Themes
 
-- [ ] **THM-01**: User can select from bundled resume.json themes for preview and export
+- [x] **THM-01**: User can select from bundled resume.json themes for preview and export
 - [ ] **THM-02**: Theme-rendered preview shows in the Preview sub-tab
 - [ ] **THM-03**: PDF export uses the selected theme's HTML rendering
 
@@ -55,12 +55,12 @@ Previously shipped and confirmed valuable.
 |-------------|-------|--------|
 | PROJ-01 | Phase 5 | Complete |
 | PROJ-02 | Phase 5 | Complete |
-| PROJ-03 | Phase 6 | Pending |
-| PROJ-04 | Phase 6 | Pending |
+| PROJ-03 | Phase 6 | Complete |
+| PROJ-04 | Phase 6 | Complete |
 | TAG-01 | Phase 5 | Complete |
 | IMP-01 | Phase 6 | Complete |
 | IMP-02 | Phase 6 | Pending |
-| THM-01 | Phase 7 | Pending |
+| THM-01 | Phase 7 | Complete |
 | THM-02 | Phase 7 | Pending |
 | THM-03 | Phase 7 | Pending |
 
