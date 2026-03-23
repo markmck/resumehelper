@@ -55,6 +55,51 @@ export function registerSettingsHandlers(): void {
     },
   )
 
+  // Fetches available models from the provider API using the stored key
+  ipcMain.handle('settings:listModels', async () => {
+    try {
+      const row = db.select().from(aiSettings).where(eq(aiSettings.id, 1)).get()
+      if (!row || row.apiKey.length === 0) {
+        return { models: [], error: 'No API key configured' }
+      }
+
+      const decryptedKey = safeStorage.decryptString(Buffer.from(row.apiKey, 'base64'))
+
+      if (row.provider === 'anthropic') {
+        const resp = await fetch('https://api.anthropic.com/v1/models', {
+          headers: {
+            'x-api-key': decryptedKey,
+            'anthropic-version': '2023-06-01',
+          },
+        })
+        if (!resp.ok) return { models: [], error: `API error: ${resp.status}` }
+        const data = (await resp.json()) as { data: Array<{ id: string; display_name?: string }> }
+        const models = data.data
+          .map((m) => m.id)
+          .filter((id) => id.startsWith('claude-'))
+          .sort()
+          .reverse()
+        return { models }
+      } else {
+        const resp = await fetch('https://api.openai.com/v1/models', {
+          headers: { Authorization: `Bearer ${decryptedKey}` },
+        })
+        if (!resp.ok) return { models: [], error: `API error: ${resp.status}` }
+        const data = (await resp.json()) as { data: Array<{ id: string }> }
+        const models = data.data
+          .map((m) => m.id)
+          .filter((id) => id.startsWith('gpt-') || id.startsWith('o'))
+          .filter((id) => !id.includes('instruct') && !id.includes('realtime') && !id.includes('audio') && !id.includes('search'))
+          .sort()
+          .reverse()
+        return { models }
+      }
+    } catch (err) {
+      console.error('settings:listModels error', err)
+      return { models: [], error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
   // Decrypts key and makes a real LLM test call with specific error classification
   ipcMain.handle('settings:testAi', async () => {
     try {

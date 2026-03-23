@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react'
 type Provider = 'openai' | 'anthropic'
 type TestStatus = 'idle' | 'loading' | 'success' | 'error'
 
-const MODELS: Record<Provider, string[]> = {
-  openai: ['gpt-4o', 'gpt-4o-mini', 'o3-mini'],
-  anthropic: ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-3-5-haiku-20241022'],
+const FALLBACK_MODELS: Record<Provider, string[]> = {
+  openai: ['gpt-4o', 'gpt-4o-mini'],
+  anthropic: ['claude-sonnet-4-5-20250514'],
 }
 
 const THEMES = [
@@ -68,7 +68,9 @@ const fieldGroupStyle: React.CSSProperties = {
 
 export function SettingsTab(): React.JSX.Element {
   const [provider, setProvider] = useState<Provider>('openai')
-  const [model, setModel] = useState<string>(MODELS.openai[0])
+  const [model, setModel] = useState<string>('')
+  const [models, setModels] = useState<string[]>([])
+  const [modelsLoading, setModelsLoading] = useState<boolean>(false)
   const [apiKey, setApiKey] = useState<string>('')
   const [hasKey, setHasKey] = useState<boolean>(false)
   const [showKey, setShowKey] = useState<boolean>(false)
@@ -80,22 +82,46 @@ export function SettingsTab(): React.JSX.Element {
     () => localStorage.getItem('preferredTheme') ?? 'even',
   )
 
+  const fetchModels = async (p?: Provider): Promise<void> => {
+    setModelsLoading(true)
+    try {
+      const result = await window.api.settings.listModels()
+      if (result.models && result.models.length > 0) {
+        setModels(result.models)
+      } else {
+        setModels(FALLBACK_MODELS[p ?? provider])
+      }
+    } catch {
+      setModels(FALLBACK_MODELS[p ?? provider])
+    } finally {
+      setModelsLoading(false)
+    }
+  }
+
   useEffect(() => {
     window.api.settings.getAi().then((data) => {
       const p = (data.provider as Provider) || 'openai'
       setProvider(p)
-      setModel(data.model || MODELS[p][0])
+      setModel(data.model || '')
       setHasKey(data.hasKey)
+      if (data.hasKey) {
+        fetchModels(p)
+      } else {
+        setModels(FALLBACK_MODELS[p])
+      }
     })
   }, [])
 
-  // When provider changes, reset model to first option for that provider
   function handleProviderChange(newProvider: Provider): void {
     setProvider(newProvider)
-    setModel(MODELS[newProvider][0])
-    // Reset test status when config changes
+    setModels(FALLBACK_MODELS[newProvider])
+    setModel(FALLBACK_MODELS[newProvider][0])
     setTestStatus('idle')
     setTestMessage('')
+    if (hasKey) {
+      // Re-fetch models for new provider after a brief delay (key is already saved)
+      fetchModels(newProvider)
+    }
   }
 
   async function handleSave(): Promise<void> {
@@ -110,6 +136,8 @@ export function SettingsTab(): React.JSX.Element {
         setApiKey('')
         setTestStatus('idle')
         setTestMessage('')
+        // Fetch available models now that we have a valid key
+        fetchModels()
       }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save settings')
@@ -170,7 +198,7 @@ export function SettingsTab(): React.JSX.Element {
 
         {/* Model */}
         <div style={fieldGroupStyle}>
-          <label style={labelStyle}>Model</label>
+          <label style={labelStyle}>Model {modelsLoading && <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 'normal' }}>(loading...)</span>}</label>
           <select
             style={selectStyle}
             value={model}
@@ -180,12 +208,17 @@ export function SettingsTab(): React.JSX.Element {
               setTestMessage('')
             }}
           >
-            {MODELS[provider].map((m) => (
+            {models.map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
             ))}
           </select>
+          {hasKey && (
+            <p style={{ marginTop: 'var(--space-1)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+              Models fetched from your provider API
+            </p>
+          )}
         </div>
 
         {/* API Key */}

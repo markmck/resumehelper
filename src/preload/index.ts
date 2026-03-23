@@ -217,6 +217,7 @@ const api = {
     setAi: (data: { provider: string; model: string; apiKey: string }) =>
       ipcRenderer.invoke('settings:setAi', data),
     testAi: () => ipcRenderer.invoke('settings:testAi'),
+    listModels: () => ipcRenderer.invoke('settings:listModels'),
   },
   ai: {
     analyze: (jobPostingId: number, variantId: number) =>
