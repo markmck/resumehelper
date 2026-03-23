@@ -7,7 +7,7 @@ export default defineConfig({
   main: {
     build: {
       externalizeDeps: {
-        exclude: ['@jsonresume/jsonresume-theme-class', 'jsonresume-theme-even']
+        exclude: ['jsonresume-theme-even']
       }
     }
   },
