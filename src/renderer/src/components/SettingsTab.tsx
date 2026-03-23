@@ -118,8 +118,9 @@ export function SettingsTab(): React.JSX.Element {
     setModel(FALLBACK_MODELS[newProvider][0])
     setTestStatus('idle')
     setTestMessage('')
+    // Auto-save provider change to DB (empty apiKey = keep existing key)
+    window.api.settings.setAi({ provider: newProvider, model: FALLBACK_MODELS[newProvider][0], apiKey: '' })
     if (hasKey) {
-      // Re-fetch models for new provider after a brief delay (key is already saved)
       fetchModels(newProvider)
     }
   }
@@ -292,9 +293,12 @@ export function SettingsTab(): React.JSX.Element {
               style={selectStyle}
               value={model}
               onChange={(e) => {
-                setModel(e.target.value)
+                const newModel = e.target.value
+                setModel(newModel)
                 setTestStatus('idle')
                 setTestMessage('')
+                // Auto-save model selection to DB
+                window.api.settings.setAi({ provider, model: newModel, apiKey: '' })
               }}
             >
               {models.map((m) => (

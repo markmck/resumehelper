@@ -34,18 +34,23 @@ export function registerSettingsHandlers(): void {
       }
 
       try {
-        let encryptedKey = ''
         if (data.apiKey.length > 0) {
-          encryptedKey = safeStorage.encryptString(data.apiKey).toString('base64')
+          // Key provided — encrypt and save everything
+          const encryptedKey = safeStorage.encryptString(data.apiKey).toString('base64')
+          db.insert(aiSettings)
+            .values({ id: 1, provider: data.provider, model: data.model, apiKey: encryptedKey })
+            .onConflictDoUpdate({
+              target: aiSettings.id,
+              set: { provider: data.provider, model: data.model, apiKey: encryptedKey },
+            })
+            .run()
+        } else {
+          // No key — update provider/model only, keep existing key
+          db.update(aiSettings)
+            .set({ provider: data.provider, model: data.model })
+            .where(eq(aiSettings.id, 1))
+            .run()
         }
-
-        db.insert(aiSettings)
-          .values({ id: 1, provider: data.provider, model: data.model, apiKey: encryptedKey })
-          .onConflictDoUpdate({
-            target: aiSettings.id,
-            set: { provider: data.provider, model: data.model, apiKey: encryptedKey },
-          })
-          .run()
 
         return { success: true }
       } catch (err) {
