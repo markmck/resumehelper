@@ -115,7 +115,7 @@ export function registerSettingsHandlers(): void {
         row.model.length > 0
           ? row.model
           : provider === 'anthropic'
-            ? 'claude-sonnet-4-20250514'
+            ? 'claude-sonnet-4-5-20250514'
             : 'gpt-4o'
 
       let modelInstance

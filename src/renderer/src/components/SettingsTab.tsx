@@ -136,7 +136,29 @@ export function SettingsTab(): React.JSX.Element {
         setApiKey('')
         setTestStatus('idle')
         setTestMessage('')
-        // Fetch available models now that we have a valid key
+        fetchModels()
+      }
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Auto-save key on blur — saves immediately, fetches models, shows confirmation
+  async function handleKeyBlur(): Promise<void> {
+    if (!apiKey.trim()) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      const result = await window.api.settings.setAi({ provider, model, apiKey })
+      if ('error' in result) {
+        setSaveError(result.error)
+      } else {
+        setHasKey(true)
+        setApiKey('')
+        setTestStatus('idle')
+        setTestMessage('')
         fetchModels()
       }
     } catch (err) {
@@ -205,7 +227,8 @@ export function SettingsTab(): React.JSX.Element {
               style={inputStyle}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Enter your API key"
+              onBlur={handleKeyBlur}
+              placeholder={hasKey ? 'Key saved — enter new key to replace' : 'Enter your API key'}
               autoComplete="off"
             />
             <button
@@ -242,14 +265,20 @@ export function SettingsTab(): React.JSX.Element {
               )}
             </button>
           </div>
-          {hasKey && !apiKey && (
+          {hasKey && (
             <p
               style={{
                 marginTop: 'var(--space-1)',
                 fontSize: 'var(--font-size-xs)',
-                color: 'var(--color-text-tertiary)',
+                color: 'var(--color-success)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-1)',
               }}
             >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
               API key saved
             </p>
           )}
