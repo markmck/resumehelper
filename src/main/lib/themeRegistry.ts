@@ -99,8 +99,30 @@ export function buildResumeJson(profileRow: Profile | undefined, builderData: Bu
   }
 }
 
+// Sanitize date fields — remove any value that would cause new Date() to throw "Invalid time value"
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sanitizeDates(resumeJson: Record<string, any>): Record<string, any> {
+  const dateFields = ['startDate', 'endDate', 'date', 'releaseDate']
+  const sections = ['work', 'education', 'volunteer', 'awards', 'publications', 'projects']
+  for (const section of sections) {
+    if (!Array.isArray(resumeJson[section])) continue
+    for (const item of resumeJson[section]) {
+      for (const field of dateFields) {
+        if (field in item && item[field]) {
+          const d = new Date(item[field])
+          if (isNaN(d.getTime())) {
+            item[field] = undefined
+          }
+        }
+      }
+    }
+  }
+  return resumeJson
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function renderThemeHtml(themeKey: string, resumeJson: Record<string, any>): Promise<string> {
+  sanitizeDates(resumeJson)
   switch (themeKey) {
     case 'even': {
       const theme = await import('jsonresume-theme-even')
