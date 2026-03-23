@@ -453,6 +453,10 @@ export interface Api {
     }>
     confirmReplace: (data: unknown) => Promise<{ success: boolean }>
   }
+  themes: {
+    renderHtml: (variantId: number, themeKey: string) => Promise<string | { error: string }>
+    list: () => Promise<Array<{ key: string; displayName: string }>>
+  }
 }
 
 declare global {

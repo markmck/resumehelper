@@ -30,7 +30,7 @@ interface BuilderData {
   references: BuilderReference[]
 }
 
-async function getBuilderDataForVariant(variantId: number): Promise<BuilderData> {
+export async function getBuilderDataForVariant(variantId: number): Promise<BuilderData> {
   const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
   const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
   const allSkills = await db.select().from(skills)

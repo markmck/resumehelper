@@ -204,6 +204,11 @@ const api = {
     parse: () => ipcRenderer.invoke('import:parseResumeJson'),
     confirmReplace: (data: unknown) => ipcRenderer.invoke('import:confirmReplace', data),
   },
+  themes: {
+    renderHtml: (variantId: number, themeKey: string) =>
+      ipcRenderer.invoke('themes:renderHtml', variantId, themeKey),
+    list: () => ipcRenderer.invoke('themes:list'),
+  },
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

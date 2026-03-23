@@ -14,6 +14,7 @@ import { registerLanguageHandlers } from './languages'
 import { registerInterestHandlers } from './interests'
 import { registerReferenceHandlers } from './references'
 import { registerImportHandlers } from './import'
+import { registerThemeHandlers } from './themes'
 
 export function registerAllHandlers(): void {
   registerJobHandlers()
@@ -32,4 +33,5 @@ export function registerAllHandlers(): void {
   registerInterestHandlers()
   registerReferenceHandlers()
   registerImportHandlers()
+  registerThemeHandlers()
 }

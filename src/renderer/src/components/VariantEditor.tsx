@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { TemplateVariant } from '../../../preload/index.d'
 import InlineEdit from './InlineEdit'
 import VariantBuilder from './VariantBuilder'
@@ -15,10 +15,32 @@ interface VariantEditorProps {
 function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Element {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('builder')
   const [exporting, setExporting] = useState<'pdf' | 'docx' | null>(null)
+  const [themes, setThemes] = useState<Array<{ key: string; displayName: string }>>([])
+  const [layoutTemplate, setLayoutTemplate] = useState(
+    variant.layoutTemplate && variant.layoutTemplate !== 'traditional'
+      ? variant.layoutTemplate
+      : 'professional'
+  )
   const { showToast } = useToast()
+
+  // Fetch theme list on mount
+  useEffect(() => {
+    window.api.themes.list().then(setThemes)
+  }, [])
+
+  // Sync layoutTemplate when variant changes
+  useEffect(() => {
+    const tpl = variant.layoutTemplate
+    setLayoutTemplate(tpl && tpl !== 'traditional' ? tpl : 'professional')
+  }, [variant.id])
 
   const sanitize = (s: string): string =>
     s.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '')
+
+  const handleThemeChange = async (newTheme: string): Promise<void> => {
+    setLayoutTemplate(newTheme)
+    await window.api.templates.setLayoutTemplate(variant.id, newTheme)
+  }
 
   const handleExportPdf = async (): Promise<void> => {
     if (exporting) return
@@ -64,7 +86,7 @@ function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Ele
           />
         </div>
 
-        {/* Sub-tab bar + export buttons */}
+        {/* Sub-tab bar + theme selector + export buttons */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex gap-1">
             {(['builder', 'preview'] as SubTab[]).map((tab) => (
@@ -82,9 +104,22 @@ function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Ele
             ))}
           </div>
 
-          {/* Export buttons — only shown on preview sub-tab */}
+          {/* Theme selector + export buttons — only shown on preview sub-tab */}
           {activeSubTab === 'preview' && (
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {themes.length > 0 && (
+                <select
+                  value={layoutTemplate}
+                  onChange={(e) => handleThemeChange(e.target.value)}
+                  className="px-2 py-1.5 text-sm font-medium rounded-md bg-zinc-800 text-zinc-200 border border-zinc-700 hover:border-zinc-500 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  {themes.map((t) => (
+                    <option key={t.key} value={t.key}>
+                      {t.displayName}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button
                 onClick={handleExportPdf}
                 disabled={exporting !== null}
@@ -107,7 +142,9 @@ function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Ele
       {/* Sub-tab content */}
       <div className="flex-1 overflow-hidden">
         {activeSubTab === 'builder' && <VariantBuilder variantId={variant.id} />}
-        {activeSubTab === 'preview' && <VariantPreview variantId={variant.id} />}
+        {activeSubTab === 'preview' && (
+          <VariantPreview variantId={variant.id} layoutTemplate={layoutTemplate} />
+        )}
       </div>
     </div>
   )
