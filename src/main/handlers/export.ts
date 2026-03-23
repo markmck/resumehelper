@@ -1,5 +1,6 @@
 import { ipcMain, BrowserWindow, dialog } from 'electron'
 import { join } from 'path'
+import { tmpdir } from 'os'
 import { is } from '@electron-toolkit/utils'
 import { promises as fs } from 'fs'
 import {
@@ -13,8 +14,9 @@ import {
   TabStopPosition
 } from 'docx'
 import { db } from '../db'
-import { profile, jobs, jobBullets, skills, projects, projectBullets, templateVariantItems, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
+import { profile, jobs, jobBullets, skills, projects, projectBullets, templateVariantItems, templateVariants, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
 import { eq, asc, desc } from 'drizzle-orm'
+import { buildResumeJson, renderThemeHtml } from '../lib/themeRegistry'
 import { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
 
 interface BuilderData {
@@ -210,50 +212,93 @@ export function registerExportHandlers(): void {
     })
     if (canceled || !filePath) return { canceled: true }
 
-    // 2. Create hidden BrowserWindow
-    const win = new BrowserWindow({
-      show: false,
-      width: 816, // 8.5in * 96dpi
-      height: 1056, // 11in * 96dpi
-      webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
-        sandbox: false,
-      },
-    })
+    // 2. Determine layout: professional (built-in) vs theme
+    const variant = db.select().from(templateVariants).where(eq(templateVariants.id, variantId)).get()
+    const layoutTemplate = variant?.layoutTemplate ?? 'professional'
+    const isProfessional = !layoutTemplate || layoutTemplate === 'professional' || layoutTemplate === 'traditional'
 
-    // 3. Load print route
-    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      await win.loadURL(
-        `${process.env['ELECTRON_RENDERER_URL']}/print.html?variantId=${variantId}`
-      )
-    } else {
-      await win.loadFile(join(__dirname, '../renderer/print.html'), {
-        query: { variantId: String(variantId) },
+    if (isProfessional) {
+      // Professional path: load print.html + wait for print:ready signal
+      const win = new BrowserWindow({
+        show: false,
+        width: 816, // 8.5in * 96dpi
+        height: 1056, // 11in * 96dpi
+        webPreferences: {
+          preload: join(__dirname, '../preload/index.js'),
+          sandbox: false,
+        },
       })
+
+      if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+        await win.loadURL(
+          `${process.env['ELECTRON_RENDERER_URL']}/print.html?variantId=${variantId}`
+        )
+      } else {
+        await win.loadFile(join(__dirname, '../renderer/print.html'), {
+          query: { variantId: String(variantId) },
+        })
+      }
+
+      // Wait for React to signal readiness
+      await new Promise<void>((resolve) => {
+        ipcMain.once('print:ready', () => resolve())
+        // Safety timeout — if signal never comes, proceed after 3 seconds
+        setTimeout(() => resolve(), 3000)
+      })
+
+      // Small settle delay for final paint
+      await new Promise((r) => setTimeout(r, 200))
+
+      const pdfBuffer = await win.webContents.printToPDF({
+        printBackground: true,
+        pageSize: 'Letter',
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      })
+      win.destroy()
+      await fs.writeFile(filePath, pdfBuffer)
+      return { canceled: false, filePath }
+    } else {
+      // Theme path: render HTML via themeRegistry, write to temp file, load in hidden window
+      const win = new BrowserWindow({
+        show: false,
+        width: 816,
+        height: 1056,
+        webPreferences: { sandbox: true }, // no preload needed for raw HTML
+      })
+
+      const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
+      const builderData = await getBuilderDataForVariant(variantId)
+      const resumeJson = buildResumeJson(profileRow, builderData)
+      const html = await renderThemeHtml(layoutTemplate, resumeJson)
+
+      const tmpPath = join(tmpdir(), `resume-theme-${variantId}-${Date.now()}.html`)
+      await fs.writeFile(tmpPath, html, 'utf-8')
+
+      await new Promise<void>((resolve) => {
+        let resolved = false
+        const done = (): void => {
+          if (!resolved) {
+            resolved = true
+            resolve()
+          }
+        }
+        win.webContents.once('did-finish-load', () => {
+          setTimeout(done, 500) // settle delay for fonts/images
+        })
+        setTimeout(done, 5000) // safety timeout
+        win.loadFile(tmpPath)
+      })
+
+      const pdfBuffer = await win.webContents.printToPDF({
+        printBackground: true,
+        pageSize: 'Letter',
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      })
+      win.destroy()
+      await fs.unlink(tmpPath).catch(() => {})
+      await fs.writeFile(filePath, pdfBuffer)
+      return { canceled: false, filePath }
     }
-
-    // 4. Wait for React to signal readiness
-    await new Promise<void>((resolve) => {
-      ipcMain.once('print:ready', () => resolve())
-      // Safety timeout — if signal never comes, proceed after 3 seconds
-      setTimeout(() => resolve(), 3000)
-    })
-
-    // 5. Small settle delay for final paint
-    await new Promise((r) => setTimeout(r, 200))
-
-    // 6. Generate PDF
-    const pdfBuffer = await win.webContents.printToPDF({
-      printBackground: true,
-      pageSize: 'Letter',
-      margins: { top: 0, bottom: 0, left: 0, right: 0 },
-    })
-
-    win.destroy()
-
-    // 7. Write to disk
-    await fs.writeFile(filePath, pdfBuffer)
-    return { canceled: false, filePath }
   })
 
   ipcMain.handle('export:docx', async (_, variantId: number, defaultFilename: string) => {
