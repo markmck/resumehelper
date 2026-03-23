@@ -1,14 +1,200 @@
 # Feature Research
 
 **Domain:** Personal resume management and job application tracking desktop app
-**Researched:** 2026-03-13 (v1.0) / 2026-03-14 (v1.1 additions)
-**Confidence:** HIGH (core schema/theme mechanics verified against official docs), MEDIUM (integration complexity estimates)
+**Researched:** 2026-03-13 (v1.0) / 2026-03-14 (v1.1 additions) / 2026-03-23 (v2.0 additions)
+**Confidence:** HIGH (core patterns verified against competing tools), MEDIUM (UX detail estimates)
 
 ---
 
-## v1.1 Feature Landscape (Current Milestone)
+## v2.0 Feature Landscape (Current Milestone: AI Analysis Integration)
 
-This section covers the four new features being added in v1.1. The v1.0 feature landscape is preserved below.
+This section covers only what is new in v2.0. v1.0 and v1.1 feature landscape is preserved below.
+
+### What Already Exists (v1.x Foundation)
+
+Work history, skills, projects, education, and all resume.json entities. Template variants with checkbox builder. PDF/DOCX export with bundled resume.json themes. Submissions with frozen snapshots and list view. resume.json import. Profile/contact info.
+
+---
+
+### Table Stakes (Users Expect These — v2.0)
+
+Features every AI resume tool provides. Missing these makes the product feel incomplete relative to Jobscan/Teal.
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Job posting text paste + analysis trigger | Entry point for all analysis; competitors (Jobscan, Teal) all start here | LOW | Textarea + "Analyze" button; loading/spinner state; URL scraping is out of scope per PROJECT.md — text paste is sufficient |
+| Match score (0-100) | Every competing tool shows a headline numeric score; users anchor to it and share it | MEDIUM | Score tied to a specific variant, not the raw DB; 65-80% is "good" per Jobscan benchmarks; score must be stored alongside the job posting record |
+| Keyword coverage list (matched / missing) | Users act on specific gaps, not just a score; competitors split hard skills from soft skills | MEDIUM | Three buckets: exact match, semantic match (LLM-detected equivalence), missing; industry expectation is 15-25 hard skills and 20-40 soft skills extracted from posting |
+| Gap analysis with severity tiers | "Missing Python (required)" drives a different action than "Could mention CI/CD" | MEDIUM | Two tiers: critical (explicitly required per posting) and moderate (preferred or implied); count per tier shown prominently |
+| Per-bullet rewrite suggestions | Rewording existing bullets to match job language is the highest-value AI action; all serious tools offer it | HIGH | AI suggests rewording of existing bullets only — never fabricates; one suggestion per bullet; user accepts or dismisses each individually |
+| Accept/dismiss per suggestion | Granular control is required; accepting all blindly undermines the AI-boundary constraint | LOW | State per bullet: original / suggested / accepted / dismissed; accepted writes back to the bullet in DB |
+| Submission pipeline stages | Applied → Phone Screen → Technical → Offer → Rejected; expected since Trello job-search templates became popular | MEDIUM | Fixed stages (per PROJECT.md key decision); stage column added to existing submissions table; drag-to-advance or dropdown change |
+| Per-submission notes field | Jobscan and Teal both surface recruiter name, interview dates, and follow-up notes on each submission card | LOW | Additive text field on existing submission record; no new entity needed |
+| AI provider settings + API key | Provider-agnostic + user-supplied key is the stated constraint; without settings nothing else works | MEDIUM | Provider selector (Claude / OpenAI / custom endpoint), API key input with masked display, test-connection button, local encrypted storage |
+
+### Differentiators (Competitive Advantage — v2.0)
+
+Features that go beyond Jobscan/Teal, made possible by this app's local-first, snapshot-linked architecture.
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Analysis tied to a specific variant snapshot | Competitors analyze a generic resume; this app analyzes the exact variant being submitted — match score reflects what was actually sent | MEDIUM | Variant selector required before analysis runs; analysis result stored with job posting record and linked to variant ID |
+| Semantic matching labeled separately from exact matching | "Led cross-functional teams" correctly matches "project management" without false-missing signal | LOW (prompt design) | LLM returns semantic matches in a distinct bucket; UI labels them differently from exact matches so user understands why they scored |
+| Gap tiers distinguish required vs preferred | Binary "missing/present" is the norm among competitors; severity drives prioritization | LOW (prompt design) | LLM classifies each gap using language from the posting ("required", "must have", "preferred", "nice to have") |
+| Rewrite suggestion shows original and proposed side-by-side | Most tools silently replace; a diff view is required for honest accept/reject | LOW | Side-by-side card: left = original text, right = LLM suggestion; accept writes to DB, dismiss restores state |
+| ATS compatibility check as a distinct signal | Formatting issues (tables, columns, images) hurt ATS parsing independently of keyword match | MEDIUM | Heuristic check on the rendered resume structure; separate from match score; flags: multi-column layout detected, table used, non-standard section heading |
+| Submission linked to exact variant + analysis used | "What resume did I send, and what was the match score at time of sending?" — no competitor offers this | LOW (schema extension) | Extend submission record to store variant ID and optional analysis run ID |
+| Analysis history per job (score progression) | Re-running analysis after edits should show improvement delta | MEDIUM | Store multiple analysis runs per job posting; display score timeline; show +/- delta from previous run |
+
+### Anti-Features (v2.0 — Commonly Requested, Often Problematic)
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| AI-generated resume text from scratch | "Just write me a better resume" is the obvious ask | Exaggerates experience — the core user pain point that motivated this app per PROJECT.md; erodes trust completely | AI rewrites existing bullets only; user controls every word; this boundary is non-negotiable |
+| Accept-all suggestions at once | Saves time | Bypasses per-bullet review that maintains the AI boundary; can introduce language the user cannot defend in interviews | Explicit accept per bullet; batch dismiss is lower risk and acceptable |
+| URL scraping of job postings | More convenient than pasting | Fragile (sites change, block bots, require JS rendering); ongoing maintenance burden for a desktop app with no server | Text paste only; copy from browser takes 3 seconds; out of scope per PROJECT.md |
+| Fully automated tailoring pipeline | One-click workflow is appealing | Removes user agency at the trust-critical step; deferred to v2.1 per PROJECT.md | Guided workflow: paste → review score → address gaps → review rewrites → export; each step explicit |
+| Custom pipeline stages | "I want to add Take-Home Test" | Custom stages complicate filtering and reporting; label the custom context in the notes field instead | Fixed stages cover 95% of cases; notes field handles the rest |
+| Submission analytics and pattern insights | "Why am I not getting callbacks?" | Needs months of history data to be meaningful; v2.0 will have too little data | Deferred to v2.2 per PROJECT.md; build data collection now, analyze later |
+| Real-time score updates while editing | Instant feedback | LLM calls are slow and expensive; polling on every keystroke is impractical | Explicit "Re-analyze" button after edits; show last-run timestamp so user knows when score was calculated |
+| Cover letter generation | Natural adjacent feature | Different document type, different failure modes; explicitly out of scope per PROJECT.md | Not in scope |
+
+---
+
+### v2.0 Feature Dependencies
+
+```
+[AI Provider Settings + API Key]
+    └──required by──> [Job Posting Analysis]
+                          └──required by──> [Match Score]
+                          └──required by──> [Keyword Coverage]
+                          └──required by──> [Gap Analysis (critical/moderate)]
+                          └──required by──> [Bullet Rewrite Suggestions]
+                          └──required by──> [ATS Compatibility Check]
+
+[Variant Selection]
+    └──required by──> [Job Posting Analysis]
+        (analysis must target a specific variant, not the raw DB)
+
+[Job Posting Analysis]
+    └──produces──> [Analysis Result record]
+                       └──linked to──> [Submission Record (v1.x)]
+
+[Bullet Rewrite Suggestions]
+    └──informed by──> [Gap Analysis]
+        (gaps tell the LLM which bullets to prioritize)
+    └──writes back to──> [Work History bullets / Project bullets (v1.x)]
+        (accepted suggestion updates bullet text in DB)
+
+[Submission Pipeline Stages]
+    └──extends──> [Submission Record (v1.x)]
+        (adds status enum column + stage history)
+
+[Per-Submission Notes]
+    └──extends──> [Submission Record (v1.x)]
+        (additive text column)
+
+[Analysis History]
+    └──requires──> [Job Posting Analysis]
+    └──enhances──> [Submission record display]
+```
+
+#### Dependency Notes
+
+- **AI Provider Settings gates every AI feature.** Must ship first or alongside the analysis UI. Cannot be deferred to a later phase.
+- **Variant selection is required before analysis runs.** Analysis without a specific variant context produces a misleading score. The UI must enforce this — no "analyze" without a selected variant.
+- **Bullet rewrite and gap analysis share the same LLM context.** Both can be returned from a single prompt call that receives the job posting and the variant's bullets together. This is a design optimization, not a hard dependency.
+- **Submission pipeline is additive to v1.x submissions.** Not a new entity — adds a `status` column (enum) and `notes` column to the existing `submissions` table. Drizzle migration is two columns.
+- **Analysis history depends on storing multiple runs.** Schema should allow N analysis runs per job posting from the start, even if the UI only shows the latest run in v2.0.
+
+---
+
+### v2.0 MVP Definition
+
+#### Launch With (v2.0)
+
+- [ ] AI provider settings (provider select, API key input, masked display, encrypted local storage, test-connection) — gates everything else
+- [ ] Job posting text paste + analysis trigger (textarea, Analyze button, loading state, error handling) — entry point
+- [ ] Match score (0-100) per variant + posting pair — headline output
+- [ ] Keyword coverage (exact match / semantic match / missing) split hard/soft — actionable output
+- [ ] Gap analysis with critical vs moderate tiers — prioritization layer on top of coverage
+- [ ] Bullet rewrite suggestions with per-bullet accept/dismiss, original vs proposed side-by-side — the AI-assists-without-fabricating flow
+- [ ] Submission pipeline stages (Applied / Phone Screen / Technical / Offer / Rejected) with status on submission cards
+- [ ] Per-submission notes field
+
+#### Add After Validation (v2.1)
+
+- [ ] Analysis history per job (score progression, delta from previous run) — needs history data first
+- [ ] ATS compatibility check (heuristic: multi-column, table, non-standard section header detection) — useful but not blocking
+- [ ] Analysis run linked to submission export (traceability: which analysis score was active when submission was created)
+- [ ] Automated tailoring pipeline — deferred per PROJECT.md
+
+#### Future Consideration (v2.2+)
+
+- [ ] Submission analytics and pattern insights — deferred per PROJECT.md; needs months of history
+- [ ] AI-powered auto-variant generation — deferred per PROJECT.md
+
+---
+
+### v2.0 Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| AI Provider Settings | HIGH (gate) | MEDIUM | P1 |
+| Job Posting Text Paste + Trigger | HIGH | LOW | P1 |
+| Match Score (0-100) | HIGH | MEDIUM | P1 |
+| Keyword Coverage List | HIGH | MEDIUM | P1 |
+| Gap Analysis (critical/moderate) | HIGH | MEDIUM | P1 |
+| Bullet Rewrite Suggestions | HIGH | HIGH | P1 |
+| Accept/Dismiss Per Suggestion | HIGH | LOW | P1 |
+| Submission Pipeline Stages | HIGH | MEDIUM | P1 |
+| Per-Submission Notes | MEDIUM | LOW | P1 |
+| ATS Compatibility Check | MEDIUM | MEDIUM | P2 |
+| Analysis History / Score Delta | MEDIUM | MEDIUM | P2 |
+| Analysis Linked to Submission Snapshot | MEDIUM | LOW | P2 |
+| Submission Analytics | LOW | HIGH | P3 |
+| Auto-Variant Generation | MEDIUM | HIGH | P3 |
+
+**Priority key:**
+- P1: Must have for v2.0 launch
+- P2: Add in v2.1 after core validated
+- P3: Defer to v2.2+
+
+---
+
+### Competitor Feature Analysis (v2.0 Context)
+
+| Feature | Jobscan | Teal | ResumeWorded | Our Approach |
+|---------|---------|------|--------------|--------------|
+| Match score | Prominent 0-100% | Yes, with excitement rating | Yes | 0-100, tied to specific variant not generic resume |
+| Keyword coverage | Hard + soft skills split | Yes, AI guidance per stage | Yes, with priority ranking | Hard/soft split + exact vs semantic match labeled distinctly |
+| Gap analysis | Missing keywords list | Skills gap with AI tips | Responsibilities alignment tiers | Critical vs moderate tiers; required vs preferred sourced from posting language |
+| Bullet rewrites | Suggests insertion points | Partial (tips only) | None | Per-bullet accept/dismiss; original vs proposed side-by-side |
+| ATS check | Core feature | Limited | Yes | Heuristic on export structure; separate signal from match score |
+| Job tracking | Kanban + notes + reminders | Kanban with excitement scale + notes | None | Fixed pipeline stages + notes; no reminders in v2.0 |
+| Snapshot linkage | None | None | None | Differentiator: submission links to exact variant + analysis run |
+| Local / private | No (cloud SaaS) | No (cloud SaaS) | No (cloud SaaS) | Electron, local SQLite, user-supplied API key; no data leaves machine |
+| Provider choice | Locked to proprietary models | Locked to proprietary models | Locked to proprietary models | Provider-agnostic; user brings Claude/OpenAI key |
+
+---
+
+### v2.0 Sources
+
+- [Jobscan ATS Resume Checker](https://www.jobscan.co/) — scoring benchmarks (65-80% match rate guidance), keyword coverage patterns (MEDIUM confidence, commercial tool)
+- [Teal Job Tracker feature overview](https://www.tealhq.com/tools/job-tracker) — pipeline stage UX, per-stage notes (MEDIUM confidence, official docs)
+- [ATS Resume Keywords Guide 2026 — uppl.ai](https://uppl.ai/ats-resume-keywords/) — keyword density targets, 15-25 keywords guidance (MEDIUM confidence)
+- [How AI Can Transform Job Matching — Medium Feb 2026](https://tusharlaad.medium.com/how-ai-can-transform-job-matching-using-llms-to-understand-what-jobs-really-offer-ab7ab4a171c9) — LLM semantic matching patterns (LOW confidence, single source)
+- [Best LLM for Resume and Job Description Analysis — PitchMeAI](https://pitchmeai.com/blog/best-llm-resume-job-description-analysis) — LLM choice for resume domain (MEDIUM confidence)
+- [Applying AI-Powered Gap Analysis — Resumly](https://www.resumly.ai/blog/applying-ai-powered-gap-analysis-to-find-missing-skills) — gap analysis output patterns (MEDIUM confidence)
+- [ATS-Friendly Resume Guide 2026 — OwlApply](https://owlapply.com/en/blog/ats-friendly-resume-guide-2026-format-keywords-score-and-fixes) — ATS formatting heuristics (MEDIUM confidence)
+- [Jobscan vs Teal 2026 — Jobscan blog](https://www.jobscan.co/blog/jobscan-vs-teal/) — feature comparison (MEDIUM confidence, vendor-authored)
+- [How to Build an LLM-Powered Resume Optimizer — Medium](https://medium.com/@leofgonzalez/how-i-built-an-llm-powered-resume-optimizer-to-beat-ats-filters-8ace36d5d32c) — finite state machine workflow pattern (LOW confidence, single source)
+
+---
+
+## v1.1 Feature Landscape
+
+*(Research from 2026-03-14 — shipped features.)*
 
 ### What Already Exists (v1.0 Foundation)
 
@@ -140,7 +326,7 @@ Themes export `render(resume: ResumeJson): string`. Output is self-contained HTM
 | Team / recruiter collaboration features | Might be useful for agencies | Adds multi-tenancy, permissions, conflict resolution; completely different product | Single-user desktop tool; explicitly not a team product |
 | Interview prep / flashcards | Logically adjacent to job search | Different domain entirely; no connection to resume data model | Not in scope; refer users to dedicated tools |
 
-## Feature Dependencies (Full, Including v1.1)
+## Feature Dependencies (Full — v1.0 + v1.1)
 
 ```
 [Experience Database]
@@ -234,5 +420,5 @@ Themes export `render(resume: ResumeJson): string`. Output is self-contained HTM
 
 ---
 
-*Feature research for: ResumeHelper v1.0 and v1.1*
-*Last updated: 2026-03-14*
+*Feature research for: ResumeHelper v1.0, v1.1, and v2.0*
+*Last updated: 2026-03-23*
