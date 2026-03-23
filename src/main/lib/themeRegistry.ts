@@ -17,7 +17,8 @@ export const THEMES: ThemeEntry[] = [
 
 export const THEME_KEYS = THEMES.map((t) => t.key)
 
-export function buildResumeJson(profileRow: Profile | undefined, builderData: BuilderData): object {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function buildResumeJson(profileRow: Profile | undefined, builderData: BuilderData): Record<string, any> {
   const includedJobs = builderData.jobs.filter((j) => !j.excluded)
   const includedSkills = builderData.skills.filter((s) => !s.excluded)
   const includedProjects = builderData.projects.filter((p) => !p.excluded)
@@ -37,7 +38,7 @@ export function buildResumeJson(profileRow: Profile | undefined, builderData: Bu
     skillGroups[group].push(skill.name)
   }
 
-  const profiles = []
+  const profiles: Array<{ network: string; username: string; url: string }> = []
   if (profileRow?.linkedin) {
     profiles.push({ network: 'LinkedIn', username: profileRow.linkedin, url: profileRow.linkedin })
   }
@@ -98,19 +99,22 @@ export function buildResumeJson(profileRow: Profile | undefined, builderData: Bu
   }
 }
 
-export async function renderThemeHtml(themeKey: string, resumeJson: object): Promise<string> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function renderThemeHtml(themeKey: string, resumeJson: Record<string, any>): Promise<string> {
   switch (themeKey) {
     case 'even': {
       const theme = await import('jsonresume-theme-even')
-      return theme.render(resumeJson)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return theme.render(resumeJson as any)
     }
     case 'class': {
       const theme = await import('@jsonresume/jsonresume-theme-class')
-      return theme.render(resumeJson)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return theme.render(resumeJson as any)
     }
     case 'elegant': {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const theme = require('jsonresume-theme-elegant') as { render: (r: object) => string }
+      const theme = require('jsonresume-theme-elegant') as { render: (r: Record<string, unknown>) => string }
       return Promise.resolve(theme.render(resumeJson))
     }
     default:
