@@ -1,10 +1,12 @@
+@import './tokens.css';
 @import './base.css';
 @import 'tailwindcss';
 
 body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
   user-select: none;
-  background-color: #09090b; /* zinc-950 */
-  color: #f4f4f5; /* zinc-100 */
 }
 
 #root {

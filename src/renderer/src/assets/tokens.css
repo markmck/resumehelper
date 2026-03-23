@@ -1,0 +1,100 @@
+/* Design System Tokens */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: url('./fonts/Inter-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  src: url('./fonts/Inter-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  src: url('./fonts/Inter-SemiBold.woff2') format('woff2');
+}
+
+:root {
+  /* Font */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Backgrounds */
+  --color-bg-base: #0a0a0b;
+  --color-bg-surface: #141416;
+  --color-bg-raised: #1c1c1f;
+  --color-bg-overlay: #232328;
+  --color-bg-input: #18181b;
+
+  /* Text */
+  --color-text-primary: #f0f0f0;
+  --color-text-secondary: #a0a0a8;
+  --color-text-tertiary: #6b6b74;
+  --color-text-muted: #4a4a52;
+
+  /* Borders */
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-default: rgba(255, 255, 255, 0.10);
+  --color-border-emphasis: rgba(255, 255, 255, 0.16);
+
+  /* Accent */
+  --color-accent: #8b5cf6;
+  --color-accent-light: #a78bfa;
+  --color-accent-bg: rgba(139, 92, 246, 0.12);
+
+  /* Status — Success */
+  --color-success: #22c55e;
+  --color-success-bg: rgba(34, 197, 94, 0.12);
+
+  /* Status — Warning */
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.12);
+
+  /* Status — Danger */
+  --color-danger: #ef4444;
+  --color-danger-bg: rgba(239, 68, 68, 0.12);
+
+  /* Status — Blue */
+  --color-blue: #3b82f6;
+  --color-blue-bg: rgba(59, 130, 246, 0.12);
+
+  /* Spacing (4px grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* Typography Sizes */
+  --font-size-xs: 11px;
+  --font-size-sm: 13px;
+  --font-size-base: 14px;
+  --font-size-md: 15px;
+  --font-size-lg: 18px;
+  --font-size-xl: 22px;
+  --font-size-2xl: 28px;
+
+  /* Z-Index */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-dropdown: 20;
+  --z-modal: 30;
+  --z-toast: 40;
+}
