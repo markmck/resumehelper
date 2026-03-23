@@ -196,31 +196,6 @@ export function SettingsTab(): React.JSX.Element {
           </select>
         </div>
 
-        {/* Model */}
-        <div style={fieldGroupStyle}>
-          <label style={labelStyle}>Model {modelsLoading && <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 'normal' }}>(loading...)</span>}</label>
-          <select
-            style={selectStyle}
-            value={model}
-            onChange={(e) => {
-              setModel(e.target.value)
-              setTestStatus('idle')
-              setTestMessage('')
-            }}
-          >
-            {models.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          {hasKey && (
-            <p style={{ marginTop: 'var(--space-1)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-              Models fetched from your provider API
-            </p>
-          )}
-        </div>
-
         {/* API Key */}
         <div style={fieldGroupStyle}>
           <label style={labelStyle}>API Key</label>
@@ -279,6 +254,31 @@ export function SettingsTab(): React.JSX.Element {
             </p>
           )}
         </div>
+
+        {/* Model — only shown after key is saved */}
+        {hasKey && (
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>Model {modelsLoading && <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 'normal' }}>(loading...)</span>}</label>
+            <select
+              style={selectStyle}
+              value={model}
+              onChange={(e) => {
+                setModel(e.target.value)
+                setTestStatus('idle')
+                setTestMessage('')
+              }}
+            >
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <p style={{ marginTop: 'var(--space-1)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+              Models fetched from your provider API
+            </p>
+          </div>
+        )}
 
         {/* Save error */}
         {saveError && (
