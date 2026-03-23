@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Analysis Integration
 status: planning
-stopped_at: Completed 09-analysis-core 09-01-PLAN.md
-last_updated: "2026-03-23T23:13:46.760Z"
+stopped_at: Completed 09-analysis-core-09-02-PLAN.md
+last_updated: "2026-03-23T23:14:57.677Z"
 last_activity: 2026-03-23 — Roadmap created, 31 requirements mapped across 5 phases
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -49,6 +49,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 08-foundation P02 | 2 | 2 tasks | 7 files |
 | Phase 08-foundation P01 | 3 | 2 tasks | 8 files |
 | Phase 09-analysis-core P01 | 2min | 2 tasks | 7 files |
+| Phase 09-analysis-core P02 | 15 | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,8 @@ Recent decisions affecting current work:
 - [Phase 09-analysis-core]: overall_score excluded from LLM schema — computed in code via deriveOverallScore (weighted formula) to avoid LLM arithmetic errors
 - [Phase 09-analysis-core]: Job parsing result cached in jobPostings columns — subsequent analyses for same posting skip Call 1 (parse)
 - [Phase 09-analysis-core]: getAnalysis auto-marks status to reviewed on first view — no separate mutation needed from renderer
+- [Phase 09-analysis-core]: AnalysisList wraps jobPostings.list() in Array.isArray check for graceful empty state when API stub returns error object
+- [Phase 09-analysis-core]: Re-analyze action navigates to analyzing screen via AnalysisTab router — AnalyzingProgress (Plan 03) owns the actual ai:analyze IPC call
 
 ### Pending Todos
 
@@ -85,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T23:13:46.758Z
-Stopped at: Completed 09-analysis-core 09-01-PLAN.md
+Last session: 2026-03-23T23:14:57.676Z
+Stopped at: Completed 09-analysis-core-09-02-PLAN.md
 Resume file: None

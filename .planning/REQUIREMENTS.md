@@ -17,11 +17,11 @@ Requirements for AI Analysis Integration milestone. Each maps to roadmap phases.
 
 ### Job Analysis
 
-- [ ] **ANLYS-01**: User can paste job posting text into a textarea and trigger analysis
+- [x] **ANLYS-01**: User can paste job posting text into a textarea and trigger analysis
 - [x] **ANLYS-02**: Analysis returns a match score (0-100) for a specific variant + job posting pair
 - [x] **ANLYS-03**: Analysis returns keyword coverage split into exact matches, semantic matches, and missing keywords
 - [x] **ANLYS-04**: Analysis returns gap analysis with critical (required) and moderate (preferred) severity tiers
-- [ ] **ANLYS-05**: User must select a variant before analysis runs — score reflects the specific variant, not the full resume DB
+- [x] **ANLYS-05**: User must select a variant before analysis runs — score reflects the specific variant, not the full resume DB
 - [x] **ANLYS-06**: Analysis results are stored in the database with links to the job posting and variant
 - [x] **ANLYS-07**: User sees a loading state during LLM analysis with progress indication
 
@@ -99,11 +99,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AI-03 | Phase 8 | Complete |
 | AI-04 | Phase 8 | Pending |
 | AI-05 | Phase 8 | Complete |
-| ANLYS-01 | Phase 9 | Pending |
+| ANLYS-01 | Phase 9 | Complete |
 | ANLYS-02 | Phase 9 | Complete |
 | ANLYS-03 | Phase 9 | Complete |
 | ANLYS-04 | Phase 9 | Complete |
-| ANLYS-05 | Phase 9 | Pending |
+| ANLYS-05 | Phase 9 | Complete |
 | ANLYS-06 | Phase 9 | Complete |
 | ANLYS-07 | Phase 9 | Complete |
 | SUGG-01 | Phase 10 | Pending |
