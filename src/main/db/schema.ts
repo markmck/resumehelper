@@ -165,6 +165,7 @@ export const jobPostings = sqliteTable('job_postings', {
   parsedSkills: text('parsed_skills').notNull().default('[]'),
   parsedKeywords: text('parsed_keywords').notNull().default('[]'),
   parsedRequirements: text('parsed_requirements').notNull().default('[]'),
+  parsedPreferred: text('parsed_preferred').notNull().default('[]'),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -179,10 +180,13 @@ export const analysisResults = sqliteTable('analysis_results', {
   matchScore: integer('match_score').notNull().default(0),
   keywordHits: text('keyword_hits').notNull().default('[]'),
   keywordMisses: text('keyword_misses').notNull().default('[]'),
+  semanticMatches: text('semantic_matches').notNull().default('[]'),
   gapSkills: text('gap_skills').notNull().default('[]'),
   suggestions: text('suggestions').notNull().default('[]'),
   atsFlags: text('ats_flags').notNull().default('[]'),
   rawLlmResponse: text('raw_llm_response').notNull().default(''),
+  status: text('status').notNull().default('unreviewed'),
+  scoreBreakdown: text('score_breakdown').notNull().default('{}'),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),

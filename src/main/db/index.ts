@@ -206,6 +206,10 @@ function ensureSchema(): void {
     'ALTER TABLE `template_variant_items` ADD COLUMN `interest_id` integer REFERENCES `interests`(`id`) ON DELETE cascade',
     'ALTER TABLE `template_variant_items` ADD COLUMN `reference_id` integer REFERENCES `references`(`id`) ON DELETE cascade',
     'ALTER TABLE `profile` ADD COLUMN `summary` text NOT NULL DEFAULT \'\'',
+    'ALTER TABLE `analysis_results` ADD COLUMN `semantic_matches` text NOT NULL DEFAULT \'[]\'',
+    'ALTER TABLE `analysis_results` ADD COLUMN `status` text NOT NULL DEFAULT \'unreviewed\'',
+    'ALTER TABLE `analysis_results` ADD COLUMN `score_breakdown` text NOT NULL DEFAULT \'{}\'',
+    'ALTER TABLE `job_postings` ADD COLUMN `parsed_preferred` text NOT NULL DEFAULT \'[]\'',
   ]
   for (const sql of alterStatements) {
     try { sqlite.exec(sql) } catch { /* column already exists */ }

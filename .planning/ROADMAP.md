@@ -47,7 +47,11 @@ Plans:
   3. Keyword results are split into three labeled groups: exact matches, semantic matches, and missing keywords
   4. Gap analysis lists items with critical (required) and moderate (preferred) severity tiers sourced from posting language
   5. Analysis results are saved to the database linked to the job posting and the specific variant used
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 09-01-PLAN.md — Backend: DB schema extension, Zod schemas, LLM two-call pipeline, job postings CRUD
+- [ ] 09-02-PLAN.md — UI: Analysis list (Screen 1) and New Analysis form (Screen 2) with variant selection
+- [ ] 09-03-PLAN.md — UI: Analyzing progress stepper (Screen 3) and Results dashboard (Screen 4), full wiring
 
 ### Phase 10: Bullet Suggestions
 **Goal**: Users can review per-bullet rewrite suggestions from the analysis, compare original and proposed text side by side, and accept or dismiss each suggestion individually — accepted suggestions write back to the database
@@ -94,7 +98,7 @@ Note: Phase 11 depends only on Phase 8 (no AI dependency) — can begin after Ph
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 8. Foundation | 2/3 | In Progress|  | - |
-| 9. Analysis Core | v2.0 | 0/TBD | Not started | - |
+| 9. Analysis Core | v2.0 | 0/3 | Not started | - |
 | 10. Bullet Suggestions | v2.0 | 0/TBD | Not started | - |
 | 11. Submission Pipeline | v2.0 | 0/TBD | Not started | - |
 | 12. UI Redesign | v2.0 | 0/TBD | Not started | - |
