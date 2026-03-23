@@ -42,17 +42,34 @@ function SubmissionsTab(): React.JSX.Element {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between" style={{ marginBottom: '20px' }}>
-        <h1 className="text-xl font-semibold text-zinc-100">Submissions</h1>
+    <div style={{ maxWidth: 960, margin: '0 auto', padding: 'var(--space-10)' }}>
+      {/* Page Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+        <h1 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>Submissions</h1>
         <button
           onClick={() => setShowAddForm((prev) => !prev)}
-          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-md transition-colors"
+          style={{
+            backgroundColor: 'var(--color-accent)',
+            color: '#fff',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-base)',
+            fontWeight: 500,
+            cursor: 'pointer',
+            height: 36,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+            fontFamily: 'var(--font-sans)',
+          }}
         >
           + Log Submission
         </button>
       </div>
+      <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-8)', marginTop: 0 }}>
+        Track your job applications and see which resume variants perform best.
+      </p>
 
       {/* Add Form */}
       {showAddForm && (

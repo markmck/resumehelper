@@ -99,17 +99,36 @@ function ExperienceTab(): React.JSX.Element {
   }
 
   return (
-    <div className="overflow-y-auto h-[calc(100vh-48px)]">
-      <div className="max-w-2xl mx-auto px-8 py-8">
-        {/* Header with Import button */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}>
-          <button
-            onClick={handleImportClick}
-            className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-medium rounded-md transition-colors"
-          >
-            Import from resume.json
-          </button>
+    <div style={{ overflow: 'auto', height: '100vh' }}>
+      <div style={{ maxWidth: 760, margin: '0 auto', padding: 'var(--space-10)' }}>
+        {/* Page Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+          <h1 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>Experience</h1>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <button
+              onClick={handleImportClick}
+              style={{
+                backgroundColor: 'transparent',
+                border: '1px solid var(--color-border-default)',
+                color: 'var(--color-text-secondary)',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--font-size-base)',
+                cursor: 'pointer',
+                height: 36,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                fontFamily: 'var(--font-sans)',
+              }}
+            >
+              Import JSON
+            </button>
+          </div>
         </div>
+        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-8)', marginTop: 0 }}>
+          Your complete work history. Toggle sections open to edit.
+        </p>
 
         <CollapsibleSection title="Profile" defaultOpen={false}>
           <ProfileSettings key={refreshKey} />

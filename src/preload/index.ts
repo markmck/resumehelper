@@ -75,6 +75,7 @@ const api = {
       phone: string
       location: string
       linkedin: string
+      summary: string
     }) => ipcRenderer.invoke('profile:set', data),
   },
   exportFile: {

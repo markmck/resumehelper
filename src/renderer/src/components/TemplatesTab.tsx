@@ -47,9 +47,18 @@ function TemplatesTab(): React.JSX.Element {
   const selectedVariant = variants.find((v) => v.id === selectedId) ?? null
 
   return (
-    <div className="flex h-[calc(100vh-48px)]">
-      {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 bg-zinc-900 border-r border-zinc-800 flex flex-col">
+    <div style={{ display: 'flex', height: '100vh' }}>
+      {/* Variant list sidebar */}
+      <aside
+        style={{
+          width: 220,
+          flexShrink: 0,
+          backgroundColor: 'var(--color-bg-surface)',
+          borderRight: '1px solid var(--color-border-subtle)',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         <VariantList
           variants={variants}
           selectedId={selectedId}
@@ -61,18 +70,29 @@ function TemplatesTab(): React.JSX.Element {
       </aside>
 
       {/* Editor area */}
-      <div className="flex-1 overflow-hidden">
+      <div style={{ flex: 1, overflow: 'hidden' }}>
         {selectedVariant ? (
           <VariantEditor
             variant={selectedVariant}
             onRename={handleRename}
           />
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-zinc-500">
-            <p className="mb-4 text-sm">No variants yet</p>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-tertiary)' }}>
+            <p style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--font-size-sm)' }}>No variants yet</p>
             <button
               onClick={handleCreate}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-md transition-colors"
+              style={{
+                backgroundColor: 'var(--color-accent)',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--font-size-base)',
+                fontWeight: 500,
+                cursor: 'pointer',
+                height: 36,
+                fontFamily: 'var(--font-sans)',
+              }}
             >
               Create your first variant
             </button>

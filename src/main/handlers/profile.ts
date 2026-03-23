@@ -10,6 +10,7 @@ const DEFAULT_PROFILE = {
   phone: '',
   location: '',
   linkedin: '',
+  summary: '',
 }
 
 export function registerProfileHandlers(): void {
@@ -22,7 +23,7 @@ export function registerProfileHandlers(): void {
     'profile:set',
     async (
       _,
-      data: { name: string; email: string; phone: string; location: string; linkedin: string },
+      data: { name: string; email: string; phone: string; location: string; linkedin: string; summary: string },
     ) => {
       db.insert(profile)
         .values({ id: 1, ...data })

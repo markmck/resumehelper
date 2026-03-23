@@ -205,6 +205,7 @@ function ensureSchema(): void {
     'ALTER TABLE `template_variant_items` ADD COLUMN `language_id` integer REFERENCES `languages`(`id`) ON DELETE cascade',
     'ALTER TABLE `template_variant_items` ADD COLUMN `interest_id` integer REFERENCES `interests`(`id`) ON DELETE cascade',
     'ALTER TABLE `template_variant_items` ADD COLUMN `reference_id` integer REFERENCES `references`(`id`) ON DELETE cascade',
+    'ALTER TABLE `profile` ADD COLUMN `summary` text NOT NULL DEFAULT \'\'',
   ]
   for (const sql of alterStatements) {
     try { sqlite.exec(sql) } catch { /* column already exists */ }

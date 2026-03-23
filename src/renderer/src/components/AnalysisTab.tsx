@@ -39,18 +39,22 @@ function AnalysisTab(): React.JSX.Element {
       <button
         style={{
           marginTop: 'var(--space-2)',
-          padding: '10px 20px',
+          padding: '8px 16px',
           backgroundColor: 'var(--color-accent)',
-          color: 'var(--color-text-primary)',
+          color: '#fff',
           border: 'none',
           borderRadius: 'var(--radius-md)',
-          fontSize: 'var(--font-size-sm)',
+          fontSize: 'var(--font-size-base)',
           fontWeight: 500,
           cursor: 'pointer',
+          height: 36,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 'var(--space-2)',
           fontFamily: 'var(--font-sans)',
         }}
       >
-        Analyze Job Posting
+        New Analysis
       </button>
     </div>
   )

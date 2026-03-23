@@ -147,6 +147,7 @@ export const profile = sqliteTable('profile', {
   phone: text('phone').notNull().default(''),
   location: text('location').notNull().default(''),
   linkedin: text('linkedin').notNull().default(''),
+  summary: text('summary').notNull().default(''),
 })
 
 export const aiSettings = sqliteTable('ai_settings', {

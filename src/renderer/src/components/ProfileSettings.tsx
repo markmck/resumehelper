@@ -7,6 +7,7 @@ interface ProfileForm {
   phone: string
   location: string
   linkedin: string
+  summary: string
 }
 
 const EMPTY_FORM: ProfileForm = {
@@ -15,6 +16,7 @@ const EMPTY_FORM: ProfileForm = {
   phone: '',
   location: '',
   linkedin: '',
+  summary: '',
 }
 
 function ProfileSettings(): React.JSX.Element {
@@ -30,6 +32,7 @@ function ProfileSettings(): React.JSX.Element {
         phone: data.phone,
         location: data.location,
         linkedin: data.linkedin,
+        summary: data.summary ?? '',
       })
       setLoading(false)
     })
@@ -68,38 +71,42 @@ function ProfileSettings(): React.JSX.Element {
         padding: '2rem 1.5rem',
       }}
     >
-      <h1
+      <h2
         style={{
-          fontSize: '1.125rem',
-          fontWeight: '600',
-          color: '#f4f4f5',
-          marginBottom: '1.5rem',
+          fontSize: 'var(--font-size-lg)',
+          fontWeight: 500,
+          color: 'var(--color-text-primary)',
+          marginBottom: 'var(--space-2)',
+          marginTop: 0,
         }}
       >
         Profile
-      </h1>
+      </h2>
       <p
         style={{
-          fontSize: '0.8125rem',
-          color: '#71717a',
-          marginBottom: '1.5rem',
-          lineHeight: '1.5',
+          fontSize: 'var(--font-size-sm)',
+          color: 'var(--color-text-tertiary)',
+          marginBottom: 'var(--space-6)',
+          marginTop: 0,
+          lineHeight: 1.5,
         }}
       >
         Your profile information appears in the resume header when exporting to PDF or DOCX.
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         {fields.map(({ key, label, placeholder }) => (
           <div key={key}>
             <label
               htmlFor={`profile-${key}`}
               style={{
                 display: 'block',
-                fontSize: '0.8125rem',
-                fontWeight: '500',
-                color: '#a1a1aa',
-                marginBottom: '0.375rem',
+                fontSize: 'var(--font-size-xs)',
+                fontWeight: 500,
+                textTransform: 'uppercase' as const,
+                letterSpacing: '0.05em',
+                color: 'var(--color-text-tertiary)',
+                marginBottom: 'var(--space-2)',
               }}
             >
               {label}
@@ -110,16 +117,76 @@ function ProfileSettings(): React.JSX.Element {
               value={form[key]}
               onChange={handleChange(key)}
               placeholder={placeholder}
-              className="bg-zinc-800 border border-zinc-700 rounded text-zinc-100 px-3 py-2 text-sm w-full focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              style={{
+                backgroundColor: 'var(--color-bg-input)',
+                border: '1px solid var(--color-border-default)',
+                borderRadius: 'var(--radius-md)',
+                padding: '8px 12px',
+                height: 36,
+                fontSize: 'var(--font-size-base)',
+                color: 'var(--color-text-primary)',
+                width: '100%',
+                outline: 'none',
+                fontFamily: 'var(--font-sans)',
+              }}
             />
           </div>
         ))}
+
+        {/* Summary / Objective */}
+        <div>
+          <label
+            htmlFor="profile-summary"
+            style={{
+              display: 'block',
+              fontSize: 'var(--font-size-xs)',
+              fontWeight: 500,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.05em',
+              color: 'var(--color-text-tertiary)',
+              marginBottom: 'var(--space-2)',
+            }}
+          >
+            Summary / Objective
+          </label>
+          <textarea
+            id="profile-summary"
+            value={form.summary}
+            onChange={(e) => setForm((prev) => ({ ...prev, summary: e.target.value }))}
+            placeholder="A brief professional summary or career objective (optional — can be toggled per variant)"
+            rows={4}
+            style={{
+              backgroundColor: 'var(--color-bg-input)',
+              border: '1px solid var(--color-border-default)',
+              borderRadius: 'var(--radius-md)',
+              padding: '8px 12px',
+              fontSize: 'var(--font-size-base)',
+              color: 'var(--color-text-primary)',
+              width: '100%',
+              outline: 'none',
+              fontFamily: 'var(--font-sans)',
+              resize: 'vertical',
+              lineHeight: 1.6,
+            }}
+          />
+        </div>
       </div>
 
-      <div style={{ marginTop: '1.5rem' }}>
+      <div style={{ marginTop: 'var(--space-6)' }}>
         <button
           onClick={handleSave}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-md transition-colors"
+          style={{
+            backgroundColor: 'var(--color-accent)',
+            color: '#fff',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-base)',
+            fontWeight: 500,
+            cursor: 'pointer',
+            height: 36,
+            fontFamily: 'var(--font-sans)',
+          }}
         >
           Save
         </button>
