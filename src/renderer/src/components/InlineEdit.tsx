@@ -5,7 +5,7 @@ interface InlineEditProps {
   onSave: (value: string) => void
   onEnter?: () => void
   placeholder?: string
-  className?: string
+  style?: React.CSSProperties
   multiline?: boolean
   autoFocus?: boolean
   onFocused?: () => void
@@ -17,7 +17,7 @@ function InlineEdit({
   onSave,
   onEnter,
   placeholder = 'Click to edit',
-  className = '',
+  style = {},
   multiline = false,
   autoFocus = false,
   onFocused,
@@ -25,6 +25,7 @@ function InlineEdit({
 }: InlineEditProps): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
+  const [focused, setFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -51,6 +52,7 @@ function InlineEdit({
 
   const handleSave = (): void => {
     setEditing(false)
+    setFocused(false)
     if (alwaysFireSave || draft !== value) {
       onSave(draft)
     }
@@ -64,17 +66,34 @@ function InlineEdit({
     } else if (e.key === 'Escape') {
       setDraft(value)
       setEditing(false)
+      setFocused(false)
     }
   }
 
   if (editing) {
+    const inputStyle: React.CSSProperties = {
+      width: '100%',
+      backgroundColor: 'var(--color-bg-input)',
+      color: 'var(--color-text-primary)',
+      borderRadius: 'var(--radius-md)',
+      padding: '4px 8px',
+      outline: 'none',
+      border: focused
+        ? '1px solid var(--color-accent)'
+        : '1px solid var(--color-border-default)',
+      fontSize: 'var(--font-size-base)',
+      fontFamily: 'var(--font-sans)',
+      ...style,
+    }
+
     const sharedProps = {
       value: draft,
       onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
         setDraft(e.target.value),
       onBlur: handleSave,
       onKeyDown: handleKeyDown,
-      className: `w-full bg-zinc-800 text-zinc-100 rounded px-2 py-1 outline-none border border-zinc-600 focus:border-indigo-500 ${className}`,
+      onFocus: () => setFocused(true),
+      style: inputStyle,
     }
 
     return multiline ? (
@@ -91,9 +110,21 @@ function InlineEdit({
   return (
     <span
       onClick={handleClick}
-      className={`cursor-text rounded px-2 py-1 hover:bg-zinc-800 transition-colors ${
-        value ? 'text-zinc-100' : 'text-zinc-500 opacity-40'
-      } ${className}`}
+      style={{
+        cursor: 'text',
+        borderRadius: 'var(--radius-md)',
+        padding: '4px 8px',
+        transition: 'background-color 0.15s',
+        color: value ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+        opacity: value ? 1 : 0.4,
+        ...style,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = 'var(--color-bg-raised)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = 'transparent'
+      }}
     >
       {value || placeholder}
     </span>

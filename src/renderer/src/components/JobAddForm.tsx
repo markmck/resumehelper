@@ -17,6 +17,7 @@ function JobAddForm({ onSave, onCancel }: JobAddFormProps): React.JSX.Element {
   const [endDate, setEndDate] = useState('')
   const [currentJob, setCurrentJob] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const [focusedField, setFocusedField] = useState<string | null>(null)
   const companyRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -41,73 +42,111 @@ function JobAddForm({ onSave, onCancel }: JobAddFormProps): React.JSX.Element {
     })
   }
 
-  const inputClass =
-    'w-full bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-md px-3 py-2 text-sm outline-none focus:border-indigo-500 placeholder-zinc-500'
+  const inputStyle = (field: string): React.CSSProperties => ({
+    width: '100%',
+    backgroundColor: 'var(--color-bg-input)',
+    border: `1px solid ${focusedField === field ? 'var(--color-accent)' : 'var(--color-border-default)'}`,
+    color: 'var(--color-text-primary)',
+    borderRadius: 'var(--radius-md)',
+    padding: '8px 12px',
+    fontSize: 'var(--font-size-base)',
+    outline: 'none',
+    fontFamily: 'inherit',
+    boxSizing: 'border-box' as const,
+  })
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 'var(--font-size-xs)',
+    fontWeight: 500,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: 'var(--color-text-tertiary)',
+    marginBottom: 'var(--space-2)',
+  }
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4"
+      style={{
+        backgroundColor: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border-subtle)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-4)',
+        marginBottom: 'var(--space-4)',
+      }}
     >
-      <h3 className="text-sm font-medium text-zinc-300 mb-3">Add Job</h3>
+      <h3 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--color-text-secondary)', marginTop: 0, marginBottom: 'var(--space-3)' }}>Add Job</h3>
 
       {errors.length > 0 && (
-        <div className="mb-3 space-y-1">
+        <div style={{ marginBottom: 'var(--space-3)' }}>
           {errors.map((err, i) => (
-            <p key={i} className="text-red-400 text-xs">
+            <p key={i} style={{ color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', margin: '0 0 4px 0' }}>
               {err}
             </p>
           ))}
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
         <div>
-          <label className="block text-xs text-zinc-400 mb-1">Company</label>
+          <label style={labelStyle}>Company</label>
           <input
             ref={companyRef}
             type="text"
             value={company}
             onChange={(e) => setCompany(e.target.value)}
             placeholder="Acme Corp"
-            className={inputClass}
+            style={inputStyle('company')}
+            onFocus={() => setFocusedField('company')}
+            onBlur={() => setFocusedField(null)}
           />
         </div>
         <div>
-          <label className="block text-xs text-zinc-400 mb-1">Role</label>
+          <label style={labelStyle}>Role</label>
           <input
             type="text"
             value={role}
             onChange={(e) => setRole(e.target.value)}
             placeholder="Software Engineer"
-            className={inputClass}
+            style={inputStyle('role')}
+            onFocus={() => setFocusedField('role')}
+            onBlur={() => setFocusedField(null)}
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
         <div>
-          <label className="block text-xs text-zinc-400 mb-1">Start Date</label>
+          <label style={labelStyle}>Start Date</label>
           <input
             type="month"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className={inputClass}
+            style={inputStyle('startDate')}
+            onFocus={() => setFocusedField('startDate')}
+            onBlur={() => setFocusedField(null)}
           />
         </div>
         <div>
-          <label className="block text-xs text-zinc-400 mb-1">End Date</label>
+          <label style={labelStyle}>End Date</label>
           <input
             type="month"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             disabled={currentJob}
-            className={`${inputClass} disabled:opacity-40 disabled:cursor-not-allowed`}
+            style={{
+              ...inputStyle('endDate'),
+              opacity: currentJob ? 0.4 : 1,
+              cursor: currentJob ? 'not-allowed' : undefined,
+            }}
+            onFocus={() => setFocusedField('endDate')}
+            onBlur={() => setFocusedField(null)}
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-4">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
         <input
           type="checkbox"
           id="currentJob"
@@ -116,24 +155,46 @@ function JobAddForm({ onSave, onCancel }: JobAddFormProps): React.JSX.Element {
             setCurrentJob(e.target.checked)
             if (e.target.checked) setEndDate('')
           }}
-          className="accent-indigo-500"
+          style={{ accentColor: 'var(--color-accent)' }}
         />
-        <label htmlFor="currentJob" className="text-xs text-zinc-400">
+        <label htmlFor="currentJob" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)' }}>
           I currently work here
         </label>
       </div>
 
-      <div className="flex gap-2">
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         <button
           type="submit"
-          className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-md transition-colors"
+          style={{
+            backgroundColor: 'var(--color-accent)',
+            color: '#fff',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-base)',
+            fontWeight: 500,
+            cursor: 'pointer',
+            height: 36,
+            fontFamily: 'var(--font-sans)',
+          }}
         >
           Save
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium rounded-md transition-colors"
+          style={{
+            backgroundColor: 'transparent',
+            border: '1px solid var(--color-border-default)',
+            color: 'var(--color-text-secondary)',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-base)',
+            fontWeight: 500,
+            cursor: 'pointer',
+            height: 36,
+            fontFamily: 'var(--font-sans)',
+          }}
         >
           Cancel
         </button>

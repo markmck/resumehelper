@@ -23,11 +23,28 @@ function CollapsibleSection({ title, defaultOpen, children }: CollapsibleSection
   const [open, setOpen] = useState(defaultOpen)
 
   return (
-    <section style={{ marginBottom: '48px' }}>
+    <section style={{ marginBottom: 'var(--space-12)' }}>
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-2 text-sm font-semibold text-zinc-400 uppercase tracking-wider hover:text-zinc-300 transition-colors"
-        style={{ marginBottom: open ? '16px' : '0' }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-2)',
+          fontSize: 'var(--font-size-sm)',
+          fontWeight: 600,
+          color: 'var(--color-text-tertiary)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: 0,
+          fontFamily: 'var(--font-sans)',
+          marginBottom: open ? 'var(--space-4)' : '0',
+          transition: 'color 0.15s',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)' }}
       >
         <span style={{ display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>&#9654;</span>
         {title}

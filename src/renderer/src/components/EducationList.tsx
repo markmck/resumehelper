@@ -12,12 +12,38 @@ interface Education {
   courses: string[]
 }
 
+const cardStyle: React.CSSProperties = {
+  backgroundColor: 'var(--color-bg-surface)',
+  borderRadius: 'var(--radius-lg)',
+  border: '1px solid var(--color-border-subtle)',
+  padding: 'var(--space-3)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-2)',
+}
+
+const addInputStyle: React.CSSProperties = {
+  width: '100%',
+  backgroundColor: 'var(--color-bg-input)',
+  color: 'var(--color-text-primary)',
+  borderRadius: 'var(--radius-md)',
+  padding: '8px 12px',
+  outline: 'none',
+  border: '1px solid var(--color-border-default)',
+  fontSize: 'var(--font-size-sm)',
+  fontFamily: 'var(--font-sans)',
+  height: 36,
+  boxSizing: 'border-box' as const,
+}
+
 function EducationList(): React.JSX.Element {
   const [items, setItems] = useState<Education[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [newInstitution, setNewInstitution] = useState('')
   const [newArea, setNewArea] = useState('')
+  const [newStartDate, setNewStartDate] = useState('')
+  const [newEndDate, setNewEndDate] = useState('')
 
   useEffect(() => {
     window.api.education.list().then((data) => {
@@ -31,10 +57,14 @@ function EducationList(): React.JSX.Element {
     const created = await window.api.education.create({
       institution: newInstitution.trim(),
       area: newArea.trim() || undefined,
+      startDate: newStartDate.trim() || undefined,
+      endDate: newEndDate.trim() || undefined,
     })
     setItems((prev) => [...prev, created as Education])
     setNewInstitution('')
     setNewArea('')
+    setNewStartDate('')
+    setNewEndDate('')
     setAdding(false)
   }
 
@@ -56,17 +86,36 @@ function EducationList(): React.JSX.Element {
     await handleUpdate(id, { courses })
   }
 
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>): void => {
+    e.currentTarget.style.borderColor = 'var(--color-accent)'
+  }
+
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>): void => {
+    e.currentTarget.style.borderColor = 'var(--color-border-default)'
+  }
+
   if (loading) {
-    return <div className="text-zinc-500 text-sm">Loading education...</div>
+    return <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>Loading education...</div>
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       {!adding && (
         <div>
           <button
             onClick={() => setAdding(true)}
-            className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded transition-colors"
+            style={{
+              fontSize: 'var(--font-size-xs)',
+              color: 'var(--color-accent-light)',
+              border: 'none',
+              backgroundColor: 'transparent',
+              padding: '4px 8px',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-bg)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
           >
             + Add Education
           </button>
@@ -74,16 +123,15 @@ function EducationList(): React.JSX.Element {
       )}
 
       {adding && (
-        <div
-          className="bg-zinc-800 rounded-lg border border-zinc-700"
-          style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}
-        >
+        <div style={cardStyle}>
           <input
             type="text"
             placeholder="Institution (required)"
             value={newInstitution}
             onChange={(e) => setNewInstitution(e.target.value)}
-            className="w-full bg-zinc-700 text-zinc-100 rounded px-2 py-1 outline-none border border-zinc-600 focus:border-indigo-500 text-sm"
+            style={addInputStyle}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
             autoFocus
           />
           <input
@@ -91,22 +139,66 @@ function EducationList(): React.JSX.Element {
             placeholder="Area of study"
             value={newArea}
             onChange={(e) => setNewArea(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleAdd()
-              if (e.key === 'Escape') { setAdding(false); setNewInstitution(''); setNewArea('') }
-            }}
-            className="w-full bg-zinc-700 text-zinc-100 rounded px-2 py-1 outline-none border border-zinc-600 focus:border-indigo-500 text-sm"
+            style={addInputStyle}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
           />
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <input
+              type="text"
+              placeholder="Start date (e.g. 2020-09)"
+              value={newStartDate}
+              onChange={(e) => setNewStartDate(e.target.value)}
+              style={{ ...addInputStyle, flex: 1 }}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+            />
+            <input
+              type="text"
+              placeholder="End date (e.g. 2024-05)"
+              value={newEndDate}
+              onChange={(e) => setNewEndDate(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAdd()
+                if (e.key === 'Escape') { setAdding(false); setNewInstitution(''); setNewArea(''); setNewStartDate(''); setNewEndDate(''); setNewStartDate(''); setNewEndDate('') }
+              }}
+              style={{ ...addInputStyle, flex: 1 }}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <button
               onClick={handleAdd}
-              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded transition-colors"
+              style={{
+                backgroundColor: 'var(--color-accent)',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--font-size-base)',
+                fontWeight: 500,
+                cursor: 'pointer',
+                height: 36,
+                fontFamily: 'var(--font-sans)',
+              }}
             >
               Add
             </button>
             <button
-              onClick={() => { setAdding(false); setNewInstitution(''); setNewArea('') }}
-              className="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs rounded transition-colors"
+              onClick={() => { setAdding(false); setNewInstitution(''); setNewArea(''); setNewStartDate(''); setNewEndDate('') }}
+              style={{
+                backgroundColor: 'transparent',
+                color: 'var(--color-text-secondary)',
+                border: '1px solid var(--color-border-default)',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--font-size-base)',
+                fontWeight: 500,
+                cursor: 'pointer',
+                height: 36,
+                fontFamily: 'var(--font-sans)',
+              }}
             >
               Cancel
             </button>
@@ -115,13 +207,24 @@ function EducationList(): React.JSX.Element {
       )}
 
       {items.length === 0 && !adding ? (
-        <div className="text-center py-8">
-          <p className="text-zinc-500 text-sm" style={{ marginBottom: '12px' }}>
+        <div style={{ textAlign: 'center', padding: 'var(--space-8) 0' }}>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-3)' }}>
             No education entries yet.
           </p>
           <button
             onClick={() => setAdding(true)}
-            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded transition-colors"
+            style={{
+              backgroundColor: 'transparent',
+              color: 'var(--color-text-secondary)',
+              border: '1px solid var(--color-border-default)',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--font-size-sm)',
+              fontWeight: 500,
+              cursor: 'pointer',
+              height: 36,
+              fontFamily: 'var(--font-sans)',
+            }}
           >
             + Add Education
           </button>
@@ -130,26 +233,30 @@ function EducationList(): React.JSX.Element {
         items.map((item) => (
           <div
             key={item.id}
-            className="bg-zinc-800 rounded-lg border border-zinc-700"
-            style={{ padding: '12px' }}
+            style={{
+              backgroundColor: 'var(--color-bg-surface)',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--color-border-subtle)',
+              padding: 'var(--space-3)',
+            }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                   <InlineEdit
                     value={item.institution}
                     placeholder="Institution"
                     onSave={(val) => handleUpdate(item.id, { institution: val })}
-                    className="text-zinc-100 font-medium text-sm"
+                    style={{ color: 'var(--color-text-primary)', fontWeight: 500, fontSize: 'var(--font-size-sm)' }}
                   />
                   {item.area && (
                     <>
-                      <span className="text-zinc-500 text-sm">—</span>
+                      <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>—</span>
                       <InlineEdit
                         value={item.area}
                         placeholder="Area"
                         onSave={(val) => handleUpdate(item.id, { area: val })}
-                        className="text-zinc-300 text-sm"
+                        style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}
                       />
                     </>
                   )}
@@ -158,73 +265,91 @@ function EducationList(): React.JSX.Element {
                       value=""
                       placeholder="+ area"
                       onSave={(val) => handleUpdate(item.id, { area: val })}
-                      className="text-zinc-500 text-sm"
+                      style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}
                     />
                   )}
                   {item.studyType && (
                     <>
-                      <span className="text-zinc-500 text-sm">(</span>
+                      <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>(</span>
                       <InlineEdit
                         value={item.studyType}
                         placeholder="Degree type"
                         onSave={(val) => handleUpdate(item.id, { studyType: val })}
-                        className="text-zinc-400 text-sm"
+                        style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-sm)' }}
                       />
-                      <span className="text-zinc-500 text-sm">)</span>
+                      <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>)</span>
                     </>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-1)', flexWrap: 'wrap' }}>
                   <InlineEdit
                     value={item.startDate || ''}
                     placeholder="Start date"
                     onSave={(val) => handleUpdate(item.id, { startDate: val })}
-                    className="text-zinc-400 text-xs"
+                    style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-xs)' }}
                   />
-                  <span className="text-zinc-600 text-xs">–</span>
+                  <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>–</span>
                   <InlineEdit
                     value={item.endDate || ''}
                     placeholder="End date"
                     onSave={(val) => handleUpdate(item.id, { endDate: val || null })}
-                    className="text-zinc-400 text-xs"
+                    style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-xs)' }}
                   />
                   {item.score && (
                     <>
-                      <span className="text-zinc-600 text-xs">|</span>
+                      <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>|</span>
                       <InlineEdit
                         value={item.score}
                         placeholder="Score/GPA"
                         onSave={(val) => handleUpdate(item.id, { score: val })}
-                        className="text-zinc-400 text-xs"
+                        style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-xs)' }}
                       />
                     </>
                   )}
                 </div>
                 {item.courses.length > 0 && (
-                  <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
                     {item.courses.map((course, i) => (
                       <span
                         key={i}
-                        className="bg-zinc-700 text-zinc-300 text-xs rounded px-2 py-0.5"
+                        style={{
+                          backgroundColor: 'var(--color-bg-raised)',
+                          color: 'var(--color-text-secondary)',
+                          fontSize: 'var(--font-size-xs)',
+                          borderRadius: 'var(--radius-sm)',
+                          padding: '2px 8px',
+                        }}
                       >
                         {course}
                       </span>
                     ))}
                   </div>
                 )}
-                <div style={{ marginTop: '6px' }}>
+                <div style={{ marginTop: 'var(--space-1)' }}>
                   <InlineEdit
                     value={item.courses.join(', ')}
                     placeholder="Courses (comma-separated)"
                     onSave={(val) => handleCoursesUpdate(item.id, val)}
-                    className="text-zinc-500 text-xs"
+                    style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}
                   />
                 </div>
               </div>
               <button
                 onClick={() => handleDelete(item.id)}
-                className="text-zinc-600 hover:text-red-400 text-xs transition-colors"
-                style={{ marginLeft: '8px', flexShrink: 0 }}
+                style={{
+                  color: 'var(--color-text-muted)',
+                  fontSize: 'var(--font-size-xs)',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                  marginLeft: 'var(--space-2)',
+                  flexShrink: 0,
+                  padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontFamily: 'var(--font-sans)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)' }}
                 title="Delete"
               >
                 ✕

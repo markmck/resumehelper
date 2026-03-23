@@ -35,6 +35,12 @@ function formatMonthDate(dateStr: string): string {
 function JobItem({ job, onUpdate, onDelete }: JobItemProps): React.JSX.Element {
   const [editingStart, setEditingStart] = useState(false)
   const [editingEnd, setEditingEnd] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const [startFocused, setStartFocused] = useState(false)
+  const [endFocused, setEndFocused] = useState(false)
+  const [deleteHovered, setDeleteHovered] = useState(false)
+  const [startHovered, setStartHovered] = useState(false)
+  const [endHovered, setEndHovered] = useState(false)
 
   const handleFieldUpdate = async (
     field: 'company' | 'role' | 'startDate' | 'endDate',
@@ -54,30 +60,50 @@ function JobItem({ job, onUpdate, onDelete }: JobItemProps): React.JSX.Element {
   const startDisplay = job.startDate ? formatMonthDate(job.startDate) : 'Start date'
   const endDisplay = job.endDate ? formatMonthDate(job.endDate) : 'Present'
 
+  const dateInputStyle: React.CSSProperties = {
+    backgroundColor: 'var(--color-bg-input)',
+    border: '1px solid var(--color-border-default)',
+    color: 'var(--color-text-primary)',
+    borderRadius: 'var(--radius-sm)',
+    padding: '2px 8px',
+    fontSize: 'var(--font-size-xs)',
+    outline: 'none',
+    fontFamily: 'inherit',
+  }
+
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3.5 group/job">
+    <div
+      style={{
+        backgroundColor: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border-subtle)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '14px 16px',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       {/* Header row */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           {/* Company and Role */}
-          <div className="flex flex-wrap items-baseline gap-x-2 mb-1">
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '0 8px', marginBottom: '4px' }}>
             <InlineEdit
               value={job.company}
               onSave={(v) => handleFieldUpdate('company', v)}
               placeholder="Company"
-              className="text-base font-semibold text-zinc-100"
+              style={{ fontSize: 'var(--font-size-base)', fontWeight: 600, color: 'var(--color-text-primary)' }}
             />
-            <span className="text-zinc-500 text-sm">·</span>
+            <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>·</span>
             <InlineEdit
               value={job.role}
               onSave={(v) => handleFieldUpdate('role', v)}
               placeholder="Role"
-              className="text-sm text-zinc-300"
+              style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}
             />
           </div>
 
           {/* Dates */}
-          <div className="flex items-center gap-1 text-sm text-zinc-400">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)' }}>
             {editingStart ? (
               <input
                 type="month"
@@ -87,12 +113,25 @@ function JobItem({ job, onUpdate, onDelete }: JobItemProps): React.JSX.Element {
                   setEditingStart(false)
                   if (e.target.value) handleFieldUpdate('startDate', e.target.value)
                 }}
-                className="bg-zinc-800 border border-zinc-700 text-zinc-100 rounded px-2 py-0.5 text-xs outline-none focus:border-indigo-500"
+                onFocus={() => setStartFocused(true)}
+                style={{
+                  ...dateInputStyle,
+                  borderColor: startFocused ? 'var(--color-accent)' : 'var(--color-border-default)',
+                }}
               />
             ) : (
               <span
                 onClick={() => setEditingStart(true)}
-                className="cursor-pointer hover:text-zinc-200 hover:bg-zinc-800 px-1 rounded transition-colors"
+                onMouseEnter={() => setStartHovered(true)}
+                onMouseLeave={() => setStartHovered(false)}
+                style={{
+                  cursor: 'pointer',
+                  padding: '0 4px',
+                  borderRadius: 'var(--radius-sm)',
+                  transition: 'color 0.15s, background-color 0.15s',
+                  color: startHovered ? 'var(--color-text-primary)' : undefined,
+                  backgroundColor: startHovered ? 'var(--color-bg-raised)' : undefined,
+                }}
               >
                 {startDisplay}
               </span>
@@ -107,12 +146,25 @@ function JobItem({ job, onUpdate, onDelete }: JobItemProps): React.JSX.Element {
                   setEditingEnd(false)
                   handleFieldUpdate('endDate', e.target.value)
                 }}
-                className="bg-zinc-800 border border-zinc-700 text-zinc-100 rounded px-2 py-0.5 text-xs outline-none focus:border-indigo-500"
+                onFocus={() => setEndFocused(true)}
+                style={{
+                  ...dateInputStyle,
+                  borderColor: endFocused ? 'var(--color-accent)' : 'var(--color-border-default)',
+                }}
               />
             ) : (
               <span
                 onClick={() => setEditingEnd(true)}
-                className="cursor-pointer hover:text-zinc-200 hover:bg-zinc-800 px-1 rounded transition-colors"
+                onMouseEnter={() => setEndHovered(true)}
+                onMouseLeave={() => setEndHovered(false)}
+                style={{
+                  cursor: 'pointer',
+                  padding: '0 4px',
+                  borderRadius: 'var(--radius-sm)',
+                  transition: 'color 0.15s, background-color 0.15s',
+                  color: endHovered ? 'var(--color-text-primary)' : undefined,
+                  backgroundColor: endHovered ? 'var(--color-bg-raised)' : undefined,
+                }}
               >
                 {endDisplay}
               </span>
@@ -123,7 +175,26 @@ function JobItem({ job, onUpdate, onDelete }: JobItemProps): React.JSX.Element {
         {/* Delete button */}
         <button
           onClick={handleDelete}
-          className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-colors opacity-0 group-hover/job:opacity-100 text-lg leading-none"
+          onMouseEnter={() => setDeleteHovered(true)}
+          onMouseLeave={() => setDeleteHovered(false)}
+          style={{
+            flexShrink: 0,
+            width: 28,
+            height: 28,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 'var(--radius-sm)',
+            color: deleteHovered ? 'var(--color-danger)' : 'var(--color-text-muted)',
+            backgroundColor: deleteHovered ? 'var(--color-bg-raised)' : 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '18px',
+            lineHeight: 1,
+            transition: 'color 0.15s, background-color 0.15s',
+            opacity: hovered ? 1 : 0,
+            padding: 0,
+          }}
           aria-label="Delete job"
         >
           ×

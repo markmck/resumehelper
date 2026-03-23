@@ -42,15 +42,14 @@ export function ToastProvider({ children }: ToastProviderProps): React.JSX.Eleme
         <div
           style={{
             position: 'fixed',
-            bottom: '1rem',
-            right: '1rem',
+            bottom: 'var(--space-4)',
+            right: 'var(--space-4)',
             zIndex: 9999,
-            backgroundColor: '#27272a',
-            color: '#ffffff',
-            padding: '0.75rem 1.25rem',
-            borderRadius: '0.5rem',
-            fontSize: '0.875rem',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+            backgroundColor: 'var(--color-bg-overlay)',
+            color: 'var(--color-text-primary)',
+            padding: 'var(--space-3) var(--space-5)',
+            borderRadius: 'var(--radius-lg)',
+            fontSize: 'var(--font-size-sm)',
             pointerEvents: 'none',
           }}
         >

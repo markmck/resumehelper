@@ -100,7 +100,7 @@ export function registerImportHandlers(): void {
 
     const counts = {
       jobs: (data.work ?? []).length,
-      skills: (data.skills ?? []).length,
+      skills: (data.skills ?? []).reduce((sum, s) => sum + (s.keywords ?? []).length, 0),
       projects: (data.projects ?? []).length,
       education: (data.education ?? []).length,
       volunteer: (data.volunteer ?? []).length,
@@ -165,11 +165,14 @@ export function registerImportHandlers(): void {
         }
       }
 
-      // Import skills
-      for (const skill of parsed.skills ?? []) {
-        sqlite
-          .prepare('INSERT INTO skills (name, tags) VALUES (?, ?)')
-          .run(skill.name ?? '', JSON.stringify(skill.keywords ?? []))
+      // Import skills — resume.json name is category, keywords are individual skills
+      for (const skillGroup of parsed.skills ?? []) {
+        const tag = skillGroup.name ?? ''
+        for (const keyword of skillGroup.keywords ?? []) {
+          sqlite
+            .prepare('INSERT INTO skills (name, tags) VALUES (?, ?)')
+            .run(keyword, JSON.stringify(tag ? [tag] : []))
+        }
       }
 
       // Import projects -> projects + project_bullets

@@ -12,6 +12,8 @@ function SkillList(): React.JSX.Element {
   const [skills, setSkills] = useState<Skill[]>([])
   const [adding, setAdding] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [addHovered, setAddHovered] = useState(false)
+  const [emptyAddHovered, setEmptyAddHovered] = useState(false)
 
   useEffect(() => {
     window.api.skills.list().then((data) => {
@@ -59,11 +61,23 @@ function SkillList(): React.JSX.Element {
   }
 
   if (loading) {
-    return <div className="text-zinc-500 text-sm">Loading skills...</div>
+    return <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>Loading skills...</div>
   }
 
   const groups = computeGroups()
   const allTags = [...new Set(skills.flatMap((s) => s.tags))]
+
+  const ghostButtonStyle = (isHovered: boolean): React.CSSProperties => ({
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: isHovered ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)',
+    padding: '4px 8px',
+    fontSize: 'var(--font-size-xs)',
+    borderRadius: 'var(--radius-sm)',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-sans)',
+    transition: 'color 0.15s',
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -72,7 +86,9 @@ function SkillList(): React.JSX.Element {
         <div>
           <button
             onClick={() => setAdding(true)}
-            className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded transition-colors"
+            onMouseEnter={() => setAddHovered(true)}
+            onMouseLeave={() => setAddHovered(false)}
+            style={ghostButtonStyle(addHovered)}
           >
             + Add Skill
           </button>
@@ -81,28 +97,38 @@ function SkillList(): React.JSX.Element {
 
       {/* Inline add form */}
       {adding && (
-        <SkillAddForm onSave={handleAddSkill} onCancel={() => setAdding(false)} />
+        <SkillAddForm onSave={handleAddSkill} onCancel={() => setAdding(false)} allTags={allTags} />
       )}
 
       {/* Empty state */}
       {skills.length === 0 && !adding ? (
-        <div className="text-center py-8">
-          <p className="text-zinc-500 text-sm mb-3">
+        <div style={{ textAlign: 'center', padding: 'var(--space-8) 0' }}>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-3)' }}>
             No skills added yet. Add your first skill to get started.
           </p>
           <button
             onClick={() => setAdding(true)}
-            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded transition-colors"
+            onMouseEnter={() => setEmptyAddHovered(true)}
+            onMouseLeave={() => setEmptyAddHovered(false)}
+            style={ghostButtonStyle(emptyAddHovered)}
           >
             + Add Skill
           </button>
         </div>
       ) : (
         // Tag-grouped display
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           {Array.from(groups.entries()).map(([tag, tagSkills]) => (
             <div key={tag}>
-              <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
+              <h3 style={{
+                fontSize: 'var(--font-size-xs)',
+                fontWeight: 500,
+                color: 'var(--color-text-muted)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginTop: 0,
+                marginBottom: 'var(--space-1)',
+              }}>
                 {tag}
               </h3>
               <div>

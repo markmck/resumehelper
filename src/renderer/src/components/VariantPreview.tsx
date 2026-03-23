@@ -54,7 +54,16 @@ function VariantPreview({ variantId, layoutTemplate }: VariantPreviewProps): Rea
     // Theme iframe path
     if (themeLoading || themeHtml === null) {
       return (
-        <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            color: 'var(--color-text-tertiary)',
+            fontSize: 'var(--font-size-sm)',
+          }}
+        >
           Loading theme...
         </div>
       )
@@ -71,14 +80,23 @@ function VariantPreview({ variantId, layoutTemplate }: VariantPreviewProps): Rea
   // Built-in ProfessionalLayout path
   if (!builderData) {
     return (
-      <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          color: 'var(--color-text-tertiary)',
+          fontSize: 'var(--font-size-sm)',
+        }}
+      >
         Loading...
       </div>
     )
   }
 
   return (
-    <div className="overflow-y-auto h-full">
+    <div style={{ overflowY: 'auto', height: '100%' }}>
       <ProfessionalLayout
         profile={profileData ?? undefined}
         jobs={builderData.jobs}

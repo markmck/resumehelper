@@ -6,6 +6,29 @@ interface SubmissionAddFormProps {
   onCancel: () => void
 }
 
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  backgroundColor: 'var(--color-bg-input)',
+  border: '1px solid var(--color-border-default)',
+  color: 'var(--color-text-primary)',
+  borderRadius: 'var(--radius-md)',
+  padding: '8px 12px',
+  fontSize: 'var(--font-size-base)',
+  height: 36,
+  outline: 'none',
+  fontFamily: 'var(--font-sans)',
+  boxSizing: 'border-box' as const,
+}
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: 'var(--font-size-xs)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  color: 'var(--color-text-tertiary)',
+  marginBottom: 'var(--space-1)',
+}
+
 function SubmissionAddForm({ onSaved, onCancel }: SubmissionAddFormProps): React.JSX.Element {
   const today = new Date().toISOString().split('T')[0]
   const [company, setCompany] = useState('')
@@ -46,33 +69,49 @@ function SubmissionAddForm({ onSaved, onCancel }: SubmissionAddFormProps): React
     onSaved()
   }
 
-  const inputClass =
-    'w-full bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-md px-3 py-2 text-sm outline-none focus:border-indigo-500 placeholder-zinc-500'
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>): void => {
+    e.currentTarget.style.borderColor = 'var(--color-accent)'
+  }
+
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>): void => {
+    e.currentTarget.style.borderColor = 'var(--color-border-default)'
+  }
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-zinc-900 border border-zinc-800 rounded-lg p-4"
-      style={{ marginBottom: '16px' }}
+      style={{
+        backgroundColor: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border-subtle)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-6)',
+        marginBottom: 'var(--space-4)',
+      }}
     >
-      <h3 className="text-sm font-medium text-zinc-300" style={{ marginBottom: '12px' }}>
+      <h3 style={{
+        fontSize: 'var(--font-size-sm)',
+        fontWeight: 500,
+        color: 'var(--color-text-primary)',
+        marginTop: 0,
+        marginBottom: 'var(--space-3)',
+      }}>
         Log Submission
       </h3>
 
       {errors.length > 0 && (
-        <div style={{ marginBottom: '12px' }}>
+        <div style={{ marginBottom: 'var(--space-3)' }}>
           {errors.map((err, i) => (
-            <p key={i} className="text-red-400 text-xs">
+            <p key={i} style={{ color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', margin: '2px 0' }}>
               {err}
             </p>
           ))}
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3" style={{ marginBottom: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
         <div>
-          <label className="block text-xs text-zinc-400" style={{ marginBottom: '4px' }}>
-            Company <span className="text-red-400">*</span>
+          <label style={labelStyle}>
+            Company <span style={{ color: 'var(--color-danger)' }}>*</span>
           </label>
           <input
             ref={companyRef}
@@ -80,37 +119,43 @@ function SubmissionAddForm({ onSaved, onCancel }: SubmissionAddFormProps): React
             value={company}
             onChange={(e) => setCompany(e.target.value)}
             placeholder="Acme Corp"
-            className={inputClass}
+            style={inputStyle}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
           />
         </div>
         <div>
-          <label className="block text-xs text-zinc-400" style={{ marginBottom: '4px' }}>
-            Role <span className="text-red-400">*</span>
+          <label style={labelStyle}>
+            Role <span style={{ color: 'var(--color-danger)' }}>*</span>
           </label>
           <input
             type="text"
             value={role}
             onChange={(e) => setRole(e.target.value)}
             placeholder="Software Engineer"
-            className={inputClass}
+            style={inputStyle}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3" style={{ marginBottom: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
         <div>
-          <label className="block text-xs text-zinc-400" style={{ marginBottom: '4px' }}>
-            Date <span className="text-red-400">*</span>
+          <label style={labelStyle}>
+            Date <span style={{ color: 'var(--color-danger)' }}>*</span>
           </label>
           <input
             type="date"
             value={submittedAt}
             onChange={(e) => setSubmittedAt(e.target.value)}
-            className={inputClass}
+            style={inputStyle}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
           />
         </div>
         <div>
-          <label className="block text-xs text-zinc-400" style={{ marginBottom: '4px' }}>
+          <label style={labelStyle}>
             Resume Variant
           </label>
           <select
@@ -118,7 +163,9 @@ function SubmissionAddForm({ onSaved, onCancel }: SubmissionAddFormProps): React
             onChange={(e) =>
               setVariantId(e.target.value === '' ? null : Number(e.target.value))
             }
-            className={inputClass}
+            style={inputStyle}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
           >
             <option value="">-- No variant --</option>
             {variants.map((v) => (
@@ -130,8 +177,8 @@ function SubmissionAddForm({ onSaved, onCancel }: SubmissionAddFormProps): React
         </div>
       </div>
 
-      <div style={{ marginBottom: '12px' }}>
-        <label className="block text-xs text-zinc-400" style={{ marginBottom: '4px' }}>
+      <div style={{ marginBottom: 'var(--space-3)' }}>
+        <label style={labelStyle}>
           URL
         </label>
         <input
@@ -139,12 +186,14 @@ function SubmissionAddForm({ onSaved, onCancel }: SubmissionAddFormProps): React
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://example.com/job"
-          className={inputClass}
+          style={inputStyle}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
         />
       </div>
 
-      <div style={{ marginBottom: '16px' }}>
-        <label className="block text-xs text-zinc-400" style={{ marginBottom: '4px' }}>
+      <div style={{ marginBottom: 'var(--space-4)' }}>
+        <label style={labelStyle}>
           Notes
         </label>
         <textarea
@@ -152,22 +201,45 @@ function SubmissionAddForm({ onSaved, onCancel }: SubmissionAddFormProps): React
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Any notes about this application..."
           rows={2}
-          className={inputClass}
-          style={{ resize: 'vertical' }}
+          style={{ ...inputStyle, height: 'auto', resize: 'vertical' }}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
         />
       </div>
 
-      <div className="flex gap-2">
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         <button
           type="submit"
-          className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-md transition-colors"
+          style={{
+            backgroundColor: 'var(--color-accent)',
+            color: '#fff',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-base)',
+            fontWeight: 500,
+            cursor: 'pointer',
+            height: 36,
+            fontFamily: 'var(--font-sans)',
+          }}
         >
           Save
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium rounded-md transition-colors"
+          style={{
+            backgroundColor: 'transparent',
+            color: 'var(--color-text-secondary)',
+            border: '1px solid var(--color-border-default)',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-base)',
+            fontWeight: 500,
+            cursor: 'pointer',
+            height: 36,
+            fontFamily: 'var(--font-sans)',
+          }}
         >
           Cancel
         </button>

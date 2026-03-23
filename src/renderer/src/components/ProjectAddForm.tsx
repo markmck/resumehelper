@@ -7,6 +7,7 @@ interface ProjectAddFormProps {
 
 function ProjectAddForm({ onSave, onCancel }: ProjectAddFormProps): React.JSX.Element {
   const [name, setName] = useState('')
+  const [focusedField, setFocusedField] = useState<string | null>(null)
   const nameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -19,36 +20,86 @@ function ProjectAddForm({ onSave, onCancel }: ProjectAddFormProps): React.JSX.El
     onSave({ name: name.trim() })
   }
 
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 'var(--font-size-xs)',
+    fontWeight: 500,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: 'var(--color-text-tertiary)',
+    marginBottom: 'var(--space-2)',
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-zinc-900 border border-zinc-800 rounded-lg p-4"
+      style={{
+        backgroundColor: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border-subtle)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-4)',
+      }}
     >
-      <h3 className="text-sm font-medium text-zinc-300" style={{ marginBottom: '12px' }}>Add Project</h3>
+      <h3 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--color-text-secondary)', marginTop: 0, marginBottom: 'var(--space-3)' }}>Add Project</h3>
 
-      <div style={{ marginBottom: '12px' }}>
-        <label className="block text-xs text-zinc-400" style={{ marginBottom: '4px' }}>Project Name</label>
+      <div style={{ marginBottom: 'var(--space-3)' }}>
+        <label style={labelStyle}>Project Name</label>
         <input
           ref={nameRef}
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="My Awesome Project"
-          className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-md px-3 py-2 text-sm outline-none focus:border-indigo-500 placeholder-zinc-500"
+          style={{
+            width: '100%',
+            backgroundColor: 'var(--color-bg-input)',
+            border: `1px solid ${focusedField === 'name' ? 'var(--color-accent)' : 'var(--color-border-default)'}`,
+            color: 'var(--color-text-primary)',
+            borderRadius: 'var(--radius-md)',
+            padding: '8px 12px',
+            fontSize: 'var(--font-size-base)',
+            outline: 'none',
+            fontFamily: 'inherit',
+            boxSizing: 'border-box',
+          }}
+          onFocus={() => setFocusedField('name')}
+          onBlur={() => setFocusedField(null)}
         />
       </div>
 
-      <div className="flex gap-2">
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         <button
           type="submit"
-          className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-md transition-colors"
+          style={{
+            backgroundColor: 'var(--color-accent)',
+            color: '#fff',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-base)',
+            fontWeight: 500,
+            cursor: 'pointer',
+            height: 36,
+            fontFamily: 'var(--font-sans)',
+          }}
         >
           Save
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium rounded-md transition-colors"
+          style={{
+            backgroundColor: 'transparent',
+            border: '1px solid var(--color-border-default)',
+            color: 'var(--color-text-secondary)',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-base)',
+            fontWeight: 500,
+            cursor: 'pointer',
+            height: 36,
+            fontFamily: 'var(--font-sans)',
+          }}
         >
           Cancel
         </button>

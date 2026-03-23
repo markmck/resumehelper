@@ -23,6 +23,8 @@ function JobList(): React.JSX.Element {
   const [jobs, setJobs] = useState<Job[]>([])
   const [adding, setAdding] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [addHovered, setAddHovered] = useState(false)
+  const [emptyAddHovered, setEmptyAddHovered] = useState(false)
 
   useEffect(() => {
     window.api.jobs.list().then((data) => {
@@ -51,8 +53,20 @@ function JobList(): React.JSX.Element {
   }
 
   if (loading) {
-    return <div className="text-zinc-500 text-sm">Loading work history...</div>
+    return <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>Loading work history...</div>
   }
+
+  const ghostButtonStyle = (isHovered: boolean): React.CSSProperties => ({
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: isHovered ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)',
+    padding: '4px 8px',
+    fontSize: 'var(--font-size-xs)',
+    borderRadius: 'var(--radius-sm)',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-sans)',
+    transition: 'color 0.15s',
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -61,7 +75,9 @@ function JobList(): React.JSX.Element {
         <div>
           <button
             onClick={() => setAdding(true)}
-            className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded transition-colors"
+            onMouseEnter={() => setAddHovered(true)}
+            onMouseLeave={() => setAddHovered(false)}
+            style={ghostButtonStyle(addHovered)}
           >
             + Add Job
           </button>
@@ -75,13 +91,15 @@ function JobList(): React.JSX.Element {
 
       {/* Job list */}
       {jobs.length === 0 && !adding ? (
-        <div className="text-center py-8">
-          <p className="text-zinc-500 text-sm" style={{ marginBottom: '12px' }}>
+        <div style={{ textAlign: 'center', padding: 'var(--space-8) 0' }}>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-3)' }}>
             No work history yet. Add your first job to get started.
           </p>
           <button
             onClick={() => setAdding(true)}
-            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded transition-colors"
+            onMouseEnter={() => setEmptyAddHovered(true)}
+            onMouseLeave={() => setEmptyAddHovered(false)}
+            style={ghostButtonStyle(emptyAddHovered)}
           >
             + Add Job
           </button>

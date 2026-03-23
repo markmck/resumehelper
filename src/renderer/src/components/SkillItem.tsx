@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import InlineEdit from './InlineEdit'
 import TagInput from './TagInput'
 
@@ -15,20 +16,36 @@ interface SkillItemProps {
 }
 
 function SkillItem({ skill, allTags, onUpdate, onDelete }: SkillItemProps): React.JSX.Element {
+  const [hovered, setHovered] = useState(false)
+  const [deleteHovered, setDeleteHovered] = useState(false)
+
   return (
-    <div className="group flex items-center gap-2 hover:bg-zinc-800/40 rounded px-2 py-1.5 -mx-2 transition-colors">
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-2)',
+        backgroundColor: hovered ? 'var(--color-bg-raised)' : 'transparent',
+        borderRadius: 'var(--radius-sm)',
+        padding: '6px 8px',
+        margin: '0 -8px',
+        transition: 'background-color 0.15s',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       {/* Skill name — inline editable */}
-      <div className="w-28 shrink-0">
+      <div style={{ width: 112, flexShrink: 0 }}>
         <InlineEdit
           value={skill.name}
           onSave={(newName) => onUpdate(skill.id, { name: newName })}
           placeholder="Skill name"
-          className="text-sm font-medium"
+          style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}
         />
       </div>
 
       {/* Tags — chip-style editable */}
-      <div className="flex-1">
+      <div style={{ flex: 1 }}>
         <TagInput
           tags={skill.tags}
           onChange={(newTags) => onUpdate(skill.id, { tags: newTags })}
@@ -40,7 +57,24 @@ function SkillItem({ skill, allTags, onUpdate, onDelete }: SkillItemProps): Reac
       <button
         type="button"
         onClick={() => onDelete(skill.id)}
-        className="opacity-0 group-hover:opacity-100 flex-shrink-0 w-5 h-5 flex items-center justify-center text-zinc-500 hover:text-red-400 rounded transition-all"
+        onMouseEnter={() => setDeleteHovered(true)}
+        onMouseLeave={() => setDeleteHovered(false)}
+        style={{
+          opacity: hovered ? 1 : 0,
+          flexShrink: 0,
+          width: 20,
+          height: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: deleteHovered ? 'var(--color-danger)' : 'var(--color-text-muted)',
+          background: 'none',
+          border: 'none',
+          borderRadius: 'var(--radius-sm)',
+          cursor: 'pointer',
+          padding: 0,
+          transition: 'color 0.15s, opacity 0.15s',
+        }}
         aria-label="Delete skill"
       >
         ×

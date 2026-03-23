@@ -31,6 +31,7 @@ interface BulletListProps {
 function BulletList({ jobId, initialBullets }: BulletListProps): React.JSX.Element {
   const [bullets, setBullets] = useState<Bullet[]>(initialBullets)
   const [focusBulletId, setFocusBulletId] = useState<number | null>(null)
+  const [addHovered, setAddHovered] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -76,7 +77,7 @@ function BulletList({ jobId, initialBullets }: BulletListProps): React.JSX.Eleme
   }
 
   return (
-    <div className="mt-3 pl-2">
+    <div style={{ marginTop: 'var(--space-3)', paddingLeft: 'var(--space-2)' }}>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={bullets.map((b) => b.id)} strategy={verticalListSortingStrategy}>
           {bullets.map((bullet) => (
@@ -96,7 +97,20 @@ function BulletList({ jobId, initialBullets }: BulletListProps): React.JSX.Eleme
 
       <button
         onClick={handleAddBullet}
-        className="mt-2 ml-4 text-xs text-zinc-500 hover:text-indigo-400 transition-colors"
+        onMouseEnter={() => setAddHovered(true)}
+        onMouseLeave={() => setAddHovered(false)}
+        style={{
+          marginTop: 'var(--space-2)',
+          marginLeft: 'var(--space-4)',
+          fontSize: 'var(--font-size-xs)',
+          color: addHovered ? 'var(--color-accent-light)' : 'var(--color-text-tertiary)',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: 0,
+          fontFamily: 'var(--font-sans)',
+          transition: 'color 0.15s',
+        }}
       >
         + Add bullet
       </button>

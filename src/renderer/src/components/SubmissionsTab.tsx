@@ -4,6 +4,25 @@ import InlineEdit from './InlineEdit'
 import SubmissionAddForm from './SubmissionAddForm'
 import SnapshotViewer from './SnapshotViewer'
 
+const thStyle: React.CSSProperties = {
+  fontSize: 'var(--font-size-xs)',
+  fontWeight: 500,
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  color: 'var(--color-text-tertiary)',
+  textAlign: 'left',
+  padding: '10px 16px',
+  borderBottom: '1px solid var(--color-border-subtle)',
+  backgroundColor: 'var(--color-bg-surface)',
+}
+
+const tdStyle: React.CSSProperties = {
+  fontSize: 'var(--font-size-base)',
+  padding: '12px 16px',
+  borderBottom: '1px solid var(--color-border-subtle)',
+  color: 'var(--color-text-secondary)',
+}
+
 function SubmissionsTab(): React.JSX.Element {
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
@@ -84,40 +103,51 @@ function SubmissionsTab(): React.JSX.Element {
 
       {/* Empty state */}
       {submissions.length === 0 && !showAddForm && (
-        <div className="text-center py-16 text-zinc-500 text-sm">
-          No submissions yet. Click '+ Log Submission' to log your first application.
+        <div style={{
+          textAlign: 'center',
+          padding: 'var(--space-16) 0',
+          color: 'var(--color-text-muted)',
+          fontSize: 'var(--font-size-sm)',
+        }}>
+          No submissions yet. Click &apos;+ Log Submission&apos; to log your first application.
         </div>
       )}
 
       {/* Table */}
       {submissions.length > 0 && (
-        <div className="border border-zinc-800 rounded-lg overflow-hidden">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-zinc-900 border-b border-zinc-800">
+        <div style={{
+          backgroundColor: 'var(--color-bg-surface)',
+          border: '1px solid var(--color-border-subtle)',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+        }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
               <tr>
-                <th className="text-zinc-500 text-xs uppercase tracking-wider px-4 py-3">
-                  Company
-                </th>
-                <th className="text-zinc-500 text-xs uppercase tracking-wider px-4 py-3">Role</th>
-                <th className="text-zinc-500 text-xs uppercase tracking-wider px-4 py-3">Date</th>
-                <th className="text-zinc-500 text-xs uppercase tracking-wider px-4 py-3">
-                  Variant
-                </th>
-                <th className="text-zinc-500 text-xs uppercase tracking-wider px-4 py-3">URL</th>
-                <th className="text-zinc-500 text-xs uppercase tracking-wider px-4 py-3">Notes</th>
-                <th className="text-zinc-500 text-xs uppercase tracking-wider px-4 py-3">
-                  Actions
-                </th>
+                <th style={thStyle}>Company</th>
+                <th style={thStyle}>Role</th>
+                <th style={thStyle}>Date</th>
+                <th style={thStyle}>Variant</th>
+                <th style={thStyle}>URL</th>
+                <th style={thStyle}>Notes</th>
+                <th style={thStyle}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {submissions.map((sub, idx) => (
+              {submissions.map((sub) => (
                 <tr
                   key={sub.id}
-                  className={idx % 2 === 0 ? 'bg-zinc-950' : 'bg-zinc-900/50'}
+                  onMouseEnter={(e) => {
+                    const cells = e.currentTarget.querySelectorAll('td')
+                    cells.forEach((cell) => { (cell as HTMLElement).style.backgroundColor = 'var(--color-bg-raised)' })
+                  }}
+                  onMouseLeave={(e) => {
+                    const cells = e.currentTarget.querySelectorAll('td')
+                    cells.forEach((cell) => { (cell as HTMLElement).style.backgroundColor = '' })
+                  }}
                 >
                   {/* Company */}
-                  <td className="text-zinc-300 border-b border-zinc-800 px-2 py-2">
+                  <td style={tdStyle}>
                     <InlineEdit
                       value={sub.company}
                       onSave={(v) => handleUpdate(sub.id, { company: v })}
@@ -125,7 +155,7 @@ function SubmissionsTab(): React.JSX.Element {
                   </td>
 
                   {/* Role */}
-                  <td className="text-zinc-300 border-b border-zinc-800 px-2 py-2">
+                  <td style={tdStyle}>
                     <InlineEdit
                       value={sub.role}
                       onSave={(v) => handleUpdate(sub.id, { role: v })}
@@ -133,47 +163,69 @@ function SubmissionsTab(): React.JSX.Element {
                   </td>
 
                   {/* Date */}
-                  <td className="text-zinc-300 border-b border-zinc-800 px-4 py-2 whitespace-nowrap">
+                  <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                     {formatDate(sub.submittedAt)}
                   </td>
 
                   {/* Variant */}
-                  <td className="text-zinc-400 border-b border-zinc-800 px-4 py-2 text-xs">
+                  <td style={{ ...tdStyle, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)' }}>
                     {sub.variantName ?? ''}
                   </td>
 
                   {/* URL */}
-                  <td className="border-b border-zinc-800 px-2 py-2 text-xs">
+                  <td style={{ ...tdStyle, fontSize: 'var(--font-size-xs)' }}>
                     <InlineEdit
                       value={sub.url ?? ''}
                       onSave={(v) => handleUpdate(sub.id, { url: v || null })}
                       placeholder="Add URL..."
-                      className="text-xs text-zinc-400"
+                      style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)' }}
                     />
                   </td>
 
                   {/* Notes */}
-                  <td className="border-b border-zinc-800 px-2 py-2 text-xs">
+                  <td style={{ ...tdStyle, fontSize: 'var(--font-size-xs)' }}>
                     <InlineEdit
                       value={sub.notes ?? ''}
                       onSave={(v) => handleUpdate(sub.id, { notes: v || null })}
                       placeholder="Add notes..."
-                      className="text-xs text-zinc-400"
+                      style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)' }}
                     />
                   </td>
 
                   {/* Actions */}
-                  <td className="border-b border-zinc-800 px-4 py-2">
-                    <div className="flex items-center gap-2">
+                  <td style={tdStyle}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                       <button
                         onClick={() => handleViewResume(sub)}
-                        className="px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs rounded transition-colors"
+                        style={{
+                          fontSize: 'var(--font-size-xs)',
+                          color: 'var(--color-accent-light)',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          padding: '4px 8px',
+                          borderRadius: 'var(--radius-sm)',
+                          cursor: 'pointer',
+                          fontFamily: 'var(--font-sans)',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-bg)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                       >
                         View Resume
                       </button>
                       <button
                         onClick={() => handleDelete(sub.id)}
-                        className="px-2 py-1 bg-zinc-800 hover:bg-red-900/50 text-zinc-500 hover:text-red-400 text-xs rounded transition-colors"
+                        style={{
+                          fontSize: 'var(--font-size-xs)',
+                          color: 'var(--color-text-muted)',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          padding: '4px 8px',
+                          borderRadius: 'var(--radius-sm)',
+                          cursor: 'pointer',
+                          fontFamily: 'var(--font-sans)',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)' }}
                         title="Delete submission"
                       >
                         ✕

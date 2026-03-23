@@ -49,7 +49,16 @@ function ProfileSettings(): React.JSX.Element {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          color: 'var(--color-text-tertiary)',
+          fontSize: 'var(--font-size-sm)',
+        }}
+      >
         Loading...
       </div>
     )
@@ -68,7 +77,7 @@ function ProfileSettings(): React.JSX.Element {
       style={{
         maxWidth: '480px',
         margin: '0 auto',
-        padding: '2rem 1.5rem',
+        padding: 'var(--space-8) var(--space-6)',
       }}
     >
       <h2

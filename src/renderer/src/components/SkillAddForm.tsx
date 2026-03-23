@@ -4,12 +4,15 @@ import TagInput from './TagInput'
 interface SkillAddFormProps {
   onSave: (data: { name: string; tags: string[] }) => void
   onCancel: () => void
+  allTags?: string[]
 }
 
-function SkillAddForm({ onSave, onCancel }: SkillAddFormProps): React.JSX.Element {
+function SkillAddForm({ onSave, onCancel, allTags }: SkillAddFormProps): React.JSX.Element {
   const [name, setName] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [errors, setErrors] = useState<string[]>([])
+  const [focusedField, setFocusedField] = useState<string | null>(null)
+  const [tagAreaFocused, setTagAreaFocused] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -35,59 +38,119 @@ function SkillAddForm({ onSave, onCancel }: SkillAddFormProps): React.JSX.Elemen
     onSave({ name: name.trim(), tags: finalTags })
   }
 
-  const inputClass =
-    'w-full bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-md px-3 py-2 text-sm outline-none focus:border-indigo-500 placeholder-zinc-500'
+  const inputStyle = (field: string): React.CSSProperties => ({
+    width: '100%',
+    backgroundColor: 'var(--color-bg-input)',
+    border: `1px solid ${focusedField === field ? 'var(--color-accent)' : 'var(--color-border-default)'}`,
+    color: 'var(--color-text-primary)',
+    borderRadius: 'var(--radius-md)',
+    padding: '8px 12px',
+    fontSize: 'var(--font-size-base)',
+    outline: 'none',
+    fontFamily: 'inherit',
+    boxSizing: 'border-box' as const,
+  })
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 'var(--font-size-xs)',
+    fontWeight: 500,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: 'var(--color-text-tertiary)',
+    marginBottom: 'var(--space-2)',
+  }
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-3"
+      style={{
+        backgroundColor: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border-subtle)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-4)',
+        marginBottom: 'var(--space-3)',
+      }}
     >
-      <h3 className="text-sm font-medium text-zinc-300 mb-3">Add Skill</h3>
+      <h3 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--color-text-secondary)', marginTop: 0, marginBottom: 'var(--space-3)' }}>Add Skill</h3>
 
       {errors.length > 0 && (
-        <div className="mb-3 space-y-1">
+        <div style={{ marginBottom: 'var(--space-3)' }}>
           {errors.map((err, i) => (
-            <p key={i} className="text-red-400 text-xs">
+            <p key={i} style={{ color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', margin: '0 0 4px 0' }}>
               {err}
             </p>
           ))}
         </div>
       )}
 
-      <div className="mb-3">
-        <label className="block text-xs text-zinc-400 mb-1">Skill Name</label>
+      <div style={{ marginBottom: 'var(--space-3)' }}>
+        <label style={labelStyle}>Skill Name</label>
         <input
           ref={nameRef}
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. React, TypeScript, Leadership"
-          className={inputClass}
+          style={inputStyle('name')}
+          onFocus={() => setFocusedField('name')}
+          onBlur={() => setFocusedField(null)}
         />
       </div>
 
-      <div className="mb-4">
-        <label className="block text-xs text-zinc-400 mb-1">Tags</label>
-        <div className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 focus-within:border-indigo-500 transition-colors">
-          <TagInput tags={tags} onChange={setTags} onInputChange={(val) => { pendingTagRef.current = val }} />
+      <div style={{ marginBottom: 'var(--space-4)' }}>
+        <label style={labelStyle}>Tags</label>
+        <div
+          style={{
+            backgroundColor: 'var(--color-bg-input)',
+            border: `1px solid ${tagAreaFocused ? 'var(--color-accent)' : 'var(--color-border-default)'}`,
+            borderRadius: 'var(--radius-md)',
+            padding: '8px 12px',
+            transition: 'border-color 0.15s',
+          }}
+          onFocusCapture={() => setTagAreaFocused(true)}
+          onBlurCapture={() => setTagAreaFocused(false)}
+        >
+          <TagInput tags={tags} onChange={setTags} onInputChange={(val) => { pendingTagRef.current = val }} suggestions={allTags} />
         </div>
-        <p className="text-xs text-zinc-500 mt-1">
+        <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 'var(--space-1)', marginBottom: 0 }}>
           Press Enter or comma to add a tag
         </p>
       </div>
 
-      <div className="flex gap-2">
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         <button
           type="submit"
-          className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-md transition-colors"
+          style={{
+            backgroundColor: 'var(--color-accent)',
+            color: '#fff',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-base)',
+            fontWeight: 500,
+            cursor: 'pointer',
+            height: 36,
+            fontFamily: 'var(--font-sans)',
+          }}
         >
           Save
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium rounded-md transition-colors"
+          style={{
+            backgroundColor: 'transparent',
+            border: '1px solid var(--color-border-default)',
+            color: 'var(--color-text-secondary)',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-base)',
+            fontWeight: 500,
+            cursor: 'pointer',
+            height: 36,
+            fontFamily: 'var(--font-sans)',
+          }}
         >
           Cancel
         </button>

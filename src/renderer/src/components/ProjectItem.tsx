@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import InlineEdit from './InlineEdit'
 import ProjectBulletList from './ProjectBulletList'
 
@@ -22,6 +23,9 @@ interface ProjectItemProps {
 }
 
 function ProjectItem({ project, onUpdate, onDelete }: ProjectItemProps): React.JSX.Element {
+  const [hovered, setHovered] = useState(false)
+  const [deleteHovered, setDeleteHovered] = useState(false)
+
   const handleNameUpdate = async (name: string): Promise<void> => {
     const updated = await window.api.projects.update(project.id, { name })
     onUpdate({ ...project, ...updated })
@@ -33,20 +37,48 @@ function ProjectItem({ project, onUpdate, onDelete }: ProjectItemProps): React.J
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3.5 group/project">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
+    <div
+      style={{
+        backgroundColor: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border-subtle)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '14px 16px',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <InlineEdit
             value={project.name}
             onSave={handleNameUpdate}
             placeholder="Project Name"
-            className="text-base font-semibold text-zinc-100"
+            style={{ fontSize: 'var(--font-size-base)', fontWeight: 600, color: 'var(--color-text-primary)' }}
           />
         </div>
 
         <button
           onClick={handleDelete}
-          className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-colors opacity-0 group-hover/project:opacity-100 text-lg leading-none"
+          onMouseEnter={() => setDeleteHovered(true)}
+          onMouseLeave={() => setDeleteHovered(false)}
+          style={{
+            flexShrink: 0,
+            width: 28,
+            height: 28,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 'var(--radius-sm)',
+            color: deleteHovered ? 'var(--color-danger)' : 'var(--color-text-muted)',
+            backgroundColor: deleteHovered ? 'var(--color-bg-raised)' : 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '18px',
+            lineHeight: 1,
+            transition: 'color 0.15s, background-color 0.15s',
+            opacity: hovered ? 1 : 0,
+            padding: 0,
+          }}
           aria-label="Delete project"
         >
           ×
