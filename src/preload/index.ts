@@ -222,8 +222,8 @@ const api = {
   ai: {
     analyze: (jobPostingId: number, variantId: number) =>
       ipcRenderer.invoke('ai:analyze', jobPostingId, variantId),
-    onProgress: (cb: (phase: string, pct: number) => void) =>
-      ipcRenderer.on('ai:progress', (_, phase, pct) => cb(phase, pct)),
+    onProgress: (cb: (phase: string, pct: number, data?: unknown) => void) =>
+      ipcRenderer.on('ai:progress', (_, phase, pct, data) => cb(phase, pct, data)),
     offProgress: () => ipcRenderer.removeAllListeners('ai:progress'),
     acceptSuggestion: (analysisId: number, bulletId: number, text: string) =>
       ipcRenderer.invoke('ai:acceptSuggestion', analysisId, bulletId, text),
