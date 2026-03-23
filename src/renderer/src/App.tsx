@@ -6,6 +6,7 @@ import AnalysisTab from './components/AnalysisTab'
 import { Sidebar } from './components/Sidebar'
 import type { Tab } from './components/Sidebar'
 import { ToastProvider } from './components/Toast'
+import { SettingsTab } from './components/SettingsTab'
 
 function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('experience')
@@ -51,17 +52,7 @@ function App(): React.JSX.Element {
           )}
           {activeTab === 'analysis' && <AnalysisTab />}
           {activeTab === 'submissions' && <SubmissionsTab />}
-          {activeTab === 'settings' && (
-            <div
-              style={{
-                padding: 'var(--space-6)',
-                color: 'var(--color-text-secondary)',
-                fontSize: 'var(--font-size-base)',
-              }}
-            >
-              Settings page coming in next plan
-            </div>
-          )}
+          {activeTab === 'settings' && <SettingsTab />}
         </main>
       </div>
     </ToastProvider>
