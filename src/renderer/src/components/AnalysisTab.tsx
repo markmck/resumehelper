@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import AnalysisList from './AnalysisList'
 import NewAnalysisForm from './NewAnalysisForm'
+import AnalyzingProgress from './AnalyzingProgress'
+import AnalysisResults from './AnalysisResults'
 
 type AnalysisScreen =
   | { name: 'list' }
@@ -36,78 +38,22 @@ function AnalysisTab(): React.JSX.Element {
 
   if (screen.name === 'analyzing') {
     return (
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          minHeight: '60vh',
-          gap: 'var(--space-4)',
-          color: 'var(--color-text-secondary)',
-          fontFamily: 'var(--font-sans)',
-        }}
-      >
-        <p style={{ fontSize: 'var(--font-size-md)', margin: 0 }}>Analyzing...</p>
-        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)', margin: 0 }}>
-          Job posting {screen.jobPostingId} · Variant {screen.variantId}
-        </p>
-        <button
-          onClick={() => setScreen({ name: 'list' })}
-          style={{
-            marginTop: 'var(--space-2)',
-            padding: '6px 14px',
-            backgroundColor: 'transparent',
-            border: '1px solid var(--color-border-default)',
-            borderRadius: 'var(--radius-md)',
-            color: 'var(--color-text-secondary)',
-            fontSize: 'var(--font-size-sm)',
-            cursor: 'pointer',
-            fontFamily: 'var(--font-sans)',
-          }}
-        >
-          Back to list
-        </button>
-      </div>
+      <AnalyzingProgress
+        jobPostingId={screen.jobPostingId}
+        variantId={screen.variantId}
+        onComplete={(analysisId) => setScreen({ name: 'results', analysisId })}
+        onError={() => setScreen({ name: 'list' })}
+      />
     )
   }
 
   // screen.name === 'results'
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        minHeight: '60vh',
-        gap: 'var(--space-4)',
-        color: 'var(--color-text-secondary)',
-        fontFamily: 'var(--font-sans)',
-      }}
-    >
-      <p style={{ fontSize: 'var(--font-size-md)', margin: 0 }}>
-        Analysis Results — ID {screen.analysisId}
-      </p>
-      <button
-        onClick={() => setScreen({ name: 'list' })}
-        style={{
-          marginTop: 'var(--space-2)',
-          padding: '6px 14px',
-          backgroundColor: 'transparent',
-          border: '1px solid var(--color-border-default)',
-          borderRadius: 'var(--radius-md)',
-          color: 'var(--color-text-secondary)',
-          fontSize: 'var(--font-size-sm)',
-          cursor: 'pointer',
-          fontFamily: 'var(--font-sans)',
-        }}
-      >
-        Back to list
-      </button>
-    </div>
+    <AnalysisResults
+      analysisId={screen.analysisId}
+      onBack={() => setScreen({ name: 'list' })}
+      onReanalyze={(jobPostingId, variantId) => setScreen({ name: 'analyzing', jobPostingId, variantId })}
+    />
   )
 }
 
