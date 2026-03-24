@@ -27,11 +27,11 @@ Requirements for AI Analysis Integration milestone. Each maps to roadmap phases.
 
 ### Bullet Suggestions
 
-- [ ] **SUGG-01**: Analysis returns per-bullet rewrite suggestions that incorporate job posting language
-- [ ] **SUGG-02**: User can accept or dismiss each suggestion individually
-- [ ] **SUGG-03**: Accepted suggestions update the bullet text in the database
-- [ ] **SUGG-04**: Original vs suggested text is displayed side-by-side for comparison
-- [ ] **SUGG-05**: AI suggestions never fabricate experience — no added technologies, metrics, or scope claims not in the original bullet
+- [x] **SUGG-01**: Analysis returns per-bullet rewrite suggestions that incorporate job posting language
+- [x] **SUGG-02**: User can accept or dismiss each suggestion individually
+- [x] **SUGG-03**: Accepted suggestions update the bullet text in the database
+- [x] **SUGG-04**: Original vs suggested text is displayed side-by-side for comparison
+- [x] **SUGG-05**: AI suggestions never fabricate experience — no added technologies, metrics, or scope claims not in the original bullet
 
 ### Submission Tracking
 
@@ -106,11 +106,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ANLYS-05 | Phase 9 | Complete |
 | ANLYS-06 | Phase 9 | Complete |
 | ANLYS-07 | Phase 9 | Complete |
-| SUGG-01 | Phase 10 | Pending |
-| SUGG-02 | Phase 10 | Pending |
-| SUGG-03 | Phase 10 | Pending |
-| SUGG-04 | Phase 10 | Pending |
-| SUGG-05 | Phase 10 | Pending |
+| SUGG-01 | Phase 10 | Complete |
+| SUGG-02 | Phase 10 | Complete |
+| SUGG-03 | Phase 10 | Complete |
+| SUGG-04 | Phase 10 | Complete |
+| SUGG-05 | Phase 10 | Complete |
 | SUB-01 | Phase 11 | Pending |
 | SUB-02 | Phase 11 | Pending |
 | SUB-03 | Phase 11 | Pending |
