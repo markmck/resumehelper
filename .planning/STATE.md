@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Analysis Integration
 status: planning
-stopped_at: Completed 11-02-PLAN.md
-last_updated: "2026-03-24T15:07:04.327Z"
+stopped_at: Completed 11-03-PLAN.md
+last_updated: "2026-03-24T19:41:39.046Z"
 last_activity: 2026-03-23 — Roadmap created, 31 requirements mapped across 5 phases
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 11
-  completed_plans: 8
+  completed_plans: 9
   percent: 80
 ---
 
@@ -70,6 +70,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 10-bullet-suggestions P01 | 4min | 2 tasks | 3 files |
 | Phase 11-submission-pipeline P01 | 20min | 2 tasks | 7 files |
 | Phase 11-submission-pipeline P02 | 4min | 2 tasks | 11 files |
+| Phase 11-submission-pipeline P03 | 45min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,8 @@ Recent decisions affecting current work:
 - [Phase 11-submission-pipeline]: snapshotPdf uses themeRegistry renderThemeHtml directly — single code path for traditional and theme layouts
 - [Phase 11-submission-pipeline]: submissions:getAnalysisById IPC in submissions handler (not jobPostings) - joins analysisResults+jobPostings+templateVariants for log form pre-fill
 - [Phase 11-submission-pipeline]: pendingLogAnalysis state in App.tsx bridges AnalysisTab to SubmissionsTab with analysisId, consumed once via onLogAnalysisConsumed callback
+- [Phase 11-submission-pipeline]: Timeline dot centering uses relative container with absolute connecting line — dots align precisely regardless of content height
+- [Phase 11-submission-pipeline]: Back link in detail view uses plain text with accent color — consistent with log form pattern, no button element
 
 ### Pending Todos
 
@@ -119,6 +122,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-24T15:07:04.325Z
-Stopped at: Completed 11-02-PLAN.md
+Last session: 2026-03-24T19:41:39.044Z
+Stopped at: Completed 11-03-PLAN.md
 Resume file: None
