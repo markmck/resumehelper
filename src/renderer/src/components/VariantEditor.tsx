@@ -10,12 +10,14 @@ type SubTab = 'builder' | 'preview'
 interface VariantEditorProps {
   variant: TemplateVariant
   onRename: (id: number, name: string) => void
+  onDelete: (id: number) => void
 }
 
-function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Element {
+function VariantEditor({ variant, onRename, onDelete }: VariantEditorProps): React.JSX.Element {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('builder')
   const [exporting, setExporting] = useState<'pdf' | 'docx' | null>(null)
   const [themes, setThemes] = useState<Array<{ key: string; displayName: string }>>([])
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [layoutTemplate, setLayoutTemplate] = useState(
     variant.layoutTemplate && variant.layoutTemplate !== 'traditional'
       ? variant.layoutTemplate
@@ -95,14 +97,32 @@ function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Ele
           backgroundColor: 'var(--color-bg-surface)',
         }}
       >
-        {/* Variant name */}
-        <div style={{ marginBottom: 'var(--space-2)' }}>
+        {/* Variant name + delete */}
+        <div style={{ marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <InlineEdit
             value={variant.name}
             onSave={(name) => onRename(variant.id, name)}
             placeholder="Untitled Variant"
             className="text-lg font-semibold"
           />
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            title="Delete variant"
+            style={{
+              padding: '4px 8px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: 'var(--color-text-muted)',
+              fontSize: 'var(--font-size-xs)',
+              cursor: 'pointer',
+              borderRadius: 'var(--radius-sm)',
+              fontFamily: 'var(--font-sans)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; e.currentTarget.style.backgroundColor = 'var(--color-bg-raised)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.backgroundColor = 'transparent' }}
+          >
+            Delete
+          </button>
         </div>
 
         {/* Sub-tab bar + theme + export */}
@@ -195,6 +215,92 @@ function VariantEditor({ variant, onRename }: VariantEditorProps): React.JSX.Ele
           <VariantPreview variantId={variant.id} layoutTemplate={layoutTemplate} />
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 30,
+          }}
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--color-bg-overlay)',
+              border: '1px solid var(--color-border-emphasis)',
+              borderRadius: 'var(--radius-xl)',
+              padding: 'var(--space-6)',
+              maxWidth: 420,
+              width: '90%',
+              fontFamily: 'var(--font-sans)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              style={{
+                fontSize: 'var(--font-size-md)',
+                fontWeight: 600,
+                color: 'var(--color-text-primary)',
+                margin: '0 0 var(--space-3) 0',
+              }}
+            >
+              Delete variant
+            </h3>
+            <p
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-secondary)',
+                lineHeight: 1.6,
+                margin: '0 0 var(--space-5) 0',
+              }}
+            >
+              Delete <strong style={{ color: 'var(--color-text-primary)' }}>{variant.name}</strong>? This will remove the variant and all its item selections. Your experience data (jobs, skills, projects) will not be affected. This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  padding: '7px 16px',
+                  backgroundColor: 'transparent',
+                  color: 'var(--color-text-secondary)',
+                  border: '1px solid var(--color-border-default)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 'var(--font-size-sm)',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  onDelete(variant.id)
+                }}
+                style={{
+                  padding: '7px 16px',
+                  backgroundColor: 'var(--color-danger)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 'var(--font-size-sm)',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)',
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

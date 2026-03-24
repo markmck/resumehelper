@@ -103,8 +103,10 @@ function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze }: Props): Reac
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortOption>('recent')
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; company: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
+  const loadData = (): void => {
     setLoading(true)
     window.api.jobPostings
       .list()
@@ -117,7 +119,25 @@ function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze }: Props): Reac
       })
       .catch(() => setRows([]))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadData()
   }, [])
+
+  const handleDeleteConfirm = async (): Promise<void> => {
+    if (!deleteConfirm) return
+    setDeleting(true)
+    try {
+      await window.api.jobPostings.delete(deleteConfirm.id)
+      setDeleteConfirm(null)
+      loadData()
+    } catch {
+      // ignore
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   // Only rows that have an analysis result
   const analyzedRows = rows.filter((r) => r.analysisId != null)
@@ -502,6 +522,7 @@ function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze }: Props): Reac
                       row={row}
                       onViewResult={onViewResult}
                       onReanalyze={onReanalyze}
+                      onDelete={(id, company) => setDeleteConfirm({ id, company })}
                     />
                   ))
                 )}
@@ -509,6 +530,91 @@ function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze }: Props): Reac
             </table>
           </div>
         </>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 30,
+          }}
+          onClick={() => setDeleteConfirm(null)}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--color-bg-overlay)',
+              border: '1px solid var(--color-border-emphasis)',
+              borderRadius: 'var(--radius-xl)',
+              padding: 'var(--space-6)',
+              maxWidth: 420,
+              width: '90%',
+              fontFamily: 'var(--font-sans)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              style={{
+                fontSize: 'var(--font-size-md)',
+                fontWeight: 600,
+                color: 'var(--color-text-primary)',
+                margin: '0 0 var(--space-3) 0',
+              }}
+            >
+              Delete analysis
+            </h3>
+            <p
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-secondary)',
+                lineHeight: 1.6,
+                margin: '0 0 var(--space-5) 0',
+              }}
+            >
+              Delete the analysis for <strong style={{ color: 'var(--color-text-primary)' }}>{deleteConfirm.company}</strong>? This will remove the job posting and all associated analysis results. This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                style={{
+                  padding: '7px 16px',
+                  backgroundColor: 'transparent',
+                  color: 'var(--color-text-secondary)',
+                  border: '1px solid var(--color-border-default)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 'var(--font-size-sm)',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+                style={{
+                  padding: '7px 16px',
+                  backgroundColor: 'var(--color-danger)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 'var(--font-size-sm)',
+                  fontWeight: 600,
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  opacity: deleting ? 0.7 : 1,
+                  fontFamily: 'var(--font-sans)',
+                }}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -518,9 +624,10 @@ interface RowProps {
   row: AnalysisRow
   onViewResult: (analysisId: number) => void
   onReanalyze: (jobPostingId: number, variantId: number) => void
+  onDelete: (jobPostingId: number, company: string) => void
 }
 
-function AnalysisTableRow({ row, onViewResult, onReanalyze }: RowProps): React.JSX.Element {
+function AnalysisTableRow({ row, onViewResult, onReanalyze, onDelete }: RowProps): React.JSX.Element {
   const [hovered, setHovered] = useState(false)
   const scoreColor = getScoreColor(row.matchScore)
   const scoreBg = getScoreBgColor(row.matchScore)
@@ -532,6 +639,10 @@ function AnalysisTableRow({ row, onViewResult, onReanalyze }: RowProps): React.J
       onClick={() => onViewResult(row.analysisId)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onDelete(row.id, row.company)
+      }}
     >
       {/* Company / Role */}
       <td

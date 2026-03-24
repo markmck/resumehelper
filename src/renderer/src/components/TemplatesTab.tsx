@@ -71,6 +71,7 @@ function TemplatesTab({ selectedVariantId, onVariantsLoaded, onSelectedChange }:
           <VariantEditor
             variant={selectedVariant}
             onRename={handleRename}
+            onDelete={handleDelete}
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-tertiary)' }}>
