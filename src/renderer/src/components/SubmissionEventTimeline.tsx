@@ -32,21 +32,7 @@ function SubmissionEventTimeline({ events }: Props): React.JSX.Element {
   }
 
   return (
-    <div style={{ position: 'relative', paddingLeft: 20 }}>
-      {/* Vertical connecting line — spans from first dot to last dot */}
-      {events.length > 1 && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 3,
-            top: 6,
-            bottom: 6,
-            width: 2,
-            backgroundColor: 'var(--color-border-subtle)',
-          }}
-        />
-      )}
-
+    <div style={{ paddingLeft: 20 }}>
       {events.map((event, index) => {
         const dotColor = getEventDotColor(event.status)
         const isLast = index === events.length - 1
@@ -61,22 +47,21 @@ function SubmissionEventTimeline({ events }: Props): React.JSX.Element {
             key={event.id}
             style={{
               position: 'relative',
-              paddingBottom: isLast ? 0 : 'var(--space-5)',
+              paddingLeft: 16,
+              paddingBottom: isLast ? 0 : 20,
+              borderLeft: `2px solid ${isLast ? 'transparent' : 'var(--color-border-subtle)'}`,
             }}
           >
-            {/* Dot — positioned over the vertical line */}
+            {/* Dot — centered on the border-left */}
             <div
               style={{
                 position: 'absolute',
-                left: -20,
-                top: 4,
-                width: 10,
-                height: 10,
+                left: -5,
+                top: 2,
+                width: 8,
+                height: 8,
                 borderRadius: '50%',
                 backgroundColor: dotColor,
-                border: '2px solid var(--color-bg-surface)',
-                zIndex: 1,
-                marginLeft: -1,
               }}
             />
 
