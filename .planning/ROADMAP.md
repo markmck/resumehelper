@@ -63,7 +63,10 @@ Plans:
   3. User can accept or dismiss each suggestion independently — no bulk accept button exists
   4. Accepting a suggestion permanently updates the bullet text in the database
   5. Suggestions never add technologies, metrics, or scope claims not present in the original bullet text
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 10-01-PLAN.md — Backend IPC handler + OptimizeVariant component (suggestion cards, skill suggestions, score ring, save flow)
+- [ ] 10-02-PLAN.md — Wire OptimizeVariant into AnalysisTab router, enable Optimize button, human verification
 
 ### Phase 11: Submission Pipeline
 **Goal**: Users can track each job application through fixed pipeline stages, add notes per submission, and filter and search the submissions list — with variant and match score stored at submission time
@@ -99,6 +102,6 @@ Note: Phase 11 depends only on Phase 8 (no AI dependency) — can begin after Ph
 |-------|-----------|----------------|--------|-----------|
 | 8. Foundation | 2/3 | In Progress|  | - |
 | 9. Analysis Core | 3/3 | Complete   | 2026-03-23 | - |
-| 10. Bullet Suggestions | v2.0 | 0/TBD | Not started | - |
+| 10. Bullet Suggestions | v2.0 | 0/2 | Planning complete | - |
 | 11. Submission Pipeline | v2.0 | 0/TBD | Not started | - |
 | 12. UI Redesign | v2.0 | 0/TBD | Not started | - |
