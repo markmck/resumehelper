@@ -5,8 +5,8 @@ interface Props {
 }
 
 function getEventDotColor(status: string): string {
-  if (status === 'withdrawn' || status === 'result') return 'var(--color-danger)'
-  if (status === 'screening' || status === 'interview' || status === 'offer') return 'var(--color-success)'
+  if (status === 'withdrawn') return 'var(--color-danger)'
+  if (status === 'result' || status === 'screening' || status === 'interview' || status === 'offer') return 'var(--color-success)'
   if (status === 'applied') return 'var(--color-accent)'
   return 'var(--color-warning)'
 }

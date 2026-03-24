@@ -758,7 +758,8 @@ export function registerExportHandlers(): void {
     const layoutTemplate = snapshotData.layoutTemplate ?? 'traditional'
     const isProfessional = !layoutTemplate || layoutTemplate === 'professional' || layoutTemplate === 'traditional'
 
-    // 3. Render HTML: professional uses theme renderer with 'traditional', theme path uses themeRegistry directly
+    // 3. Render HTML: professional/traditional use 'even' theme as fallback (print.html requires live variantId),
+    //    theme-based layouts use their own theme renderer
     const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
     const snapshotBuilderData = {
       jobs: snapshotData.jobs ?? [],
@@ -773,7 +774,7 @@ export function registerExportHandlers(): void {
       references: snapshotData.references ?? [],
     }
     const resumeJson = buildResumeJson(profileRow, snapshotBuilderData)
-    const themeKey = isProfessional ? 'traditional' : layoutTemplate
+    const themeKey = isProfessional ? 'even' : layoutTemplate
     const html = await renderThemeHtml(themeKey, resumeJson)
 
     // 4. Write to temp file and print to PDF
