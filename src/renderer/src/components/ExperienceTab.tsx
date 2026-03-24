@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import JobList from './JobList'
 import SkillList from './SkillList'
 import ProfileSettings from './ProfileSettings'
@@ -17,9 +17,10 @@ interface CollapsibleSectionProps {
   title: string
   defaultOpen: boolean
   children: React.ReactNode
+  badge?: string
 }
 
-function CollapsibleSection({ title, defaultOpen, children }: CollapsibleSectionProps): React.JSX.Element {
+function CollapsibleSection({ title, defaultOpen, children, badge }: CollapsibleSectionProps): React.JSX.Element {
   const [open, setOpen] = useState(defaultOpen)
 
   return (
@@ -48,6 +49,21 @@ function CollapsibleSection({ title, defaultOpen, children }: CollapsibleSection
       >
         <span style={{ display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>&#9654;</span>
         {title}
+        {badge && (
+          <span style={{
+            fontSize: 'var(--font-size-xs)',
+            fontWeight: 500,
+            color: 'var(--color-text-muted)',
+            backgroundColor: 'var(--color-bg-raised)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '1px 6px',
+            marginLeft: 'var(--space-1)',
+            textTransform: 'none',
+            letterSpacing: 'normal',
+          }}>
+            {badge}
+          </span>
+        )}
       </button>
       {open && children}
     </section>
@@ -85,6 +101,13 @@ function ExperienceTab(): React.JSX.Element {
   const [importData, setImportData] = useState<ImportData | null>(null)
   const [importLoading, setImportLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [skillCount, setSkillCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    window.api.skills.list().then((skills) => {
+      setSkillCount(skills.length)
+    })
+  }, [refreshKey])
 
   const handleImportClick = async (): Promise<void> => {
     const result = await window.api.import_.parse()
@@ -115,6 +138,8 @@ function ExperienceTab(): React.JSX.Element {
     }
   }
 
+  const skillBadge = skillCount !== null ? `${skillCount} skill${skillCount !== 1 ? 's' : ''}` : undefined
+
   return (
     <div style={{ overflow: 'auto', height: '100vh' }}>
       <div style={{ maxWidth: 760, margin: '0 auto', padding: 'var(--space-10)' }}>
@@ -143,31 +168,42 @@ function ExperienceTab(): React.JSX.Element {
             </button>
           </div>
         </div>
-        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-8)', marginTop: 0 }}>
-          Your complete work history. Toggle sections open to edit.
+        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-8)', marginTop: 0 }}>
+          Your complete work history. Toggle sections open to edit. Drag to reorder.
         </p>
 
         <CollapsibleSection title="Profile" defaultOpen={false}>
           <ProfileSettings key={refreshKey} />
         </CollapsibleSection>
 
-        <CollapsibleSection title="Work History" defaultOpen={true}>
+        {/* Work History — always visible, no collapsible wrapper */}
+        <section style={{ marginBottom: 'var(--space-12)' }}>
+          <div style={{
+            fontSize: 'var(--font-size-sm)',
+            fontWeight: 600,
+            color: 'var(--color-text-tertiary)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            marginBottom: 'var(--space-4)',
+          }}>
+            Work History
+          </div>
           <JobList key={refreshKey} />
+        </section>
+
+        <CollapsibleSection title="Skills" defaultOpen={false} badge={skillBadge}>
+          <SkillList key={refreshKey} onCountChange={setSkillCount} />
         </CollapsibleSection>
 
-        <CollapsibleSection title="Skills" defaultOpen={true}>
-          <SkillList key={refreshKey} />
-        </CollapsibleSection>
-
-        <CollapsibleSection title="Projects" defaultOpen={true}>
+        <CollapsibleSection title="Projects" defaultOpen={false}>
           <ProjectList key={refreshKey} />
         </CollapsibleSection>
 
-        <CollapsibleSection title="Education" defaultOpen={true}>
+        <CollapsibleSection title="Education" defaultOpen={false}>
           <EducationList key={refreshKey} />
         </CollapsibleSection>
 
-        <CollapsibleSection title="Volunteer" defaultOpen={true}>
+        <CollapsibleSection title="Volunteer" defaultOpen={false}>
           <VolunteerList key={refreshKey} />
         </CollapsibleSection>
 
