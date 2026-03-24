@@ -103,6 +103,7 @@ function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze }: Props): Reac
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortOption>('recent')
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; id: number; company: string } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; company: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -522,7 +523,7 @@ function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze }: Props): Reac
                       row={row}
                       onViewResult={onViewResult}
                       onReanalyze={onReanalyze}
-                      onDelete={(id, company) => setDeleteConfirm({ id, company })}
+                      onContextMenu={(e, id, company) => setContextMenu({ x: e.clientX, y: e.clientY, id, company })}
                     />
                   ))
                 )}
@@ -530,6 +531,66 @@ function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze }: Props): Reac
             </table>
           </div>
         </>
+      )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 29,
+          }}
+          onClick={() => setContextMenu(null)}
+          onContextMenu={(e) => { e.preventDefault(); setContextMenu(null) }}
+        >
+          <div
+            style={{
+              position: 'fixed',
+              left: contextMenu.x,
+              top: contextMenu.y,
+              backgroundColor: 'var(--color-bg-overlay)',
+              border: '1px solid var(--color-border-emphasis)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-1)',
+              minWidth: 140,
+              fontFamily: 'var(--font-sans)',
+              zIndex: 30,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                setDeleteConfirm({ id: contextMenu.id, company: contextMenu.company })
+                setContextMenu(null)
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                width: '100%',
+                padding: '8px 12px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--color-danger)',
+                fontSize: 'var(--font-size-sm)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-danger-bg)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+              </svg>
+              Delete analysis
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Delete Confirmation Modal */}
@@ -624,10 +685,10 @@ interface RowProps {
   row: AnalysisRow
   onViewResult: (analysisId: number) => void
   onReanalyze: (jobPostingId: number, variantId: number) => void
-  onDelete: (jobPostingId: number, company: string) => void
+  onContextMenu: (e: React.MouseEvent, jobPostingId: number, company: string) => void
 }
 
-function AnalysisTableRow({ row, onViewResult, onReanalyze, onDelete }: RowProps): React.JSX.Element {
+function AnalysisTableRow({ row, onViewResult, onReanalyze, onContextMenu }: RowProps): React.JSX.Element {
   const [hovered, setHovered] = useState(false)
   const scoreColor = getScoreColor(row.matchScore)
   const scoreBg = getScoreBgColor(row.matchScore)
@@ -641,7 +702,7 @@ function AnalysisTableRow({ row, onViewResult, onReanalyze, onDelete }: RowProps
       onMouseLeave={() => setHovered(false)}
       onContextMenu={(e) => {
         e.preventDefault()
-        onDelete(row.id, row.company)
+        onContextMenu(e, row.id, row.company)
       }}
     >
       {/* Company / Role */}

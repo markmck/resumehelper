@@ -112,14 +112,14 @@ function VariantEditor({ variant, onRename, onDelete }: VariantEditorProps): Rea
               padding: '4px 8px',
               backgroundColor: 'transparent',
               border: 'none',
-              color: 'var(--color-text-muted)',
+              color: 'var(--color-danger)',
               fontSize: 'var(--font-size-xs)',
               cursor: 'pointer',
               borderRadius: 'var(--radius-sm)',
               fontFamily: 'var(--font-sans)',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; e.currentTarget.style.backgroundColor = 'var(--color-bg-raised)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.backgroundColor = 'transparent' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-danger-bg)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
           >
             Delete
           </button>
