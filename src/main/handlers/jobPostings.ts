@@ -184,4 +184,15 @@ export function registerJobPostingHandlers(): void {
       return { error: err instanceof Error ? err.message : String(err) }
     }
   })
+
+  // Updates analysis status (e.g., to 'optimized' after saving accepted suggestions)
+  ipcMain.handle('jobPostings:updateAnalysisStatus', async (_event, analysisId: number, status: string) => {
+    try {
+      db.update(analysisResults).set({ status }).where(eq(analysisResults.id, analysisId)).run()
+      return { success: true }
+    } catch (err) {
+      console.error('jobPostings:updateAnalysisStatus error', err)
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
 }
