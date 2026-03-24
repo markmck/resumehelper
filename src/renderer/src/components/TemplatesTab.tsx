@@ -72,7 +72,7 @@ function TemplatesTab({ selectedVariantId, onVariantsLoaded, onSelectedChange, o
               onClick={handleCreate}
               style={{
                 backgroundColor: 'var(--color-accent)',
-                color: '#fff',
+                color: 'var(--color-text-on-accent, #fff)',
                 border: 'none',
                 padding: '8px 16px',
                 borderRadius: 'var(--radius-md)',
