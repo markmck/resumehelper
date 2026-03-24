@@ -12,6 +12,7 @@ const api = {
       data: { company?: string; role?: string; startDate?: string; endDate?: string | null },
     ) => ipcRenderer.invoke('jobs:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('jobs:delete', id),
+    reorder: (orderedIds: number[]) => ipcRenderer.invoke('jobs:reorder', orderedIds),
   },
   bullets: {
     create: (data: { jobId: number; text: string; sortOrder: number }) =>

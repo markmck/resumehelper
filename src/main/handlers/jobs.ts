@@ -1,11 +1,11 @@
 import { ipcMain } from 'electron'
 import { db } from '../db'
 import { jobs, jobBullets } from '../db/schema'
-import { eq, asc, desc } from 'drizzle-orm'
+import { eq, asc } from 'drizzle-orm'
 
 export function registerJobHandlers(): void {
   ipcMain.handle('jobs:list', async () => {
-    const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
+    const allJobs = await db.select().from(jobs).orderBy(asc(jobs.sortOrder))
     const result = await Promise.all(
       allJobs.map(async (job) => {
         const bullets = await db
@@ -52,5 +52,11 @@ export function registerJobHandlers(): void {
 
   ipcMain.handle('jobs:delete', async (_, id: number) => {
     await db.delete(jobs).where(eq(jobs.id, id))
+  })
+
+  ipcMain.handle('jobs:reorder', async (_, orderedIds: number[]) => {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await db.update(jobs).set({ sortOrder: i }).where(eq(jobs.id, orderedIds[i]))
+    }
   })
 }

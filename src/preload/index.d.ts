@@ -284,6 +284,7 @@ export interface Api {
       data: { company?: string; role?: string; startDate?: string; endDate?: string | null },
     ) => Promise<Job>
     delete: (id: number) => Promise<void>
+    reorder: (orderedIds: number[]) => Promise<void>
   }
   bullets: {
     create: (data: { jobId: number; text: string; sortOrder: number }) => Promise<Bullet>

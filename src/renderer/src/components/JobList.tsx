@@ -1,3 +1,18 @@
+import {
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
 import { useEffect, useState } from 'react'
 import JobAddForm from './JobAddForm'
 import JobItem from './JobItem'
@@ -26,12 +41,32 @@ function JobList(): React.JSX.Element {
   const [addHovered, setAddHovered] = useState(false)
   const [emptyAddHovered, setEmptyAddHovered] = useState(false)
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  )
+
   useEffect(() => {
     window.api.jobs.list().then((data) => {
       setJobs(data as Job[])
       setLoading(false)
     })
   }, [])
+
+  const handleDragEnd = async (event: DragEndEvent): Promise<void> => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = jobs.findIndex((j) => j.id === active.id)
+    const newIndex = jobs.findIndex((j) => j.id === over.id)
+
+    const reordered = arrayMove(jobs, oldIndex, newIndex)
+    setJobs(reordered)
+
+    await window.api.jobs.reorder(reordered.map((j) => j.id))
+  }
 
   const handleAddJob = async (data: {
     company: string
@@ -69,7 +104,7 @@ function JobList(): React.JSX.Element {
   })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       {/* Add Job button */}
       {!adding && (
         <div>
@@ -79,7 +114,7 @@ function JobList(): React.JSX.Element {
             onMouseLeave={() => setAddHovered(false)}
             style={ghostButtonStyle(addHovered)}
           >
-            + Add Job
+            + Add position
           </button>
         </div>
       )}
@@ -93,7 +128,7 @@ function JobList(): React.JSX.Element {
       {jobs.length === 0 && !adding ? (
         <div style={{ textAlign: 'center', padding: 'var(--space-8) 0' }}>
           <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-3)' }}>
-            No work history yet. Add your first job to get started.
+            No work history yet. Add your first position to get started.
           </p>
           <button
             onClick={() => setAdding(true)}
@@ -101,18 +136,24 @@ function JobList(): React.JSX.Element {
             onMouseLeave={() => setEmptyAddHovered(false)}
             style={ghostButtonStyle(emptyAddHovered)}
           >
-            + Add Job
+            + Add position
           </button>
         </div>
       ) : (
-        jobs.map((job) => (
-          <JobItem
-            key={job.id}
-            job={job}
-            onUpdate={handleUpdateJob}
-            onDelete={handleDeleteJob}
-          />
-        ))
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={jobs.map((j) => j.id)} strategy={verticalListSortingStrategy}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {jobs.map((job) => (
+                <JobItem
+                  key={job.id}
+                  job={job}
+                  onUpdate={handleUpdateJob}
+                  onDelete={handleDeleteJob}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   )

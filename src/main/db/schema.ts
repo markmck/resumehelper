@@ -6,6 +6,7 @@ export const jobs = sqliteTable('jobs', {
   role: text('role').notNull(),
   startDate: text('start_date').notNull(),
   endDate: text('end_date'),
+  sortOrder: integer('sort_order').notNull().default(0),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
