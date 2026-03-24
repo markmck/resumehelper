@@ -15,9 +15,11 @@ type AnalysisScreen =
 interface AnalysisTabProps {
   onLogSubmission?: (analysisId: number) => void
   onViewSubmission?: (submissionId: number) => void
+  initialOptimizeAnalysisId?: number | null
+  onOptimizeAnalysisConsumed?: () => void
 }
 
-function AnalysisTab({ onLogSubmission, onViewSubmission }: AnalysisTabProps): React.JSX.Element {
+function AnalysisTab({ onLogSubmission, onViewSubmission, initialOptimizeAnalysisId, onOptimizeAnalysisConsumed }: AnalysisTabProps): React.JSX.Element {
   const [screen, setScreen] = useState<AnalysisScreen>({ name: 'list' })
   const screenHistory = useRef<AnalysisScreen[]>([{ name: 'list' }])
 
@@ -25,6 +27,14 @@ function AnalysisTab({ onLogSubmission, onViewSubmission }: AnalysisTabProps): R
     screenHistory.current.push(s)
     setScreen(s)
   }, [])
+
+  // Navigate to optimize screen when triggered from VariantEditor
+  useEffect(() => {
+    if (initialOptimizeAnalysisId != null) {
+      navigateScreen({ name: 'optimize', analysisId: initialOptimizeAnalysisId })
+      onOptimizeAnalysisConsumed?.()
+    }
+  }, [initialOptimizeAnalysisId])
 
   // Listen for mouse back button / Alt+Left from App
   useEffect(() => {

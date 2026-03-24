@@ -6,9 +6,10 @@ interface TemplatesTabProps {
   selectedVariantId: number | null
   onVariantsLoaded: (variants: Array<{ id: number; name: string }>) => void
   onSelectedChange: (id: number | null) => void
+  onOptimizeVariant?: (analysisId: number) => void
 }
 
-function TemplatesTab({ selectedVariantId, onVariantsLoaded, onSelectedChange }: TemplatesTabProps): React.JSX.Element {
+function TemplatesTab({ selectedVariantId, onVariantsLoaded, onSelectedChange, onOptimizeVariant }: TemplatesTabProps): React.JSX.Element {
   const [variants, setVariants] = useState<TemplateVariant[]>([])
 
   useEffect(() => {
@@ -55,13 +56,14 @@ function TemplatesTab({ selectedVariantId, onVariantsLoaded, onSelectedChange }:
   const selectedVariant = variants.find((v) => v.id === selectedVariantId) ?? null
 
   return (
-    <div style={{ display: 'flex', height: '100vh' }}>
+    <div style={{ display: 'flex', height: '100%' }}>
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {selectedVariant ? (
           <VariantEditor
             variant={selectedVariant}
             onRename={handleRename}
             onDelete={handleDelete}
+            onOptimizeVariant={onOptimizeVariant}
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-tertiary)' }}>

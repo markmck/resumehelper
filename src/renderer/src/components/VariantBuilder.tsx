@@ -13,6 +13,7 @@ import {
 
 interface VariantBuilderProps {
   variantId: number
+  onToggle?: () => void
 }
 
 const sectionTitleStyle: React.CSSProperties = {
@@ -58,7 +59,7 @@ const companyStyle: React.CSSProperties = {
   color: 'var(--color-text-tertiary)',
 }
 
-function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
+function VariantBuilder({ variantId, onToggle }: VariantBuilderProps): React.JSX.Element {
   const [builderData, setBuilderData] = useState<BuilderData | null>(null)
   const [summaryIncluded, setSummaryIncluded] = useState(true)
   const [profileSummary, setProfileSummary] = useState('')
@@ -76,6 +77,7 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
       return { ...prev, jobs: prev.jobs.map((j) => j.id === jobId ? { ...j, bullets: j.bullets.map((b) => b.id === bulletId ? { ...b, excluded: newExcluded } : b) } : j) }
     })
     await window.api.templates.setItemExcluded(variantId, 'bullet', bulletId, newExcluded)
+    onToggle?.()
   }
 
   const handleSkillToggle = async (skill: BuilderSkill): Promise<void> => {
@@ -85,6 +87,7 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
       return { ...prev, skills: prev.skills.map((s) => s.id === skill.id ? { ...s, excluded: newExcluded } : s) }
     })
     await window.api.templates.setItemExcluded(variantId, 'skill', skill.id, newExcluded)
+    onToggle?.()
   }
 
   const handleProjectBulletToggle = async (projectId: number, bulletId: number, currentExcluded: boolean): Promise<void> => {
@@ -94,6 +97,7 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
       return { ...prev, projects: prev.projects.map((p) => p.id === projectId ? { ...p, bullets: p.bullets.map((b) => b.id === bulletId ? { ...b, excluded: newExcluded } : b) } : p) }
     })
     await window.api.templates.setItemExcluded(variantId, 'projectBullet', bulletId, newExcluded)
+    onToggle?.()
   }
 
   const handleEducationToggle = async (edu: BuilderEducation): Promise<void> => {
@@ -103,6 +107,7 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
       return { ...prev, education: (prev.education ?? []).map((e) => e.id === edu.id ? { ...e, excluded: newExcluded } : e) }
     })
     await window.api.templates.setItemExcluded(variantId, 'education', edu.id, newExcluded)
+    onToggle?.()
   }
 
   const handleVolunteerToggle = async (vol: BuilderVolunteer): Promise<void> => {
@@ -112,6 +117,7 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
       return { ...prev, volunteer: (prev.volunteer ?? []).map((v) => v.id === vol.id ? { ...v, excluded: newExcluded } : v) }
     })
     await window.api.templates.setItemExcluded(variantId, 'volunteer', vol.id, newExcluded)
+    onToggle?.()
   }
 
   const handleAwardToggle = async (award: BuilderAward): Promise<void> => {
@@ -121,6 +127,7 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
       return { ...prev, awards: (prev.awards ?? []).map((a) => a.id === award.id ? { ...a, excluded: newExcluded } : a) }
     })
     await window.api.templates.setItemExcluded(variantId, 'award', award.id, newExcluded)
+    onToggle?.()
   }
 
   const handlePublicationToggle = async (pub: BuilderPublication): Promise<void> => {
@@ -130,6 +137,7 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
       return { ...prev, publications: (prev.publications ?? []).map((p) => p.id === pub.id ? { ...p, excluded: newExcluded } : p) }
     })
     await window.api.templates.setItemExcluded(variantId, 'publication', pub.id, newExcluded)
+    onToggle?.()
   }
 
   const handleLanguageToggle = async (lang: BuilderLanguage): Promise<void> => {
@@ -139,6 +147,7 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
       return { ...prev, languages: (prev.languages ?? []).map((l) => l.id === lang.id ? { ...l, excluded: newExcluded } : l) }
     })
     await window.api.templates.setItemExcluded(variantId, 'language', lang.id, newExcluded)
+    onToggle?.()
   }
 
   const handleInterestToggle = async (interest: BuilderInterest): Promise<void> => {
@@ -148,6 +157,7 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
       return { ...prev, interests: (prev.interests ?? []).map((i) => i.id === interest.id ? { ...i, excluded: newExcluded } : i) }
     })
     await window.api.templates.setItemExcluded(variantId, 'interest', interest.id, newExcluded)
+    onToggle?.()
   }
 
   const handleReferenceToggle = async (ref: BuilderReference): Promise<void> => {
@@ -157,6 +167,7 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
       return { ...prev, references: (prev.references ?? []).map((r) => r.id === ref.id ? { ...r, excluded: newExcluded } : r) }
     })
     await window.api.templates.setItemExcluded(variantId, 'reference', ref.id, newExcluded)
+    onToggle?.()
   }
 
   if (!builderData) {

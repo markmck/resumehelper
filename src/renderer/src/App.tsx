@@ -14,6 +14,7 @@ function App(): React.JSX.Element {
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null)
   const [pendingLogAnalysis, setPendingLogAnalysis] = useState<number | null>(null)
   const [pendingViewSubmission, setPendingViewSubmission] = useState<number | null>(null)
+  const [pendingOptimizeAnalysis, setPendingOptimizeAnalysis] = useState<number | null>(null)
 
   const handleVariantsLoaded = useCallback((list: Array<{ id: number; name: string }>) => {
     setVariants(list)
@@ -96,9 +97,13 @@ function App(): React.JSX.Element {
               selectedVariantId={selectedVariantId}
               onVariantsLoaded={handleVariantsLoaded}
               onSelectedChange={setSelectedVariantId}
+              onOptimizeVariant={(analysisId: number) => {
+                setPendingOptimizeAnalysis(analysisId)
+                navigateTab('analysis')
+              }}
             />
           )}
-          {activeTab === 'analysis' && <AnalysisTab onLogSubmission={(analysisId: number) => {
+          {activeTab === 'analysis' && <AnalysisTab initialOptimizeAnalysisId={pendingOptimizeAnalysis} onOptimizeAnalysisConsumed={() => setPendingOptimizeAnalysis(null)} onLogSubmission={(analysisId: number) => {
             setPendingLogAnalysis(analysisId)
             navigateTab('submissions')
           }} onViewSubmission={(submissionId: number) => {

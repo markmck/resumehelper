@@ -5,13 +5,14 @@ import ProfessionalLayout from './ProfessionalLayout'
 interface VariantPreviewProps {
   variantId: number
   layoutTemplate?: string
+  refreshKey?: number
 }
 
 function isBuiltIn(layoutTemplate: string | undefined): boolean {
   return !layoutTemplate || layoutTemplate === 'professional' || layoutTemplate === 'traditional'
 }
 
-function VariantPreview({ variantId, layoutTemplate }: VariantPreviewProps): React.JSX.Element {
+function VariantPreview({ variantId, layoutTemplate, refreshKey }: VariantPreviewProps): React.JSX.Element {
   const [builderData, setBuilderData] = useState<BuilderData | null>(null)
   const [profileData, setProfileData] = useState<Profile | null>(null)
   const [themeHtml, setThemeHtml] = useState<string | null>(null)
@@ -27,7 +28,7 @@ function VariantPreview({ variantId, layoutTemplate }: VariantPreviewProps): Rea
       setBuilderData(builder)
       setProfileData(profile)
     })
-  }, [variantId])
+  }, [variantId, refreshKey])
 
   // Load theme HTML when using a non-built-in theme
   useEffect(() => {
@@ -48,7 +49,7 @@ function VariantPreview({ variantId, layoutTemplate }: VariantPreviewProps): Rea
       }
       setThemeLoading(false)
     })
-  }, [variantId, layoutTemplate])
+  }, [variantId, layoutTemplate, refreshKey])
 
   if (!isBuiltIn(layoutTemplate)) {
     // Theme iframe path
