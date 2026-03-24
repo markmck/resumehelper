@@ -32,59 +32,66 @@ function SubmissionEventTimeline({ events }: Props): React.JSX.Element {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <div style={{ position: 'relative', paddingLeft: 20 }}>
+      {/* Vertical connecting line — spans from first dot to last dot */}
+      {events.length > 1 && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 3,
+            top: 6,
+            bottom: 6,
+            width: 2,
+            backgroundColor: 'var(--color-border-subtle)',
+          }}
+        />
+      )}
+
       {events.map((event, index) => {
         const dotColor = getEventDotColor(event.status)
         const isLast = index === events.length - 1
 
-        // Determine event label
         const isCreationEvent = event.note === 'Submission created'
         const label = isCreationEvent
           ? 'Submission created'
           : `Status changed to ${capitalize(event.status)}`
 
         return (
-          <div key={event.id} style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
-            {/* Left: dot + vertical line */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: 16, paddingTop: 2 }}>
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  backgroundColor: dotColor,
-                  border: `2px solid ${dotColor}`,
-                  flexShrink: 0,
-                  zIndex: 1,
-                }}
-              />
-              {!isLast && (
-                <div
-                  style={{
-                    width: 2,
-                    flex: 1,
-                    minHeight: 24,
-                    backgroundColor: 'var(--color-border-subtle)',
-                    marginTop: 2,
-                  }}
-                />
-              )}
-            </div>
+          <div
+            key={event.id}
+            style={{
+              position: 'relative',
+              paddingBottom: isLast ? 0 : 'var(--space-5)',
+            }}
+          >
+            {/* Dot — positioned over the vertical line */}
+            <div
+              style={{
+                position: 'absolute',
+                left: -20,
+                top: 4,
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                backgroundColor: dotColor,
+                border: '2px solid var(--color-bg-surface)',
+                zIndex: 1,
+                marginLeft: -1,
+              }}
+            />
 
-            {/* Right: content */}
-            <div style={{ paddingBottom: isLast ? 0 : 'var(--space-4)', flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                {label}
+            {/* Content */}
+            <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+              {label}
+            </p>
+            <p style={{ margin: '2px 0 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+              {formatEventDate(event.createdAt)}
+            </p>
+            {event.note && !isCreationEvent && (
+              <p style={{ margin: '4px 0 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>
+                {event.note}
               </p>
-              <p style={{ margin: '2px 0 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-                {formatEventDate(event.createdAt)}
-              </p>
-              {event.note && !isCreationEvent && (
-                <p style={{ margin: '4px 0 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>
-                  {event.note}
-                </p>
-              )}
-            </div>
+            )}
           </div>
         )
       })}

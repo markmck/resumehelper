@@ -40,92 +40,61 @@ function PipelineBar({ status }: PipelineBarProps): React.JSX.Element {
   const isWithdrawn = status === 'withdrawn'
   const stageIndex = isWithdrawn ? -1 : STAGES.indexOf(status)
 
+  function getDotColor(i: number): string {
+    if (isWithdrawn) return 'var(--color-bg-raised)'
+    if (status === 'result') return 'var(--color-success)'
+    if (i < stageIndex) return 'var(--color-success)'
+    if (i === stageIndex) return stageIndex === 0 ? 'var(--color-accent)' : 'var(--color-warning)'
+    return 'var(--color-bg-raised)'
+  }
+
+  function getLineColor(i: number): string {
+    if (isWithdrawn) return 'var(--color-border-subtle)'
+    if (status === 'result') return 'var(--color-success)'
+    if (i < stageIndex) return 'var(--color-success)'
+    return 'var(--color-border-subtle)'
+  }
+
   return (
-    <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 'var(--space-8)' }}>
-      {/* Connecting lines behind dots */}
-      {STAGES.map((_, i) => {
-        if (i === STAGES.length - 1) return null
+    <div style={{ marginBottom: 'var(--space-8)' }}>
+      {/* Dots and connecting lines row */}
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        {STAGES.map((stage, i) => {
+          const dotColor = getDotColor(i)
+          const isCurrentStage = !isWithdrawn && i === stageIndex
+          const dotSize = isCurrentStage ? 18 : 14
 
-        let lineColor: string
-        if (isWithdrawn) {
-          lineColor = 'var(--color-border-subtle)'
-        } else if (status === 'result') {
-          lineColor = 'var(--color-success)'
-        } else if (i < stageIndex) {
-          lineColor = 'var(--color-success)'
-        } else {
-          lineColor = 'var(--color-border-subtle)'
-        }
-
-        return (
+          return (
+            <div key={stage} style={{ display: 'contents' }}>
+              {/* Connecting line before dot (skip first) */}
+              {i > 0 && (
+                <div style={{ flex: 1, height: 2, backgroundColor: getLineColor(i - 1) }} />
+              )}
+              {/* Dot */}
+              <div
+                style={{
+                  width: dotSize,
+                  height: dotSize,
+                  borderRadius: '50%',
+                  backgroundColor: dotColor,
+                  flexShrink: 0,
+                  boxShadow: isCurrentStage ? `0 0 0 3px ${dotColor}22` : undefined,
+                }}
+              />
+            </div>
+          )
+        })}
+      </div>
+      {/* Labels row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', marginTop: 'var(--space-2)' }}>
+        {STAGES.map((_, i) => (
           <div
-            key={`line-${i}`}
+            key={STAGES[i]}
             style={{
-              position: 'absolute',
-              top: 8,
-              left: `calc(${(i / (STAGES.length - 1)) * 100}% + 8px)`,
-              width: `calc(${(1 / (STAGES.length - 1)) * 100}% - 16px)`,
-              height: 2,
-              backgroundColor: lineColor,
-              zIndex: 0,
-            }}
-          />
-        )
-      })}
-
-      {/* Stage dots + labels */}
-      {STAGES.map((stage, i) => {
-        let circleColor: string
-        let circleBorder: string
-        let isCurrentStage = false
-
-        if (isWithdrawn) {
-          circleColor = 'transparent'
-          circleBorder = 'var(--color-border-subtle)'
-        } else if (status === 'result') {
-          circleColor = 'var(--color-success)'
-          circleBorder = 'var(--color-success)'
-        } else if (i < stageIndex) {
-          circleColor = 'var(--color-success)'
-          circleBorder = 'var(--color-success)'
-        } else if (i === stageIndex) {
-          isCurrentStage = true
-          if (stageIndex === 0) {
-            circleColor = 'var(--color-accent)'
-            circleBorder = 'var(--color-accent)'
-          } else {
-            circleColor = 'var(--color-warning)'
-            circleBorder = 'var(--color-warning)'
-          }
-        } else {
-          circleColor = 'var(--color-bg-raised)'
-          circleBorder = 'var(--color-bg-raised)'
-        }
-
-        return (
-          <div
-            key={stage}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 'var(--space-2)',
-              zIndex: 1,
               flex: 1,
+              textAlign: i === 0 ? 'left' : i === STAGES.length - 1 ? 'right' : 'center',
             }}
           >
-            <div
-              style={{
-                width: isCurrentStage ? 20 : 16,
-                height: isCurrentStage ? 20 : 16,
-                borderRadius: '50%',
-                backgroundColor: circleColor,
-                border: `2px solid ${circleBorder}`,
-                boxShadow: isCurrentStage ? `0 0 0 3px ${circleBorder}22` : undefined,
-                flexShrink: 0,
-                marginTop: isCurrentStage ? -2 : 0,
-              }}
-            />
             <span
               style={{
                 fontSize: 'var(--font-size-xs)',
@@ -141,41 +110,13 @@ function PipelineBar({ status }: PipelineBarProps): React.JSX.Element {
               {STAGE_LABELS[i]}
             </span>
           </div>
-        )
-      })}
+        ))}
+      </div>
 
-      {/* Withdrawn indicator overlaid at start */}
+      {/* Withdrawn label */}
       {isWithdrawn && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
-            zIndex: 2,
-          }}
-        >
-          <div
-            style={{
-              width: 20,
-              height: 20,
-              borderRadius: '50%',
-              backgroundColor: 'var(--color-danger)',
-              border: '2px solid var(--color-danger)',
-              marginTop: -2,
-            }}
-          />
-          <span
-            style={{
-              fontSize: 'var(--font-size-xs)',
-              fontWeight: 600,
-              color: 'var(--color-danger)',
-              whiteSpace: 'nowrap',
-            }}
-          >
+        <div style={{ marginTop: 'var(--space-1)' }}>
+          <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-danger)' }}>
             Withdrawn
           </span>
         </div>
