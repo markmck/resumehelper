@@ -24,13 +24,13 @@ interface AnalysisData {
   jobPostingId: number
   variantId: number
   matchScore: number
-  keywordHits: string
-  keywordMisses: string
-  semanticMatches: string
-  gapSkills: string
-  suggestions: string
-  atsFlags: string
-  scoreBreakdown: string
+  keywordHits: string[]
+  keywordMisses: string[]
+  semanticMatches: string[]
+  gapSkills: Gap[]
+  suggestions: RewriteSuggestion[]
+  atsFlags: string[]
+  scoreBreakdown: ScoreBreakdown | null
   status: string
   createdAt: Date
   company: string
@@ -96,21 +96,14 @@ function AnalysisResults({ analysisId, onBack, onReanalyze }: Props): React.JSX.
         }
 
         const data = raw as AnalysisData
-        const exactMatches = safeJsonParse<string[]>(data.keywordHits, [])
-        const missingKeywords = safeJsonParse<string[]>(data.keywordMisses, [])
-        const semanticMatches = safeJsonParse<string[]>(data.semanticMatches, [])
-        const gaps = safeJsonParse<Gap[]>(data.gapSkills, [])
-        const rewrites = safeJsonParse<RewriteSuggestion[]>(data.suggestions, [])
-        const scoreBreakdown = safeJsonParse<ScoreBreakdown | null>(data.scoreBreakdown, null)
-
         setAnalysis({
           raw: data,
-          exactMatches,
-          missingKeywords,
-          semanticMatches,
-          gaps,
-          rewrites,
-          scoreBreakdown,
+          exactMatches: data.keywordHits ?? [],
+          missingKeywords: data.keywordMisses ?? [],
+          semanticMatches: data.semanticMatches ?? [],
+          gaps: data.gapSkills ?? [],
+          rewrites: data.suggestions ?? [],
+          scoreBreakdown: data.scoreBreakdown ?? null,
         })
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Unknown error')
