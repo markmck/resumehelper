@@ -75,7 +75,8 @@ function App(): React.JSX.Element {
       <div
         style={{
           display: 'flex',
-          minHeight: '100vh',
+          height: '100vh',
+          overflow: 'hidden',
           backgroundColor: 'var(--color-bg-base)',
         }}
       >

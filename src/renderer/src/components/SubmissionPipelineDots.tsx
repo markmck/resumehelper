@@ -53,9 +53,9 @@ export function SubmissionPipelineDots({ status }: Props): React.JSX.Element {
             bgColor = stageIndex === 0 ? 'var(--color-accent)' : 'var(--color-warning)'
             borderColor = stageIndex === 0 ? 'var(--color-accent)' : 'var(--color-warning)'
           } else {
-            // Future stage: hollow
-            bgColor = 'transparent'
-            borderColor = 'var(--color-border-subtle)'
+            // Future stage: solid gray
+            bgColor = 'var(--color-bg-raised)'
+            borderColor = 'var(--color-bg-raised)'
           }
 
           return (

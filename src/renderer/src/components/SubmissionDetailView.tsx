@@ -98,8 +98,8 @@ function PipelineBar({ status }: PipelineBarProps): React.JSX.Element {
             circleBorder = 'var(--color-warning)'
           }
         } else {
-          circleColor = 'transparent'
-          circleBorder = 'var(--color-border-subtle)'
+          circleColor = 'var(--color-bg-raised)'
+          circleBorder = 'var(--color-bg-raised)'
         }
 
         return (
@@ -331,20 +331,20 @@ function SubmissionDetailView({ submissionId, onBack, onViewAnalysis, onDelete }
       <button
         onClick={onBack}
         style={{
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          cursor: 'pointer',
-          color: 'var(--color-accent)',
-          fontSize: 'var(--font-size-sm)',
-          fontFamily: 'var(--font-sans)',
-          marginBottom: 'var(--space-4)',
           display: 'inline-flex',
           alignItems: 'center',
           gap: 'var(--space-1)',
+          background: 'none',
+          border: 'none',
+          color: 'var(--color-text-secondary)',
+          fontSize: 'var(--font-size-sm)',
+          cursor: 'pointer',
+          padding: 0,
+          marginBottom: 'var(--space-4)',
+          fontFamily: 'var(--font-sans)',
         }}
       >
-        &larr; Back to submissions
+        ← Back to submissions
       </button>
 
       {/* Header row */}
