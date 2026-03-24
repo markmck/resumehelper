@@ -18,10 +18,10 @@ export const JobParserSchema = z.object({
 })
 
 export const ResumeScorerSchema = z.object({
-  keyword_score: z.number().min(0).max(100),
-  skills_score: z.number().min(0).max(100),
-  experience_score: z.number().min(0).max(100),
-  ats_score: z.number().min(0).max(100),
+  keyword_score: z.number(),
+  skills_score: z.number(),
+  experience_score: z.number(),
+  ats_score: z.number(),
   exact_keyword_matches: z.array(z.string()),
   semantic_keyword_matches: z.array(z.string()),
   missing_keywords: z.array(z.string()),
@@ -120,10 +120,11 @@ export function deriveOverallScore(subscores: {
   experience_score: number
   ats_score: number
 }): number {
+  const clamp = (n: number): number => Math.max(0, Math.min(100, n))
   return Math.round(
-    subscores.keyword_score * 0.35 +
-      subscores.skills_score * 0.35 +
-      subscores.experience_score * 0.20 +
-      subscores.ats_score * 0.10
+    clamp(subscores.keyword_score) * 0.35 +
+      clamp(subscores.skills_score) * 0.35 +
+      clamp(subscores.experience_score) * 0.20 +
+      clamp(subscores.ats_score) * 0.10
   )
 }
