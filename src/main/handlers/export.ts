@@ -17,7 +17,7 @@ import { db } from '../db'
 import { profile, jobs, jobBullets, skills, projects, projectBullets, templateVariantItems, templateVariants, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
 import { eq, asc, desc } from 'drizzle-orm'
 import { buildResumeJson, renderThemeHtml } from '../lib/themeRegistry'
-import { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
+import { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference, SubmissionSnapshot } from '../../preload/index.d'
 
 interface BuilderData {
   jobs: BuilderJob[]
@@ -742,6 +742,74 @@ export function registerExportHandlers(): void {
     // 4. Generate buffer and write
     const buffer = await Packer.toBuffer(doc)
     await fs.writeFile(filePath, buffer)
+    return { canceled: false, filePath }
+  })
+
+  ipcMain.handle('export:snapshotPdf', async (_, snapshotData: SubmissionSnapshot, defaultFilename: string) => {
+    // 1. Show Save As dialog
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'Export Snapshot as PDF',
+      defaultPath: defaultFilename,
+      filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+    })
+    if (canceled || !filePath) return { canceled: true }
+
+    // 2. Determine layout from snapshot
+    const layoutTemplate = snapshotData.layoutTemplate ?? 'traditional'
+    const isProfessional = !layoutTemplate || layoutTemplate === 'professional' || layoutTemplate === 'traditional'
+
+    // 3. Render HTML: professional uses theme renderer with 'traditional', theme path uses themeRegistry directly
+    const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
+    const snapshotBuilderData = {
+      jobs: snapshotData.jobs ?? [],
+      skills: snapshotData.skills ?? [],
+      projects: snapshotData.projects ?? [],
+      education: snapshotData.education ?? [],
+      volunteer: snapshotData.volunteer ?? [],
+      awards: snapshotData.awards ?? [],
+      publications: snapshotData.publications ?? [],
+      languages: snapshotData.languages ?? [],
+      interests: snapshotData.interests ?? [],
+      references: snapshotData.references ?? [],
+    }
+    const resumeJson = buildResumeJson(profileRow, snapshotBuilderData)
+    const themeKey = isProfessional ? 'traditional' : layoutTemplate
+    const html = await renderThemeHtml(themeKey, resumeJson)
+
+    // 4. Write to temp file and print to PDF
+    const win = new BrowserWindow({
+      show: false,
+      width: 816,
+      height: 1056,
+      webPreferences: { sandbox: true },
+    })
+
+    const tmpPath = join(tmpdir(), `resume-snapshot-${Date.now()}.html`)
+    await fs.writeFile(tmpPath, html, 'utf-8')
+
+    await new Promise<void>((resolve) => {
+      let resolved = false
+      const done = (): void => {
+        if (!resolved) {
+          resolved = true
+          resolve()
+        }
+      }
+      win.webContents.once('did-finish-load', () => {
+        setTimeout(done, 500)
+      })
+      setTimeout(done, 5000)
+      win.loadFile(tmpPath)
+    })
+
+    const pdfBuffer = await win.webContents.printToPDF({
+      printBackground: true,
+      pageSize: 'Letter',
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    })
+    win.destroy()
+    await fs.unlink(tmpPath).catch(() => {})
+    await fs.writeFile(filePath, pdfBuffer)
     return { canceled: false, filePath }
   })
 }

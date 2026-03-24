@@ -54,6 +54,9 @@ const api = {
       variantId: number | null
       url?: string
       notes?: string
+      status?: string
+      scoreAtSubmit?: number | null
+      analysisId?: number | null
     }) => ipcRenderer.invoke('submissions:create', data),
     update: (
       id: number,
@@ -66,6 +69,13 @@ const api = {
       },
     ) => ipcRenderer.invoke('submissions:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('submissions:delete', id),
+    updateStatus: (id: number, status: string, note?: string) =>
+      ipcRenderer.invoke('submissions:updateStatus', id, status, note),
+    getEvents: (submissionId: number) =>
+      ipcRenderer.invoke('submissions:getEvents', submissionId),
+    addEvent: (data: { submissionId: number; status: string; note?: string }) =>
+      ipcRenderer.invoke('submissions:addEvent', data),
+    metrics: () => ipcRenderer.invoke('submissions:metrics'),
   },
   profile: {
     get: () => ipcRenderer.invoke('profile:get'),
@@ -83,6 +93,8 @@ const api = {
       ipcRenderer.invoke('export:pdf', variantId, defaultFilename),
     docx: (variantId: number, defaultFilename: string) =>
       ipcRenderer.invoke('export:docx', variantId, defaultFilename),
+    snapshotPdf: (snapshotData: unknown, defaultFilename: string) =>
+      ipcRenderer.invoke('export:snapshotPdf', snapshotData, defaultFilename),
   },
   projects: {
     list: () => ipcRenderer.invoke('projects:list'),

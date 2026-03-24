@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { db } from '../db'
-import { submissions, templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
+import { submissions, submissionEvents, templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
 import { eq, desc, asc } from 'drizzle-orm'
 import type { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
 
@@ -208,6 +208,9 @@ export function registerSubmissionHandlers(): void {
         resumeSnapshot: submissions.resumeSnapshot,
         url: submissions.url,
         notes: submissions.notes,
+        status: submissions.status,
+        scoreAtSubmit: submissions.scoreAtSubmit,
+        analysisId: submissions.analysisId,
         variantName: templateVariants.name,
       })
       .from(submissions)
@@ -223,6 +226,9 @@ export function registerSubmissionHandlers(): void {
       resumeSnapshot: row.resumeSnapshot,
       url: row.url,
       notes: row.notes,
+      status: row.status ?? 'applied',
+      scoreAtSubmit: row.scoreAtSubmit ?? null,
+      analysisId: row.analysisId ?? null,
       variantName: row.variantName ?? null,
     }))
   })
@@ -238,6 +244,9 @@ export function registerSubmissionHandlers(): void {
         variantId: number | null
         url?: string
         notes?: string
+        status?: string
+        scoreAtSubmit?: number | null
+        analysisId?: number | null
       },
     ) => {
       let snapshot: SubmissionSnapshot = { layoutTemplate: 'traditional', jobs: [], skills: [], projects: [], education: [], volunteer: [], awards: [], publications: [], languages: [], interests: [], references: [] }
@@ -255,10 +264,50 @@ export function registerSubmissionHandlers(): void {
           resumeSnapshot: JSON.stringify(snapshot),
           url: data.url ?? null,
           notes: data.notes ?? null,
+          status: data.status ?? 'applied',
+          scoreAtSubmit: data.scoreAtSubmit ?? null,
+          analysisId: data.analysisId ?? null,
         })
         .returning()
 
-      return rows[0]
+      const newRow = rows[0]
+
+      // Also create an initial submission event
+      await db
+        .insert(submissionEvents)
+        .values({
+          submissionId: newRow.id,
+          status: data.status ?? 'applied',
+          note: 'Submission created',
+        })
+
+      // Return with variantName via LEFT JOIN
+      const [fullRow] = await db
+        .select({
+          id: submissions.id,
+          company: submissions.company,
+          role: submissions.role,
+          submittedAt: submissions.submittedAt,
+          variantId: submissions.variantId,
+          resumeSnapshot: submissions.resumeSnapshot,
+          url: submissions.url,
+          notes: submissions.notes,
+          status: submissions.status,
+          scoreAtSubmit: submissions.scoreAtSubmit,
+          analysisId: submissions.analysisId,
+          variantName: templateVariants.name,
+        })
+        .from(submissions)
+        .leftJoin(templateVariants, eq(submissions.variantId, templateVariants.id))
+        .where(eq(submissions.id, newRow.id))
+
+      return {
+        ...fullRow,
+        status: fullRow.status ?? 'applied',
+        scoreAtSubmit: fullRow.scoreAtSubmit ?? null,
+        analysisId: fullRow.analysisId ?? null,
+        variantName: fullRow.variantName ?? null,
+      }
     },
   )
 
@@ -293,5 +342,110 @@ export function registerSubmissionHandlers(): void {
 
   ipcMain.handle('submissions:delete', async (_, id: number) => {
     await db.delete(submissions).where(eq(submissions.id, id))
+  })
+
+  ipcMain.handle('submissions:updateStatus', async (_, id: number, status: string, note?: string) => {
+    await db
+      .update(submissions)
+      .set({ status })
+      .where(eq(submissions.id, id))
+
+    await db
+      .insert(submissionEvents)
+      .values({
+        submissionId: id,
+        status,
+        note: note ?? null,
+      })
+  })
+
+  ipcMain.handle('submissions:getEvents', async (_, submissionId: number) => {
+    const rows = await db
+      .select()
+      .from(submissionEvents)
+      .where(eq(submissionEvents.submissionId, submissionId))
+      .orderBy(desc(submissionEvents.createdAt))
+
+    return rows
+  })
+
+  ipcMain.handle(
+    'submissions:addEvent',
+    async (_, data: { submissionId: number; status: string; note?: string }) => {
+      const rows = await db
+        .insert(submissionEvents)
+        .values({
+          submissionId: data.submissionId,
+          status: data.status,
+          note: data.note ?? null,
+        })
+        .returning()
+
+      return rows[0]
+    },
+  )
+
+  ipcMain.handle('submissions:metrics', async () => {
+    const all = await db
+      .select({
+        id: submissions.id,
+        submittedAt: submissions.submittedAt,
+        status: submissions.status,
+        scoreAtSubmit: submissions.scoreAtSubmit,
+      })
+      .from(submissions)
+
+    const total = all.length
+    if (total === 0) {
+      return {
+        total: 0,
+        thisMonth: 0,
+        active: 0,
+        responseRate: 0,
+        respondedCount: 0,
+        avgScore: null,
+        respondedAvgScore: null,
+      }
+    }
+
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+    const thisMonth = all.filter(
+      (s) => s.submittedAt != null && s.submittedAt >= startOfMonth,
+    ).length
+
+    const active = all.filter(
+      (s) => s.status === 'screening' || s.status === 'interview',
+    ).length
+
+    const responded = all.filter(
+      (s) => s.status != null && s.status !== 'applied',
+    )
+
+    const responseRate = Math.round((responded.length / total) * 100)
+    const respondedCount = responded.length
+
+    const scoredAll = all.filter((s) => s.scoreAtSubmit != null)
+    const avgScore =
+      scoredAll.length > 0
+        ? scoredAll.reduce((sum, s) => sum + (s.scoreAtSubmit ?? 0), 0) / scoredAll.length
+        : null
+
+    const scoredResponded = responded.filter((s) => s.scoreAtSubmit != null)
+    const respondedAvgScore =
+      scoredResponded.length > 0
+        ? scoredResponded.reduce((sum, s) => sum + (s.scoreAtSubmit ?? 0), 0) / scoredResponded.length
+        : null
+
+    return {
+      total,
+      thisMonth,
+      active,
+      responseRate,
+      respondedCount,
+      avgScore,
+      respondedAvgScore,
+    }
   })
 }
