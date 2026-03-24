@@ -12,7 +12,7 @@ import {
 } from '../../../preload/index.d'
 
 interface ProfessionalLayoutProps {
-  profile?: { name: string; email: string; phone: string; location: string; linkedin: string }
+  profile?: { name: string; email: string; phone: string; location: string; linkedin: string; summary?: string }
   jobs: BuilderJob[]
   skills: BuilderSkill[]
   projects?: BuilderProject[]
@@ -102,6 +102,12 @@ function ProfessionalLayout({
         padding: '0.5in',
       }}
     >
+      {/* Page break CSS */}
+      <style>{`
+        @page { margin: 0.4in 0; }
+        section { break-inside: avoid; }
+      `}</style>
+
       {/* Header */}
       <div
         style={{
@@ -146,6 +152,16 @@ function ProfessionalLayout({
           </div>
         )}
       </div>
+
+      {/* Summary */}
+      {profile?.summary && (
+        <section>
+          <h2 style={sectionHeadingStyle}>Summary</h2>
+          <div style={{ fontSize: '11px', color: '#1a1a1a', lineHeight: '1.6' }}>
+            {profile.summary}
+          </div>
+        </section>
+      )}
 
       {/* Work Experience */}
       {includedJobs.length > 0 && (

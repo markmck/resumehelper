@@ -176,23 +176,12 @@ function ExperienceTab(): React.JSX.Element {
           <ProfileSettings key={refreshKey} />
         </CollapsibleSection>
 
-        {/* Work History — always visible, no collapsible wrapper */}
-        <section style={{ marginBottom: 'var(--space-12)' }}>
-          <div style={{
-            fontSize: 'var(--font-size-sm)',
-            fontWeight: 600,
-            color: 'var(--color-text-tertiary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            marginBottom: 'var(--space-4)',
-          }}>
-            Work History
-          </div>
+        <CollapsibleSection title="Work History" defaultOpen={true}>
           <JobList key={refreshKey} />
-        </section>
+        </CollapsibleSection>
 
         <CollapsibleSection title="Skills" defaultOpen={false} badge={skillBadge}>
-          <SkillList key={refreshKey} onCountChange={setSkillCount} />
+          <SkillList key={refreshKey} />
         </CollapsibleSection>
 
         <CollapsibleSection title="Projects" defaultOpen={false}>

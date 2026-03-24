@@ -261,45 +261,41 @@ export function Sidebar({ activeTab, onTabChange, variants, selectedVariantId, o
       {/* Spacer */}
       <div style={{ flex: activeTab === 'variants' && !collapsed ? 0 : 1 }} />
 
-      {/* Divider + Settings */}
+      {/* Divider + Settings + Collapse Toggle on same row */}
       <div style={{ padding: '0 var(--space-2)' }}>
         <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', margin: '4px 0' }} />
-        {bottomNavItems.map(renderNavButton)}
-      </div>
-
-      {/* Collapse Toggle */}
-      <div
-        style={{
-          padding: 'var(--space-2)',
-        }}
-      >
-        <button
-          onClick={() => setCollapsed((prev) => !prev)}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: collapsed ? 'center' : 'flex-end',
-            padding: '8px 12px',
-            borderRadius: 'var(--radius-md)',
-            border: 'none',
-            cursor: 'pointer',
-            backgroundColor: 'transparent',
-            color: 'var(--color-text-tertiary)',
-            width: '100%',
-            transition: 'background-color 0.15s ease, color 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--color-bg-raised)'
-            ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)'
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
-            ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-tertiary)'
-          }}
-        >
-          {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <div style={{ flex: 1 }}>
+            {bottomNavItems.map(renderNavButton)}
+          </div>
+          <button
+            onClick={() => setCollapsed((prev) => !prev)}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '8px',
+              borderRadius: 'var(--radius-md)',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: 'transparent',
+              color: 'var(--color-text-tertiary)',
+              flexShrink: 0,
+              transition: 'background-color 0.15s ease, color 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--color-bg-raised)'
+              ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)'
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
+              ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-tertiary)'
+            }}
+          >
+            {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+          </button>
+        </div>
       </div>
     </aside>
   )
