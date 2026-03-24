@@ -118,6 +118,7 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
   const [saving, setSaving] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [saveAsNew, setSaveAsNew] = useState(false)
+  const [newVariantName, setNewVariantName] = useState('')
   const [savedMessage, setSavedMessage] = useState<string | null>(null)
 
   // ── Load on mount
@@ -157,29 +158,45 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
             }
             setBulletIdMap(map)
 
-            // Derive skill suggestions: gap skills not already in variant
+            // Derive skill suggestions: gap skills not included in variant
             const gapSkills = data.gapSkills ?? []
-            // Get existing variant skills from builder data
-            const existingSkillNames = new Set<string>()
             const bdAny = builderData as Record<string, unknown>
+            const includedSkillNames = new Set<string>()
+            const excludedSkillNames = new Set<string>()
             if (Array.isArray(bdAny.skills)) {
               for (const s of bdAny.skills as Array<{ name?: string; excluded?: boolean }>) {
-                if (s.name && !s.excluded) {
-                  existingSkillNames.add(s.name.toLowerCase())
+                if (s.name) {
+                  if (s.excluded) {
+                    excludedSkillNames.add(s.name.toLowerCase())
+                  } else {
+                    includedSkillNames.add(s.name.toLowerCase())
+                  }
                 }
               }
             }
-            const filtered = gapSkills.filter(
-              (g) => !existingSkillNames.has(g.skill.toLowerCase())
-            )
-            setStagedSkills(
-              filtered.map((g) => ({
-                name: g.skill,
-                reason: g.reason ?? 'Required by posting. Not currently in variant.',
-                severity: g.severity,
-                state: 'pending',
-              }))
-            )
+            const suggestions: StagedSkill[] = []
+            for (const g of gapSkills) {
+              const lower = g.skill.toLowerCase()
+              if (includedSkillNames.has(lower)) continue // already included
+              if (excludedSkillNames.has(lower)) {
+                // Skill exists but is excluded from this variant — suggest re-including
+                suggestions.push({
+                  name: g.skill,
+                  reason: 'Already in your skills but excluded from this variant. Re-include it.',
+                  severity: g.severity,
+                  state: 'pending',
+                })
+              } else {
+                // Skill doesn't exist at all — suggest adding
+                suggestions.push({
+                  name: g.skill,
+                  reason: g.reason ?? 'Required by posting. Not currently in variant.',
+                  severity: g.severity,
+                  state: 'pending',
+                })
+              }
+            }
+            setStagedSkills(suggestions)
           }
         }
       } catch (e) {
@@ -338,6 +355,11 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
         const dup = duplicated as { id?: number }
         if (dup?.id) {
           targetVariantId = dup.id
+          // Rename the copy if user provided a name
+          const trimmed = newVariantName.trim()
+          if (trimmed) {
+            await window.api.templates.rename(dup.id, trimmed)
+          }
         }
       }
 
@@ -1422,7 +1444,7 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
               Save optimized variant
             </button>
             <button
-              onClick={() => { setSaveAsNew(true); setShowConfirm(true) }}
+              onClick={() => { setSaveAsNew(true); setNewVariantName(`${analysis?.variantName ?? 'Variant'} (optimized)`); setShowConfirm(true) }}
               disabled={!canSave || saving}
               style={{
                 padding: '7px 16px',
@@ -1538,6 +1560,42 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
                 </>
               )}
             </p>
+            {saveAsNew && (
+              <div style={{ marginBottom: 'var(--space-4)' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--font-size-xs)',
+                    fontWeight: 500,
+                    textTransform: 'uppercase' as const,
+                    letterSpacing: '0.05em',
+                    color: 'var(--color-text-tertiary)',
+                    marginBottom: 'var(--space-2)',
+                  }}
+                >
+                  New variant name
+                </label>
+                <input
+                  type="text"
+                  value={newVariantName}
+                  onChange={(e) => setNewVariantName(e.target.value)}
+                  placeholder={`${analysis.variantName ?? 'Variant'} (optimized)`}
+                  style={{
+                    width: '100%',
+                    height: 36,
+                    backgroundColor: 'var(--color-bg-input)',
+                    border: '1px solid var(--color-border-default)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '8px 12px',
+                    fontSize: 'var(--font-size-base)',
+                    color: 'var(--color-text-primary)',
+                    outline: 'none',
+                    fontFamily: 'var(--font-sans)',
+                  }}
+                  autoFocus
+                />
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setShowConfirm(false)}
