@@ -861,19 +861,19 @@ function AnalysisTableRow({ row, onViewResult, onReanalyze, onOptimize, onContex
             onClick={() => onViewResult(row.analysisId)}
           />
           <ActionBtn
+            label="Optimize"
+            variant="primary"
+            onClick={() => onOptimize(row.analysisId)}
+          />
+          <ActionBtn
             label="Re-analyze"
-            variant="default"
+            variant="primary"
             onClick={() => {
               if (row.variantId != null) {
                 onReanalyze(row.id, row.variantId)
               }
             }}
             disabled={row.variantId == null}
-          />
-          <ActionBtn
-            label="Optimize"
-            variant="primary"
-            onClick={() => onOptimize(row.analysisId)}
           />
           <ActionBtn
             label="Submit"

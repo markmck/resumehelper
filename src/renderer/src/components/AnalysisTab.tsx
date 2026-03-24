@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import AnalysisList from './AnalysisList'
 import NewAnalysisForm from './NewAnalysisForm'
 import AnalyzingProgress from './AnalyzingProgress'
@@ -14,16 +14,36 @@ type AnalysisScreen =
 
 function AnalysisTab(): React.JSX.Element {
   const [screen, setScreen] = useState<AnalysisScreen>({ name: 'list' })
+  const screenHistory = useRef<AnalysisScreen[]>([{ name: 'list' }])
+
+  const navigateScreen = useCallback((s: AnalysisScreen) => {
+    screenHistory.current.push(s)
+    setScreen(s)
+  }, [])
+
+  // Listen for mouse back button / Alt+Left from App
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      if (screenHistory.current.length > 1) {
+        e.preventDefault() // Tell App we handled it
+        screenHistory.current.pop()
+        const prev = screenHistory.current[screenHistory.current.length - 1]
+        setScreen(prev)
+      }
+    }
+    window.addEventListener('app:navigate-back', handler)
+    return () => window.removeEventListener('app:navigate-back', handler)
+  }, [])
 
   if (screen.name === 'list') {
     return (
       <AnalysisList
-        onNewAnalysis={() => setScreen({ name: 'new' })}
-        onViewResult={(analysisId) => setScreen({ name: 'results', analysisId })}
+        onNewAnalysis={() => navigateScreen({ name: 'new' })}
+        onViewResult={(analysisId) => navigateScreen({ name: 'results', analysisId })}
         onReanalyze={(jobPostingId, variantId) =>
-          setScreen({ name: 'analyzing', jobPostingId, variantId })
+          navigateScreen({ name: 'analyzing', jobPostingId, variantId })
         }
-        onOptimize={(analysisId) => setScreen({ name: 'optimize', analysisId })}
+        onOptimize={(analysisId) => navigateScreen({ name: 'optimize', analysisId })}
       />
     )
   }
@@ -31,9 +51,9 @@ function AnalysisTab(): React.JSX.Element {
   if (screen.name === 'new') {
     return (
       <NewAnalysisForm
-        onBack={() => setScreen({ name: 'list' })}
+        onBack={() => navigateScreen({ name: 'list' })}
         onStartAnalysis={(jobPostingId, variantId) =>
-          setScreen({ name: 'analyzing', jobPostingId, variantId })
+          navigateScreen({ name: 'analyzing', jobPostingId, variantId })
         }
       />
     )
@@ -44,8 +64,8 @@ function AnalysisTab(): React.JSX.Element {
       <AnalyzingProgress
         jobPostingId={screen.jobPostingId}
         variantId={screen.variantId}
-        onComplete={(analysisId) => setScreen({ name: 'results', analysisId })}
-        onError={() => setScreen({ name: 'list' })}
+        onComplete={(analysisId) => navigateScreen({ name: 'results', analysisId })}
+        onError={() => navigateScreen({ name: 'list' })}
       />
     )
   }
@@ -54,7 +74,7 @@ function AnalysisTab(): React.JSX.Element {
     return (
       <OptimizeVariant
         analysisId={screen.analysisId}
-        onBack={() => setScreen({ name: 'results', analysisId: screen.analysisId })}
+        onBack={() => navigateScreen({ name: 'results', analysisId: screen.analysisId })}
       />
     )
   }
@@ -63,9 +83,9 @@ function AnalysisTab(): React.JSX.Element {
   return (
     <AnalysisResults
       analysisId={screen.analysisId}
-      onBack={() => setScreen({ name: 'list' })}
-      onReanalyze={(jobPostingId, variantId) => setScreen({ name: 'analyzing', jobPostingId, variantId })}
-      onOptimize={() => setScreen({ name: 'optimize', analysisId: screen.analysisId })}
+      onBack={() => navigateScreen({ name: 'list' })}
+      onReanalyze={(jobPostingId, variantId) => navigateScreen({ name: 'analyzing', jobPostingId, variantId })}
+      onOptimize={() => navigateScreen({ name: 'optimize', analysisId: screen.analysisId })}
     />
   )
 }
