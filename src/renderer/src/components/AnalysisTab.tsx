@@ -3,12 +3,14 @@ import AnalysisList from './AnalysisList'
 import NewAnalysisForm from './NewAnalysisForm'
 import AnalyzingProgress from './AnalyzingProgress'
 import AnalysisResults from './AnalysisResults'
+import OptimizeVariant from './OptimizeVariant'
 
 type AnalysisScreen =
   | { name: 'list' }
   | { name: 'new' }
   | { name: 'analyzing'; jobPostingId: number; variantId: number }
   | { name: 'results'; analysisId: number }
+  | { name: 'optimize'; analysisId: number }
 
 function AnalysisTab(): React.JSX.Element {
   const [screen, setScreen] = useState<AnalysisScreen>({ name: 'list' })
@@ -47,12 +49,22 @@ function AnalysisTab(): React.JSX.Element {
     )
   }
 
+  if (screen.name === 'optimize') {
+    return (
+      <OptimizeVariant
+        analysisId={screen.analysisId}
+        onBack={() => setScreen({ name: 'results', analysisId: screen.analysisId })}
+      />
+    )
+  }
+
   // screen.name === 'results'
   return (
     <AnalysisResults
       analysisId={screen.analysisId}
       onBack={() => setScreen({ name: 'list' })}
       onReanalyze={(jobPostingId, variantId) => setScreen({ name: 'analyzing', jobPostingId, variantId })}
+      onOptimize={() => setScreen({ name: 'optimize', analysisId: screen.analysisId })}
     />
   )
 }

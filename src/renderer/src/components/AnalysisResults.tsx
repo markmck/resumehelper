@@ -52,6 +52,7 @@ interface Props {
   analysisId: number
   onBack: () => void
   onReanalyze: (jobPostingId: number, variantId: number) => void
+  onOptimize: () => void
 }
 
 function getScoreColor(score: number): string {
@@ -80,7 +81,7 @@ function formatDate(d: Date | string): string {
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-function AnalysisResults({ analysisId, onBack, onReanalyze }: Props): React.JSX.Element {
+function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize }: Props): React.JSX.Element {
   const [analysis, setAnalysis] = useState<ParsedAnalysis | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -757,8 +758,7 @@ function AnalysisResults({ analysisId, onBack, onReanalyze }: Props): React.JSX.
         }}
       >
         <button
-          disabled
-          title="Coming in Phase 10"
+          onClick={onOptimize}
           style={{
             padding: '8px 16px',
             backgroundColor: 'var(--color-accent)',
@@ -768,8 +768,7 @@ function AnalysisResults({ analysisId, onBack, onReanalyze }: Props): React.JSX.
             fontSize: 'var(--font-size-sm)',
             fontWeight: 500,
             fontFamily: 'var(--font-sans)',
-            cursor: 'not-allowed',
-            opacity: 0.5,
+            cursor: 'pointer',
           }}
         >
           Optimize Variant
