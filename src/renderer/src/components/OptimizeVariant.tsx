@@ -132,7 +132,7 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
           return
         }
 
-        const data = raw as AnalysisData
+        const data = raw as unknown as AnalysisData
         setAnalysis(data)
 
         // Initialize suggestion states
@@ -160,7 +160,7 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
 
             // Derive skill suggestions: gap skills not included in variant
             const gapSkills = data.gapSkills ?? []
-            const bdAny = builderData as Record<string, unknown>
+            const bdAny = builderData as unknown as Record<string, unknown>
             const includedSkillNames = new Set<string>()
             const excludedSkillNames = new Set<string>()
             if (Array.isArray(bdAny.skills)) {

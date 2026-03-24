@@ -178,6 +178,7 @@ export interface Profile {
   phone: string
   location: string
   linkedin: string
+  summary: string
 }
 
 export interface Education {
@@ -246,6 +247,27 @@ export interface Submission {
   url: string | null
   notes: string | null
   variantName: string | null   // from LEFT JOIN, null if variant deleted
+  status: string               // 'applied' | 'screening' | 'interview' | 'offer' | 'result' | 'withdrawn'
+  scoreAtSubmit: number | null
+  analysisId: number | null
+}
+
+export interface SubmissionEvent {
+  id: number
+  submissionId: number
+  status: string
+  note: string | null
+  createdAt: Date
+}
+
+export interface SubmissionMetrics {
+  total: number
+  thisMonth: number
+  active: number
+  responseRate: number
+  respondedCount: number
+  avgScore: number | null
+  respondedAvgScore: number | null
 }
 
 export interface Api {
@@ -299,6 +321,9 @@ export interface Api {
       variantId: number | null
       url?: string
       notes?: string
+      status?: string
+      scoreAtSubmit?: number | null
+      analysisId?: number | null
     }) => Promise<Submission>
     update: (
       id: number,
@@ -311,6 +336,10 @@ export interface Api {
       },
     ) => Promise<Submission>
     delete: (id: number) => Promise<void>
+    updateStatus: (id: number, status: string, note?: string) => Promise<void>
+    getEvents: (submissionId: number) => Promise<SubmissionEvent[]>
+    addEvent: (data: { submissionId: number; status: string; note?: string }) => Promise<SubmissionEvent>
+    metrics: () => Promise<SubmissionMetrics>
   }
   profile: {
     get: () => Promise<Profile>
@@ -325,6 +354,7 @@ export interface Api {
   exportFile: {
     pdf: (variantId: number, defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string }>
     docx: (variantId: number, defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string }>
+    snapshotPdf: (snapshotData: SubmissionSnapshot, defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string }>
   }
   projects: {
     list: () => Promise<ProjectWithBullets[]>
@@ -457,6 +487,26 @@ export interface Api {
     renderHtml: (variantId: number, themeKey: string) => Promise<string | { error: string }>
     renderSnapshotHtml: (themeKey: string, snapshotData: SubmissionSnapshot) => Promise<string | { error: string }>
     list: () => Promise<Array<{ key: string; displayName: string }>>
+  }
+  settings: {
+    getAi: () => Promise<{ provider: string; model: string; hasKey: boolean }>
+    setAi: (data: { provider: string; model: string; apiKey: string }) => Promise<{ success: boolean } | { error: string }>
+    testAi: () => Promise<{ success: boolean; error?: string }>
+    listModels: () => Promise<{ models: string[] }>
+  }
+  ai: {
+    analyze: (jobPostingId: number, variantId: number) => Promise<{ analysisId: number; parsedJob: unknown } | { error: string; code: string }>
+    onProgress: (cb: (phase: string, pct: number, data?: unknown) => void) => void
+    offProgress: () => void
+    acceptSuggestion: (analysisId: number, bulletId: number, text: string) => Promise<void>
+    dismissSuggestion: (analysisId: number, bulletId: number) => Promise<void>
+  }
+  jobPostings: {
+    list: () => Promise<unknown[]>
+    create: (data: { company: string; role: string; rawText: string }) => Promise<unknown>
+    delete: (id: number) => Promise<void>
+    getAnalysis: (id: number) => Promise<Record<string, unknown> | null>
+    updateAnalysisStatus: (analysisId: number, status: string) => Promise<void>
   }
 }
 

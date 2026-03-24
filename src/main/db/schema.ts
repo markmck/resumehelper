@@ -138,6 +138,20 @@ export const submissions = sqliteTable('submissions', {
   notes: text('notes'),
   status: text('status').default('applied'),
   jobPostingId: integer('job_posting_id'),
+  scoreAtSubmit: integer('score_at_submit'),
+  analysisId: integer('analysis_id'),
+})
+
+export const submissionEvents = sqliteTable('submission_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  submissionId: integer('submission_id')
+    .notNull()
+    .references(() => submissions.id, { onDelete: 'cascade' }),
+  status: text('status').notNull(),
+  note: text('note'),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
 })
 
 export const profile = sqliteTable('profile', {

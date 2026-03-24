@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   BuilderData,
-  BuilderJob,
-  BuilderProject,
   BuilderSkill,
   BuilderEducation,
   BuilderVolunteer,
@@ -71,15 +69,6 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
     window.api.profile.get().then((p) => setProfileSummary(p.summary ?? ''))
   }, [variantId])
 
-  const handleJobToggle = async (job: BuilderJob): Promise<void> => {
-    const newExcluded = !job.excluded
-    setBuilderData((prev) => {
-      if (!prev) return prev
-      return { ...prev, jobs: prev.jobs.map((j) => j.id === job.id ? { ...j, excluded: newExcluded } : j) }
-    })
-    await window.api.templates.setItemExcluded(variantId, 'job', job.id, newExcluded)
-  }
-
   const handleBulletToggle = async (jobId: number, bulletId: number, currentExcluded: boolean): Promise<void> => {
     const newExcluded = !currentExcluded
     setBuilderData((prev) => {
@@ -96,15 +85,6 @@ function VariantBuilder({ variantId }: VariantBuilderProps): React.JSX.Element {
       return { ...prev, skills: prev.skills.map((s) => s.id === skill.id ? { ...s, excluded: newExcluded } : s) }
     })
     await window.api.templates.setItemExcluded(variantId, 'skill', skill.id, newExcluded)
-  }
-
-  const handleProjectToggle = async (project: BuilderProject): Promise<void> => {
-    const newExcluded = !project.excluded
-    setBuilderData((prev) => {
-      if (!prev) return prev
-      return { ...prev, projects: prev.projects.map((p) => p.id === project.id ? { ...p, excluded: newExcluded } : p) }
-    })
-    await window.api.templates.setItemExcluded(variantId, 'project', project.id, newExcluded)
   }
 
   const handleProjectBulletToggle = async (projectId: number, bulletId: number, currentExcluded: boolean): Promise<void> => {

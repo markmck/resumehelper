@@ -6,6 +6,7 @@ interface InlineEditProps {
   onEnter?: () => void
   placeholder?: string
   style?: React.CSSProperties
+  className?: string
   multiline?: boolean
   autoFocus?: boolean
   onFocused?: () => void

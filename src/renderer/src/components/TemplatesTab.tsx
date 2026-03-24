@@ -43,16 +43,6 @@ function TemplatesTab({ selectedVariantId, onVariantsLoaded, onSelectedChange }:
     })
   }
 
-  const handleDuplicate = async (id: number): Promise<void> => {
-    const copy = await window.api.templates.duplicate(id)
-    setVariants((prev) => {
-      const updated = [...prev, copy]
-      onVariantsLoaded(updated.map((v) => ({ id: v.id, name: v.name })))
-      return updated
-    })
-    onSelectedChange(copy.id)
-  }
-
   const handleRename = async (id: number, newName: string): Promise<void> => {
     const updated = await window.api.templates.rename(id, newName)
     setVariants((prev) => {

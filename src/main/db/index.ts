@@ -190,6 +190,15 @@ function ensureSchema(): void {
       FOREIGN KEY (\`job_posting_id\`) REFERENCES \`job_postings\`(\`id\`) ON DELETE cascade,
       FOREIGN KEY (\`variant_id\`) REFERENCES \`template_variants\`(\`id\`) ON DELETE set null
     );
+
+    CREATE TABLE IF NOT EXISTS \`submission_events\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`submission_id\` integer NOT NULL,
+      \`status\` text NOT NULL,
+      \`note\` text,
+      \`created_at\` integer NOT NULL DEFAULT (unixepoch()),
+      FOREIGN KEY (\`submission_id\`) REFERENCES \`submissions\`(\`id\`) ON DELETE cascade
+    );
   `)
 
   // Add columns that may be missing on existing databases
@@ -210,6 +219,8 @@ function ensureSchema(): void {
     'ALTER TABLE `analysis_results` ADD COLUMN `status` text NOT NULL DEFAULT \'unreviewed\'',
     'ALTER TABLE `analysis_results` ADD COLUMN `score_breakdown` text NOT NULL DEFAULT \'{}\'',
     'ALTER TABLE `job_postings` ADD COLUMN `parsed_preferred` text NOT NULL DEFAULT \'[]\'',
+    'ALTER TABLE `submissions` ADD COLUMN `score_at_submit` integer',
+    'ALTER TABLE `submissions` ADD COLUMN `analysis_id` integer REFERENCES `analysis_results`(`id`)',
   ]
   for (const sql of alterStatements) {
     try { sqlite.exec(sql) } catch { /* column already exists */ }

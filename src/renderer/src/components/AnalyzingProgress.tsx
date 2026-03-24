@@ -300,8 +300,6 @@ function AnalyzingProgress({ jobPostingId, variantId, onComplete, onError }: Pro
         {STEPS.map((step, idx) => {
           const isDone = completedSteps.has(idx)
           const isActive = activeStep === idx && !isDone
-          const isPending = !isDone && !isActive
-
           return (
             <div key={step.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
               {/* Icon column */}

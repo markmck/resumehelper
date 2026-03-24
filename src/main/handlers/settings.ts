@@ -135,7 +135,7 @@ export function registerSettingsHandlers(): void {
       await generateText({
         model: modelInstance,
         prompt: 'Say hello',
-        maxTokens: 5,
+        maxOutputTokens: 5,
       })
 
       return { success: true }

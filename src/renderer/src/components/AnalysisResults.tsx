@@ -67,13 +67,6 @@ function getScoreBg(score: number): string {
   return 'var(--color-danger-bg)'
 }
 
-function safeJsonParse<T>(str: string, fallback: T): T {
-  try {
-    return JSON.parse(str) as T
-  } catch {
-    return fallback
-  }
-}
 
 function formatDate(d: Date | string): string {
   const date = d instanceof Date ? d : new Date(d)
@@ -96,7 +89,7 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize }: Props)
           return
         }
 
-        const data = raw as AnalysisData
+        const data = raw as unknown as AnalysisData
         setAnalysis({
           raw: data,
           exactMatches: data.keywordHits ?? [],
