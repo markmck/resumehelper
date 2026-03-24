@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import SubmissionListView from './SubmissionListView'
 import SubmissionLogForm from './SubmissionLogForm'
+import SubmissionDetailView from './SubmissionDetailView'
 
 type SubmissionScreen =
   | { name: 'list' }
@@ -54,9 +55,11 @@ function SubmissionsTab({ initialLogAnalysisId, onLogAnalysisConsumed }: Props):
 
   if (screen.name === 'detail') {
     return (
-      <div style={{ padding: 'var(--space-10)', fontFamily: 'var(--font-sans)', color: 'var(--color-text-secondary)' }}>
-        Detail view for submission {screen.submissionId} (Plan 03)
-      </div>
+      <SubmissionDetailView
+        submissionId={screen.submissionId}
+        onBack={() => navigateScreen({ name: 'list' })}
+        onDelete={() => navigateScreen({ name: 'list' })}
+      />
     )
   }
 
