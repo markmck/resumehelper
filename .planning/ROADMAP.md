@@ -63,7 +63,7 @@ Plans:
   3. User can accept or dismiss each suggestion independently — no bulk accept button exists
   4. Accepting a suggestion permanently updates the bullet text in the database
   5. Suggestions never add technologies, metrics, or scope claims not present in the original bullet text
-**Plans:** 1/2 plans executed
+**Plans:** 1/2 plans complete
 Plans:
 - [ ] 10-01-PLAN.md — Backend IPC handler + OptimizeVariant component (suggestion cards, skill suggestions, score ring, save flow)
 - [ ] 10-02-PLAN.md — Wire OptimizeVariant into AnalysisTab router, enable Optimize button, human verification
@@ -78,7 +78,11 @@ Plans:
   3. User can add and edit notes on a submission (recruiter name, dates, follow-up reminders)
   4. Submissions list columns include status badge, variant tag, and match score (if analysis was run at submission)
   5. User can filter submissions by status and search by company name
-**Plans**: TBD
+**Plans:** 1/3 plans executed
+Plans:
+- [ ] 11-01-PLAN.md — Backend: DB schema migrations (submission_events, score_at_submit, analysis_id), new IPC handlers (events, metrics, updateStatus, snapshotPdf)
+- [ ] 11-02-PLAN.md — UI: SubmissionsTab router, SubmissionListView (metrics, filters, mini-dots table), SubmissionLogForm (both paths), cross-tab navigation from AnalysisResults
+- [ ] 11-03-PLAN.md — UI: SubmissionDetailView (pipeline bar, timeline, notes, status updates, snapshot viewer/export), human verification
 
 ### Phase 12: UI Redesign
 **Goal**: All pages reflect the v2.0 dark-theme design system with the redesigned layouts — Experience uses collapsible cards with drag reorder, Variant Builder uses a split pane, and the Analysis and Submissions views match their HTML mockup layouts — without breaking any existing export or snapshot functionality
@@ -102,6 +106,6 @@ Note: Phase 11 depends only on Phase 8 (no AI dependency) — can begin after Ph
 |-------|-----------|----------------|--------|-----------|
 | 8. Foundation | 2/3 | In Progress|  | - |
 | 9. Analysis Core | 3/3 | Complete   | 2026-03-23 | - |
-| 10. Bullet Suggestions | 1/2 | In Progress|  | - |
-| 11. Submission Pipeline | v2.0 | 0/TBD | Not started | - |
+| 10. Bullet Suggestions | 1/2 | Complete    | 2026-03-24 | - |
+| 11. Submission Pipeline | 1/3 | In Progress|  | - |
 | 12. UI Redesign | v2.0 | 0/TBD | Not started | - |

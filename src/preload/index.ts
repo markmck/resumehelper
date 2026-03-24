@@ -76,6 +76,8 @@ const api = {
     addEvent: (data: { submissionId: number; status: string; note?: string }) =>
       ipcRenderer.invoke('submissions:addEvent', data),
     metrics: () => ipcRenderer.invoke('submissions:metrics'),
+    getAnalysisById: (analysisId: number) =>
+      ipcRenderer.invoke('submissions:getAnalysisById', analysisId),
   },
   profile: {
     get: () => ipcRenderer.invoke('profile:get'),

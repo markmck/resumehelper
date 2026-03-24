@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { db } from '../db'
-import { submissions, submissionEvents, templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
+import { submissions, submissionEvents, templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisResults, jobPostings } from '../db/schema'
 import { eq, desc, asc } from 'drizzle-orm'
 import type { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
 
@@ -446,6 +446,36 @@ export function registerSubmissionHandlers(): void {
       respondedCount,
       avgScore,
       respondedAvgScore,
+    }
+  })
+
+  ipcMain.handle('submissions:getAnalysisById', async (_, analysisId: number) => {
+    const rows = await db
+      .select({
+        id: analysisResults.id,
+        company: jobPostings.company,
+        role: jobPostings.role,
+        score: analysisResults.matchScore,
+        variantId: analysisResults.variantId,
+        variantName: templateVariants.name,
+        createdAt: analysisResults.createdAt,
+      })
+      .from(analysisResults)
+      .innerJoin(jobPostings, eq(analysisResults.jobPostingId, jobPostings.id))
+      .leftJoin(templateVariants, eq(analysisResults.variantId, templateVariants.id))
+      .where(eq(analysisResults.id, analysisId))
+
+    if (rows.length === 0) return null
+
+    const row = rows[0]
+    return {
+      id: row.id,
+      company: row.company,
+      role: row.role,
+      score: row.score,
+      variantId: row.variantId ?? 0,
+      variantName: row.variantName ?? '',
+      createdAt: row.createdAt ? row.createdAt.toISOString() : new Date().toISOString(),
     }
   })
 }

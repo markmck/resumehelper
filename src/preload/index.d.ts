@@ -340,6 +340,15 @@ export interface Api {
     getEvents: (submissionId: number) => Promise<SubmissionEvent[]>
     addEvent: (data: { submissionId: number; status: string; note?: string }) => Promise<SubmissionEvent>
     metrics: () => Promise<SubmissionMetrics>
+    getAnalysisById: (analysisId: number) => Promise<{
+      id: number
+      company: string
+      role: string
+      score: number
+      variantId: number
+      variantName: string
+      createdAt: string
+    } | null>
   }
   profile: {
     get: () => Promise<Profile>

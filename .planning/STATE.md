@@ -3,11 +3,27 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Analysis Integration
 status: planning
-stopped_at: Completed 10-bullet-suggestions 10-01-PLAN.md
-last_updated: "2026-03-24T01:43:54.442Z"
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-03-24T15:00:43.538Z"
 last_activity: 2026-03-23 — Roadmap created, 31 requirements mapped across 5 phases
 progress:
   total_phases: 5
+  completed_phases: 1
+  total_plans: 11
+  completed_plans: 7
+  percent: 80
+---
+
+---
+gsd_state_version: 1.0
+milestone: v2.0
+milestone_name: AI Analysis Integration
+status: planning
+stopped_at: Phase 11 context gathered
+last_updated: "2026-03-24T14:26:06.518Z"
+last_activity: 2026-03-23 — Roadmap created, 31 requirements mapped across 5 phases
+progress:
+  [████████░░] 80%
   completed_phases: 1
   total_plans: 8
   completed_plans: 6
@@ -52,6 +68,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 09-analysis-core P02 | 15 | 1 tasks | 3 files |
 | Phase 09-analysis-core P03 | 15min | 2 tasks | 3 files |
 | Phase 10-bullet-suggestions P01 | 4min | 2 tasks | 3 files |
+| Phase 11-submission-pipeline P01 | 20min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -83,10 +100,14 @@ Recent decisions affecting current work:
 - [Phase 10-bullet-suggestions]: No DB writes on accept/dismiss - all writes batched through existing IPC handlers on Save
 - [Phase 10-bullet-suggestions]: SVG score ring uses inline transition style on stroke-dashoffset, no className needed
 - [Phase 10-bullet-suggestions]: Bullet ID resolved via bulletIdMap (original_text->id) built from getBuilderData at mount
+- [Phase 11-submission-pipeline]: submission_events created alongside every status change including initial create — full history from day one
+- [Phase 11-submission-pipeline]: metrics computed in Node handler using in-memory filtering — simpler for personal app scale
+- [Phase 11-submission-pipeline]: snapshotPdf uses themeRegistry renderThemeHtml directly — single code path for traditional and theme layouts
 
 ### Pending Todos
 
-None yet.
+- **Configurable DB location** — Allow user to set the SQLite database path (e.g., NAS/network drive) via Settings. Requires moving the db init to use a configurable path instead of hardcoded `app.getPath('userData')`. Future milestone.
+- **Template/theme quality overhaul** — The bundled resume.json themes (Even, Class, Elegant) don't produce paper-quality documents. The built-in Professional layout is the only one that looks right. Needs serious design work on the theme rendering to produce proper paper-sized, print-ready output. Future milestone.
 
 ### Blockers/Concerns
 
@@ -95,6 +116,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T01:43:54.440Z
-Stopped at: Completed 10-bullet-suggestions 10-01-PLAN.md
+Last session: 2026-03-24T15:00:43.536Z
+Stopped at: Completed 11-01-PLAN.md
 Resume file: None
