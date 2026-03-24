@@ -142,7 +142,7 @@ function JobList(): React.JSX.Element {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={jobs.map((j) => j.id)} strategy={verticalListSortingStrategy}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {jobs.map((job) => (
                 <JobItem
                   key={job.id}

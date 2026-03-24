@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React from 'react'
 
 export type Tab = 'experience' | 'variants' | 'analysis' | 'submissions' | 'settings'
 
@@ -57,21 +57,7 @@ function GearIcon(): React.JSX.Element {
   )
 }
 
-function ChevronLeftIcon(): React.JSX.Element {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="15 18 9 12 15 6" />
-    </svg>
-  )
-}
 
-function ChevronRightIcon(): React.JSX.Element {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  )
-}
 
 const mainNavItems: NavItem[] = [
   { id: 'experience', label: 'Experience', icon: <BriefcaseIcon /> },
@@ -99,16 +85,14 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, onTabChange, variants, selectedVariantId, onVariantSelect, onVariantCreate }: SidebarProps): React.JSX.Element {
-  const [collapsed, setCollapsed] = useState(false)
-
-  const sidebarWidth = collapsed ? 48 : 240
+  const sidebarWidth = 240
 
   const renderNavButton = (item: NavItem): React.JSX.Element => {
     const isActive = activeTab === item.id
     return (
       <button
         key={item.id}
-        title={collapsed ? item.label : undefined}
+        title={undefined}
         onClick={() => onTabChange(item.id)}
         style={{
           display: 'flex',
@@ -143,11 +127,9 @@ export function Sidebar({ activeTab, onTabChange, variants, selectedVariantId, o
         <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
           {item.icon}
         </span>
-        {!collapsed && (
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {item.label}
-          </span>
-        )}
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {item.label}
+        </span>
       </button>
     )
   }
@@ -162,16 +144,13 @@ export function Sidebar({ activeTab, onTabChange, variants, selectedVariantId, o
         borderRight: '1px solid var(--color-border-subtle)',
         display: 'flex',
         flexDirection: 'column',
-        transition: 'width 0.2s ease, min-width 0.2s ease',
         overflow: 'hidden',
       }}
     >
       {/* Brand */}
-      {!collapsed && (
-        <div style={{ padding: '12px 16px 4px', fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-sans)' }}>
-          ResumeHelper
-        </div>
-      )}
+      <div style={{ padding: '12px 16px 4px', fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-sans)' }}>
+        ResumeHelper
+      </div>
 
       {/* Main Nav Items */}
       <nav
@@ -186,7 +165,7 @@ export function Sidebar({ activeTab, onTabChange, variants, selectedVariantId, o
       </nav>
 
       {/* Variant sub-list when on Variants tab */}
-      {activeTab === 'variants' && !collapsed && variants && (
+      {activeTab === 'variants' && variants && (
         <div style={{ padding: '0 var(--space-2)', flex: 1, overflow: 'auto' }}>
           <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', margin: '4px 0 8px' }} />
           <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: 'var(--color-text-muted)', padding: '4px 12px 4px' }}>
@@ -259,43 +238,12 @@ export function Sidebar({ activeTab, onTabChange, variants, selectedVariantId, o
       )}
 
       {/* Spacer */}
-      <div style={{ flex: activeTab === 'variants' && !collapsed ? 0 : 1 }} />
+      <div style={{ flex: activeTab === 'variants' ? 0 : 1 }} />
 
-      {/* Divider + Settings + Collapse Toggle on same row */}
+      {/* Divider + Settings */}
       <div style={{ padding: '0 var(--space-2)' }}>
         <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', margin: '4px 0' }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <div style={{ flex: 1 }}>
-            {bottomNavItems.map(renderNavButton)}
-          </div>
-          <button
-            onClick={() => setCollapsed((prev) => !prev)}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '8px',
-              borderRadius: 'var(--radius-md)',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: 'transparent',
-              color: 'var(--color-text-tertiary)',
-              flexShrink: 0,
-              transition: 'background-color 0.15s ease, color 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--color-bg-raised)'
-              ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)'
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
-              ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-tertiary)'
-            }}
-          >
-            {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
-          </button>
-        </div>
+        {bottomNavItems.map(renderNavButton)}
       </div>
     </aside>
   )

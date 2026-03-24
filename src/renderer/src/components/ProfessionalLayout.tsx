@@ -102,12 +102,6 @@ function ProfessionalLayout({
         padding: '0.5in',
       }}
     >
-      {/* Page break CSS */}
-      <style>{`
-        @page { margin: 0.4in 0; }
-        section { break-inside: avoid; }
-      `}</style>
-
       {/* Header */}
       <div
         style={{
