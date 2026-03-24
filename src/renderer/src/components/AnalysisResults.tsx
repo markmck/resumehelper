@@ -53,6 +53,7 @@ interface Props {
   onBack: () => void
   onReanalyze: (jobPostingId: number, variantId: number) => void
   onOptimize: () => void
+  onLogSubmission?: (analysisId: number) => void
 }
 
 function getScoreColor(score: number): string {
@@ -74,7 +75,7 @@ function formatDate(d: Date | string): string {
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize }: Props): React.JSX.Element {
+function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSubmission }: Props): React.JSX.Element {
   const [analysis, setAnalysis] = useState<ParsedAnalysis | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -768,18 +769,16 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize }: Props)
         </button>
 
         <button
-          disabled
-          title="Coming in Phase 11"
+          onClick={() => onLogSubmission?.(raw.id)}
           style={{
             padding: '8px 16px',
             backgroundColor: 'var(--color-bg-surface)',
-            color: 'var(--color-text-secondary)',
-            border: '1px solid var(--color-border-default)',
+            color: 'var(--color-accent)',
+            border: '1px solid var(--color-accent)',
             borderRadius: 'var(--radius-md)',
             fontSize: 'var(--font-size-sm)',
             fontFamily: 'var(--font-sans)',
-            cursor: 'not-allowed',
-            opacity: 0.5,
+            cursor: 'pointer',
           }}
         >
           Log Submission

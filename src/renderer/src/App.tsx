@@ -12,6 +12,7 @@ function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('experience')
   const [variants, setVariants] = useState<Array<{ id: number; name: string }>>([])
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null)
+  const [pendingLogAnalysis, setPendingLogAnalysis] = useState<number | null>(null)
 
   const handleVariantsLoaded = useCallback((list: Array<{ id: number; name: string }>) => {
     setVariants(list)
@@ -95,8 +96,14 @@ function App(): React.JSX.Element {
               onSelectedChange={setSelectedVariantId}
             />
           )}
-          {activeTab === 'analysis' && <AnalysisTab />}
-          {activeTab === 'submissions' && <SubmissionsTab />}
+          {activeTab === 'analysis' && <AnalysisTab onLogSubmission={(analysisId: number) => {
+            setPendingLogAnalysis(analysisId)
+            navigateTab('submissions')
+          }} />}
+          {activeTab === 'submissions' && <SubmissionsTab
+            initialLogAnalysisId={pendingLogAnalysis}
+            onLogAnalysisConsumed={() => setPendingLogAnalysis(null)}
+          />}
           {activeTab === 'settings' && <SettingsTab />}
         </main>
       </div>
