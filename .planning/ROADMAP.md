@@ -94,7 +94,11 @@ Plans:
   3. Analysis dashboard shows 4 metric cards and a two-column layout (keyword analysis + gap details on left, suggested rewrites on right)
   4. Submissions tracker shows metric cards (total, in progress, interviews, response rate) above a filter-pill + searchable table layout
   5. PDF export, DOCX export, snapshot viewer, and variant builder preview all function correctly after the redesign
-**Plans**: TBD
+**Plans:** 2/3 plans executed
+Plans:
+- [ ] 12-01-PLAN.md — Experience page: collapsible job cards with drag reorder, jobs:reorder IPC, skills chip display
+- [ ] 12-02-PLAN.md — Variant Builder: 50/50 split-pane layout with live preview, export controls in header, analysis score badge
+- [ ] 12-03-PLAN.md — Analysis/Submissions token polish (RGBA fixes) and export regression smoke test
 
 ## Progress
 
@@ -107,5 +111,5 @@ Note: Phase 11 depends only on Phase 8 (no AI dependency) — can begin after Ph
 | 8. Foundation | 2/3 | In Progress|  | - |
 | 9. Analysis Core | 3/3 | Complete   | 2026-03-23 | - |
 | 10. Bullet Suggestions | 1/2 | Complete    | 2026-03-24 | - |
-| 11. Submission Pipeline | 3/3 | Complete   | 2026-03-24 | - |
-| 12. UI Redesign | v2.0 | 0/TBD | Not started | - |
+| 11. Submission Pipeline | 3/3 | Complete    | 2026-03-24 | - |
+| 12. UI Redesign | 2/3 | In Progress|  | - |

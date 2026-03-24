@@ -73,7 +73,7 @@ function SubmissionListView({ onViewDetail, onLogSubmission }: Props): React.JSX
 
   const buttonBase: React.CSSProperties = {
     backgroundColor: 'var(--color-accent)',
-    color: '#fff',
+    color: 'white', /* intentional contrast on accent button */
     border: 'none',
     padding: '8px 16px',
     borderRadius: 'var(--radius-md)',
@@ -209,7 +209,7 @@ function SubmissionListView({ onViewDetail, onLogSubmission }: Props): React.JSX
               cursor: 'pointer',
               fontFamily: 'var(--font-sans)',
               backgroundColor: activeFilter === pill.key ? 'var(--color-accent)' : 'var(--color-bg-surface)',
-              color: activeFilter === pill.key ? '#fff' : 'var(--color-text-secondary)',
+              color: activeFilter === pill.key ? 'white' /* intentional contrast on active pill */ : 'var(--color-text-secondary)',
               transition: 'background-color 0.1s ease',
             }}
           >
@@ -324,7 +324,7 @@ function SubmissionListView({ onViewDetail, onLogSubmission }: Props): React.JSX
                       <span style={{
                         display: 'inline-block',
                         padding: '2px 8px',
-                        backgroundColor: 'rgba(139, 92, 246, 0.12)',
+                        backgroundColor: 'var(--color-accent-bg)',
                         color: 'var(--color-accent)',
                         borderRadius: 'var(--radius-sm)',
                         fontSize: 'var(--font-size-xs)',

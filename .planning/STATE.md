@@ -3,11 +3,27 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Analysis Integration
 status: planning
-stopped_at: Completed 11-03-PLAN.md
-last_updated: "2026-03-24T19:41:39.046Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-03-24T21:01:15.448Z"
 last_activity: 2026-03-23 — Roadmap created, 31 requirements mapped across 5 phases
 progress:
   total_phases: 5
+  completed_phases: 2
+  total_plans: 14
+  completed_plans: 11
+  percent: 87
+---
+
+---
+gsd_state_version: 1.0
+milestone: v2.0
+milestone_name: AI Analysis Integration
+status: planning
+stopped_at: Phase 12 context gathered
+last_updated: "2026-03-24T20:27:23.594Z"
+last_activity: 2026-03-23 — Roadmap created, 31 requirements mapped across 5 phases
+progress:
+  [█████████░] 87%
   completed_phases: 2
   total_plans: 11
   completed_plans: 9
@@ -71,6 +87,8 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 11-submission-pipeline P01 | 20min | 2 tasks | 7 files |
 | Phase 11-submission-pipeline P02 | 4min | 2 tasks | 11 files |
 | Phase 11-submission-pipeline P03 | 45min | 2 tasks | 3 files |
+| Phase 12-ui-redesign P01 | 5min | 2 tasks | 9 files |
+| Phase 12-ui-redesign P02 | 4min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -109,6 +127,9 @@ Recent decisions affecting current work:
 - [Phase 11-submission-pipeline]: pendingLogAnalysis state in App.tsx bridges AnalysisTab to SubmissionsTab with analysisId, consumed once via onLogAnalysisConsumed callback
 - [Phase 11-submission-pipeline]: Timeline dot centering uses relative container with absolute connecting line — dots align precisely regardless of content height
 - [Phase 11-submission-pipeline]: Back link in detail view uses plain text with accent color — consistent with log form pattern, no button element
+- [Phase 12-ui-redesign]: jobs:reorder IPC with sort_order column added to jobs schema — missing from original schema despite plan claiming it was there
+- [Phase 12-ui-redesign]: previewVersion counter as refreshKey — supports rapid toggles without race conditions
+- [Phase 12-ui-redesign]: onOptimizeVariant callback chain + pendingOptimizeAnalysis mirrors pendingLogAnalysis pattern for cross-tab deep navigation
 
 ### Pending Todos
 
@@ -122,6 +143,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-24T19:41:39.044Z
-Stopped at: Completed 11-03-PLAN.md
+Last session: 2026-03-24T21:01:15.446Z
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None

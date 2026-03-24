@@ -149,8 +149,8 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
       <div style={{ padding: 'var(--space-8)', fontFamily: 'var(--font-sans)' }}>
         <div
           style={{
-            backgroundColor: 'rgba(239, 68, 68, 0.08)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
+            backgroundColor: 'var(--color-danger-bg)',
+            border: '1px solid rgba(239, 68, 68, 0.3)', /* no token equivalent -- danger border at 30% opacity */
             borderRadius: 'var(--radius-lg)',
             padding: 'var(--space-6)',
             maxWidth: 480,
@@ -249,7 +249,7 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
             <span
               style={{
                 padding: '2px 10px',
-                backgroundColor: 'rgba(139, 92, 246, 0.12)',
+                backgroundColor: 'var(--color-accent-bg)',
                 color: 'var(--color-accent)',
                 borderRadius: 'var(--radius-sm)',
                 fontSize: 'var(--font-size-xs)',
@@ -442,7 +442,7 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
                         display: 'inline-flex',
                         alignItems: 'center',
                         padding: '2px 8px',
-                        backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                        backgroundColor: 'var(--color-success-bg)',
                         color: 'var(--color-success)',
                         borderRadius: 'var(--radius-sm)',
                         fontSize: 'var(--font-size-xs)',
@@ -470,7 +470,7 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
                         display: 'inline-flex',
                         alignItems: 'center',
                         padding: '2px 8px',
-                        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                        backgroundColor: 'var(--color-warning-bg)',
                         color: 'var(--color-warning)',
                         borderRadius: 'var(--radius-sm)',
                         fontSize: 'var(--font-size-xs)',
@@ -498,7 +498,7 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
                         display: 'inline-flex',
                         alignItems: 'center',
                         padding: '2px 8px',
-                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                        backgroundColor: 'var(--color-danger-bg)',
                         color: 'var(--color-danger)',
                         borderRadius: 'var(--radius-sm)',
                         fontSize: 'var(--font-size-xs)',
@@ -573,7 +573,7 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
                         <span
                           style={{
                             padding: '1px 6px',
-                            backgroundColor: gap.severity === 'critical' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                            backgroundColor: gap.severity === 'critical' ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)',
                             color: gap.severity === 'critical' ? 'var(--color-danger)' : 'var(--color-warning)',
                             borderRadius: 'var(--radius-sm)',
                             fontSize: 'var(--font-size-xs)',
@@ -632,7 +632,7 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
                     justifyContent: 'center',
                     width: 20,
                     height: 20,
-                    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                    backgroundColor: 'var(--color-accent-bg)',
                     color: 'var(--color-accent)',
                     borderRadius: '50%',
                     fontSize: 'var(--font-size-xs)',
@@ -725,7 +725,7 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
                             key={kw}
                             style={{
                               padding: '1px 6px',
-                              backgroundColor: 'rgba(139, 92, 246, 0.12)',
+                              backgroundColor: 'var(--color-accent-bg)',
                               color: 'var(--color-accent-light)',
                               borderRadius: 'var(--radius-sm)',
                               fontSize: 'var(--font-size-xs)',
