@@ -9,8 +9,8 @@ interface AnalysisRow {
   variantName: string | null
   matchScore: number
   status: string
-  keywordHits: number
-  keywordMisses: number
+  keywordHitsCount: number | null
+  keywordMissesCount: number | null
   createdAt: Date | string | null
 }
 
@@ -20,6 +20,7 @@ interface Props {
   onNewAnalysis: () => void
   onViewResult: (analysisId: number) => void
   onReanalyze: (jobPostingId: number, variantId: number) => void
+  onOptimize: (analysisId: number) => void
 }
 
 function getScoreColor(score: number): string {
@@ -98,7 +99,7 @@ const tdStyle: React.CSSProperties = {
   color: 'var(--color-text-secondary)',
 }
 
-function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze }: Props): React.JSX.Element {
+function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze, onOptimize }: Props): React.JSX.Element {
   const [rows, setRows] = useState<AnalysisRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -523,6 +524,7 @@ function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze }: Props): Reac
                       row={row}
                       onViewResult={onViewResult}
                       onReanalyze={onReanalyze}
+                      onOptimize={onOptimize}
                       onContextMenu={(e, id, company) => setContextMenu({ x: e.clientX, y: e.clientY, id, company })}
                     />
                   ))
@@ -685,14 +687,17 @@ interface RowProps {
   row: AnalysisRow
   onViewResult: (analysisId: number) => void
   onReanalyze: (jobPostingId: number, variantId: number) => void
+  onOptimize: (analysisId: number) => void
   onContextMenu: (e: React.MouseEvent, jobPostingId: number, company: string) => void
 }
 
-function AnalysisTableRow({ row, onViewResult, onReanalyze, onContextMenu }: RowProps): React.JSX.Element {
+function AnalysisTableRow({ row, onViewResult, onReanalyze, onOptimize, onContextMenu }: RowProps): React.JSX.Element {
   const [hovered, setHovered] = useState(false)
   const scoreColor = getScoreColor(row.matchScore)
   const scoreBg = getScoreBgColor(row.matchScore)
-  const totalKeywords = row.keywordHits + row.keywordMisses
+  const hits = row.keywordHitsCount ?? 0
+  const misses = row.keywordMissesCount ?? 0
+  const totalKeywords = hits + misses
 
   return (
     <tr
@@ -803,7 +808,7 @@ function AnalysisTableRow({ row, onViewResult, onReanalyze, onContextMenu }: Row
         }}
       >
         <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-          {row.keywordHits}/{totalKeywords > 0 ? totalKeywords : '?'}
+          {hits}/{totalKeywords > 0 ? totalKeywords : '?'}
         </span>
       </td>
 
@@ -867,10 +872,8 @@ function AnalysisTableRow({ row, onViewResult, onReanalyze, onContextMenu }: Row
           />
           <ActionBtn
             label="Optimize"
-            variant="default"
-            onClick={() => {}}
-            disabled={true}
-            title="Coming in Phase 10"
+            variant="primary"
+            onClick={() => onOptimize(row.analysisId)}
           />
           <ActionBtn
             label="Submit"

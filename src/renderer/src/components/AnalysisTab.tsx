@@ -23,6 +23,7 @@ function AnalysisTab(): React.JSX.Element {
         onReanalyze={(jobPostingId, variantId) =>
           setScreen({ name: 'analyzing', jobPostingId, variantId })
         }
+        onOptimize={(analysisId) => setScreen({ name: 'optimize', analysisId })}
       />
     )
   }
