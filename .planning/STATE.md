@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Analysis Integration
 status: planning
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-03-24T15:00:43.538Z"
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-03-24T15:07:04.327Z"
 last_activity: 2026-03-23 — Roadmap created, 31 requirements mapped across 5 phases
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 11
-  completed_plans: 7
+  completed_plans: 8
   percent: 80
 ---
 
@@ -69,6 +69,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 09-analysis-core P03 | 15min | 2 tasks | 3 files |
 | Phase 10-bullet-suggestions P01 | 4min | 2 tasks | 3 files |
 | Phase 11-submission-pipeline P01 | 20min | 2 tasks | 7 files |
+| Phase 11-submission-pipeline P02 | 4min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,8 @@ Recent decisions affecting current work:
 - [Phase 11-submission-pipeline]: submission_events created alongside every status change including initial create — full history from day one
 - [Phase 11-submission-pipeline]: metrics computed in Node handler using in-memory filtering — simpler for personal app scale
 - [Phase 11-submission-pipeline]: snapshotPdf uses themeRegistry renderThemeHtml directly — single code path for traditional and theme layouts
+- [Phase 11-submission-pipeline]: submissions:getAnalysisById IPC in submissions handler (not jobPostings) - joins analysisResults+jobPostings+templateVariants for log form pre-fill
+- [Phase 11-submission-pipeline]: pendingLogAnalysis state in App.tsx bridges AnalysisTab to SubmissionsTab with analysisId, consumed once via onLogAnalysisConsumed callback
 
 ### Pending Todos
 
@@ -116,6 +119,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-24T15:00:43.536Z
-Stopped at: Completed 11-01-PLAN.md
+Last session: 2026-03-24T15:07:04.325Z
+Stopped at: Completed 11-02-PLAN.md
 Resume file: None

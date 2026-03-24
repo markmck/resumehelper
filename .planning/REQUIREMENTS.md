@@ -35,12 +35,12 @@ Requirements for AI Analysis Integration milestone. Each maps to roadmap phases.
 
 ### Submission Tracking
 
-- [ ] **SUB-01**: Each submission has a status from fixed stages: Applied, Phone Screen, Technical, Offer, Rejected
-- [ ] **SUB-02**: User can change submission status via dropdown or status badge interaction
-- [ ] **SUB-03**: User can add/edit notes on each submission (recruiter name, dates, follow-ups)
-- [ ] **SUB-04**: Submission record stores the variant ID and analysis score at time of submission
-- [ ] **SUB-05**: Submissions list shows status badges, variant tag, and match score columns
-- [ ] **SUB-06**: User can filter submissions by status and search by company name
+- [x] **SUB-01**: Each submission has a status from fixed stages: Applied, Phone Screen, Technical, Offer, Rejected
+- [x] **SUB-02**: User can change submission status via dropdown or status badge interaction
+- [x] **SUB-03**: User can add/edit notes on each submission (recruiter name, dates, follow-ups)
+- [x] **SUB-04**: Submission record stores the variant ID and analysis score at time of submission
+- [x] **SUB-05**: Submissions list shows status badges, variant tag, and match score columns
+- [x] **SUB-06**: User can filter submissions by status and search by company name
 
 ### UI Redesign
 
@@ -111,12 +111,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SUGG-03 | Phase 10 | Complete |
 | SUGG-04 | Phase 10 | Complete |
 | SUGG-05 | Phase 10 | Complete |
-| SUB-01 | Phase 11 | Pending |
-| SUB-02 | Phase 11 | Pending |
-| SUB-03 | Phase 11 | Pending |
-| SUB-04 | Phase 11 | Pending |
-| SUB-05 | Phase 11 | Pending |
-| SUB-06 | Phase 11 | Pending |
+| SUB-01 | Phase 11 | Complete |
+| SUB-02 | Phase 11 | Complete |
+| SUB-03 | Phase 11 | Complete |
+| SUB-04 | Phase 11 | Complete |
+| SUB-05 | Phase 11 | Complete |
+| SUB-06 | Phase 11 | Complete |
 | UI-01 | Phase 8 | Complete |
 | UI-02 | Phase 8 | Complete |
 | UI-03 | Phase 12 | Pending |

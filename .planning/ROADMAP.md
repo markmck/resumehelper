@@ -78,7 +78,7 @@ Plans:
   3. User can add and edit notes on a submission (recruiter name, dates, follow-up reminders)
   4. Submissions list columns include status badge, variant tag, and match score (if analysis was run at submission)
   5. User can filter submissions by status and search by company name
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 Plans:
 - [ ] 11-01-PLAN.md — Backend: DB schema migrations (submission_events, score_at_submit, analysis_id), new IPC handlers (events, metrics, updateStatus, snapshotPdf)
 - [ ] 11-02-PLAN.md — UI: SubmissionsTab router, SubmissionListView (metrics, filters, mini-dots table), SubmissionLogForm (both paths), cross-tab navigation from AnalysisResults
@@ -107,5 +107,5 @@ Note: Phase 11 depends only on Phase 8 (no AI dependency) — can begin after Ph
 | 8. Foundation | 2/3 | In Progress|  | - |
 | 9. Analysis Core | 3/3 | Complete   | 2026-03-23 | - |
 | 10. Bullet Suggestions | 1/2 | Complete    | 2026-03-24 | - |
-| 11. Submission Pipeline | 1/3 | In Progress|  | - |
+| 11. Submission Pipeline | 2/3 | In Progress|  | - |
 | 12. UI Redesign | v2.0 | 0/TBD | Not started | - |
