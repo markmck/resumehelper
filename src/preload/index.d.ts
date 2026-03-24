@@ -349,6 +349,10 @@ export interface Api {
       variantName: string
       createdAt: string
     } | null>
+    findByAnalysis: (analysisId: number) => Promise<{
+      id: number
+      submittedAt: Date | null
+    } | null>
   }
   profile: {
     get: () => Promise<Profile>

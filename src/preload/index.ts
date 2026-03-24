@@ -78,6 +78,8 @@ const api = {
     metrics: () => ipcRenderer.invoke('submissions:metrics'),
     getAnalysisById: (analysisId: number) =>
       ipcRenderer.invoke('submissions:getAnalysisById', analysisId),
+    findByAnalysis: (analysisId: number) =>
+      ipcRenderer.invoke('submissions:findByAnalysis', analysisId),
   },
   profile: {
     get: () => ipcRenderer.invoke('profile:get'),

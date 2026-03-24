@@ -14,9 +14,10 @@ type AnalysisScreen =
 
 interface AnalysisTabProps {
   onLogSubmission?: (analysisId: number) => void
+  onViewSubmission?: (submissionId: number) => void
 }
 
-function AnalysisTab({ onLogSubmission }: AnalysisTabProps): React.JSX.Element {
+function AnalysisTab({ onLogSubmission, onViewSubmission }: AnalysisTabProps): React.JSX.Element {
   const [screen, setScreen] = useState<AnalysisScreen>({ name: 'list' })
   const screenHistory = useRef<AnalysisScreen[]>([{ name: 'list' }])
 
@@ -91,6 +92,7 @@ function AnalysisTab({ onLogSubmission }: AnalysisTabProps): React.JSX.Element {
       onReanalyze={(jobPostingId, variantId) => navigateScreen({ name: 'analyzing', jobPostingId, variantId })}
       onOptimize={() => navigateScreen({ name: 'optimize', analysisId: screen.analysisId })}
       onLogSubmission={onLogSubmission}
+      onViewSubmission={onViewSubmission}
     />
   )
 }

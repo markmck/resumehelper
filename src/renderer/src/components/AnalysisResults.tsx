@@ -54,6 +54,7 @@ interface Props {
   onReanalyze: (jobPostingId: number, variantId: number) => void
   onOptimize: () => void
   onLogSubmission?: (analysisId: number) => void
+  onViewSubmission?: (submissionId: number) => void
 }
 
 function getScoreColor(score: number): string {
@@ -75,10 +76,11 @@ function formatDate(d: Date | string): string {
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSubmission }: Props): React.JSX.Element {
+function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSubmission, onViewSubmission }: Props): React.JSX.Element {
   const [analysis, setAnalysis] = useState<ParsedAnalysis | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [existingSubmission, setExistingSubmission] = useState<{ id: number; submittedAt: Date | null } | null>(null)
 
   useEffect(() => {
     const load = async (): Promise<void> => {
@@ -100,6 +102,9 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
           rewrites: data.suggestions ?? [],
           scoreBreakdown: data.scoreBreakdown ?? null,
         })
+        // Check if a submission already exists for this analysis
+        const sub = await window.api.submissions.findByAnalysis(analysisId)
+        if (sub) setExistingSubmission(sub)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Unknown error')
       } finally {
@@ -768,21 +773,58 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
           Optimize Variant
         </button>
 
-        <button
-          onClick={() => onLogSubmission?.(raw.id)}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: 'var(--color-bg-surface)',
-            color: 'var(--color-accent)',
-            border: '1px solid var(--color-accent)',
-            borderRadius: 'var(--radius-md)',
-            fontSize: 'var(--font-size-sm)',
-            fontFamily: 'var(--font-sans)',
-            cursor: 'pointer',
-          }}
-        >
-          Log Submission
-        </button>
+        {existingSubmission ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <button
+              onClick={() => onViewSubmission?.(existingSubmission.id)}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: 'var(--color-bg-surface)',
+                color: 'var(--color-success)',
+                border: '1px solid var(--color-success)',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--font-size-sm)',
+                fontFamily: 'var(--font-sans)',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+              }}
+            >
+              ✓ Submitted {existingSubmission.submittedAt ? formatDate(existingSubmission.submittedAt) : ''}
+            </button>
+            <button
+              onClick={() => onLogSubmission?.(raw.id)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--color-text-tertiary)',
+                fontSize: 'var(--font-size-xs)',
+                fontFamily: 'var(--font-sans)',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              Log another →
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => onLogSubmission?.(raw.id)}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: 'var(--color-bg-surface)',
+              color: 'var(--color-accent)',
+              border: '1px solid var(--color-accent)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--font-size-sm)',
+              fontFamily: 'var(--font-sans)',
+              cursor: 'pointer',
+            }}
+          >
+            Log Submission
+          </button>
+        )}
 
         <button
           onClick={() => onReanalyze(raw.jobPostingId, raw.variantId)}

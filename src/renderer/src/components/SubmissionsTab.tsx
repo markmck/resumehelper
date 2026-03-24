@@ -10,10 +10,12 @@ type SubmissionScreen =
 
 interface Props {
   initialLogAnalysisId?: number | null
+  initialViewSubmissionId?: number | null
   onLogAnalysisConsumed?: () => void
+  onViewSubmissionConsumed?: () => void
 }
 
-function SubmissionsTab({ initialLogAnalysisId, onLogAnalysisConsumed }: Props): React.JSX.Element {
+function SubmissionsTab({ initialLogAnalysisId, onLogAnalysisConsumed, initialViewSubmissionId, onViewSubmissionConsumed }: Props): React.JSX.Element {
   const [screen, setScreen] = useState<SubmissionScreen>({ name: 'list' })
   const screenHistory = useRef<SubmissionScreen[]>([{ name: 'list' }])
 
@@ -43,6 +45,14 @@ function SubmissionsTab({ initialLogAnalysisId, onLogAnalysisConsumed }: Props):
       onLogAnalysisConsumed?.()
     }
   }, [initialLogAnalysisId, navigateScreen, onLogAnalysisConsumed])
+
+  // Navigate to detail view if initialViewSubmissionId is provided
+  useEffect(() => {
+    if (initialViewSubmissionId != null && initialViewSubmissionId > 0) {
+      navigateScreen({ name: 'detail', submissionId: initialViewSubmissionId })
+      onViewSubmissionConsumed?.()
+    }
+  }, [initialViewSubmissionId, navigateScreen, onViewSubmissionConsumed])
 
   if (screen.name === 'list') {
     return (

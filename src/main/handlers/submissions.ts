@@ -344,6 +344,19 @@ export function registerSubmissionHandlers(): void {
     await db.delete(submissions).where(eq(submissions.id, id))
   })
 
+  ipcMain.handle('submissions:findByAnalysis', async (_, analysisId: number) => {
+    const row = await db
+      .select({
+        id: submissions.id,
+        submittedAt: submissions.submittedAt,
+      })
+      .from(submissions)
+      .where(eq(submissions.analysisId, analysisId))
+      .limit(1)
+
+    return row[0] ?? null
+  })
+
   ipcMain.handle('submissions:updateStatus', async (_, id: number, status: string, note?: string) => {
     await db
       .update(submissions)
