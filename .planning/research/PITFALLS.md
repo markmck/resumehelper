@@ -1,8 +1,8 @@
 # Pitfalls Research
 
 **Domain:** Resume management desktop app (Electron + SQLite + AI matching + PDF/DOCX export)
-**Researched:** 2026-03-14 (v1.1 update — appended to v1.0 findings) / 2026-03-23 (v2.0 update — AI integration, LLM API, UI redesign)
-**Confidence:** HIGH for schema/migration and IPC patterns (code verified); MEDIUM for resume.json theme integration (official docs reviewed, no live Electron integration examples found); MEDIUM for LLM integration patterns (official docs + community sources); HIGH for Electron security (official docs + CVE research)
+**Researched:** 2026-03-14 (v1.1 update — appended to v1.0 findings) / 2026-03-23 (v2.0 update — AI integration, LLM API, UI redesign) / 2026-03-25 (v2.1 update — HTML/CSS templates, printToPDF, DOCX, ATS compliance)
+**Confidence:** HIGH for schema/migration and IPC patterns (code verified); MEDIUM for resume.json theme integration (official docs reviewed, no live Electron integration examples found); MEDIUM for LLM integration patterns (official docs + community sources); HIGH for Electron security (official docs + CVE research); HIGH for printToPDF pitfalls (Electron GitHub issue tracker reviewed, codebase audited); MEDIUM for ATS parsing (community sources + 2025/2026 ATS research, behavior varies by ATS vendor)
 
 ---
 
@@ -669,6 +669,217 @@ Job analysis core phase — prompt structure must be designed with injection def
 
 ---
 
+## v2.1 Pitfalls — HTML/CSS Templates, printToPDF, DOCX Export, ATS Compliance
+
+The following pitfalls are specific to v2.1: purpose-built HTML/CSS resume templates with page-accurate preview, Electron `printToPDF` export, DOCX generation, and ATS compatibility. The existing export infrastructure uses hidden `BrowserWindow` + `printToPDF` with `printBackground: true`, `pageSize: 'Letter'`, and zero margins (verified in `src/main/handlers/export.ts`).
+
+---
+
+### Pitfall 27: Preview and PDF Use Different Rendering Contexts — Layout Drift
+
+**What goes wrong:**
+The live preview in the UI renders the template in an `<iframe srcdoc>` inside the Electron renderer. The PDF is generated in a separate hidden `BrowserWindow`. Both are Chromium but they render at different viewport widths, pixel densities, and font hinting settings. The preview shows a clean single-page layout. The PDF clips the last bullet point or adds a blank second page. Users trust the preview and don't catch the discrepancy until they open the exported file.
+
+**Why it happens:**
+The preview `<iframe>` has a CSS-transformed viewport (zoomed to fit the pane width, e.g., `transform: scale(0.7)`). The hidden PDF window is sized at 816×1056px (8.5×11in at 96dpi) per the existing code. If the preview scales differently than the print window, line heights, word wrapping, and column widths diverge. Even a 1px font-weight difference can push a long bullet to a second line and shift the page break.
+
+**How to avoid:**
+- Size the preview iframe's inner document at exactly 816×1056px (no scaling on the document itself) and use CSS `transform: scale(N)` on the iframe's outer container to fit the pane — never scale the document content
+- The hidden PDF BrowserWindow must be exactly 816px wide with no system zoom applied (set `win.webContents.setZoomFactor(1.0)` explicitly before calling `printToPDF`)
+- Use the same HTML/CSS file and the same data payload for both preview and PDF — derive both from the same render function, never maintain two parallel templates
+- Add a system display scaling warning: on Windows with 125%/150% DPI, Electron's window size in logical pixels differs from physical pixels; set `<meta name="viewport" content="width=816">` in the resume HTML to force a predictable layout width
+
+**Warning signs:**
+- Preview looks correct but exported PDF has an extra blank page or a clipped section
+- Line breaks in the PDF occur at different points than in the preview
+- System DPI is not 100% and the test machine is at a non-standard scale factor
+
+**Phase to address:**
+Template foundation phase — establish the preview/PDF rendering contract before building any template. Both must share the exact same layout dimensions and font rendering parameters.
+
+---
+
+### Pitfall 28: CSS Page Break Properties Unreliable with Electron's printToPDF — Missing Both Old and New Syntax
+
+**What goes wrong:**
+Template CSS uses `page-break-inside: avoid` on experience blocks. In the PDF, experience entries still split mid-block — the section header appears at the bottom of page 1 and the bullets continue on page 2. The author adds more `page-break-*` rules but they have no effect. Investigation reveals that Electron's Chromium version requires the modern `break-inside: avoid` syntax, and that `page-break-inside: avoid` on elements that contain `display: flex` children is ignored entirely.
+
+**Why it happens:**
+There are two concurrent issues documented in Electron's GitHub:
+1. Electron has had persistent bugs where `page-break-*` properties inside `<webview>` and certain layout contexts don't take effect. The fix is using the modern `break-inside` / `break-before` / `break-after` syntax alongside the legacy `page-break-*` aliases.
+2. `break-inside: avoid` is ignored on flex containers in Chromium's print rendering path. The element must be `display: block` (or `table`) for `break-inside` to be respected. Flex layouts inside a break-avoided block may still break.
+
+**How to avoid:**
+- Always declare both the legacy and modern syntax together: `page-break-inside: avoid; break-inside: avoid;`
+- For the outer experience block wrapper, use `display: block` — not `display: flex`. Use a nested flex container for the internal layout (dates, title, company), but wrap it in a `display: block` outer element that carries `break-inside: avoid`
+- Add `widows: 2; orphans: 2;` to `<li>` elements to prevent lone lines at page boundaries
+- Test page break behavior with a resume that has exactly enough content to fill 1.5 pages — this is the critical boundary case
+- Force `@media print` rules to restate all break properties explicitly — don't assume screen rules apply during printToPDF
+
+**Warning signs:**
+- Experience blocks split with the header on one page and bullets on the next
+- Adding more `page-break-*` rules has no visible effect in the PDF
+- Template uses `display: flex` on the outermost experience block wrapper
+- `@media print` block is absent or only sets margins
+
+**Phase to address:**
+Template CSS foundation phase. Establish the page-break pattern on a skeleton template before building 5 full templates — if it doesn't work on the skeleton, no template will behave correctly.
+
+---
+
+### Pitfall 29: printToPDF Zero-Margin Mode Conflicts with CSS @page Margins — Double Margin Problem
+
+**What goes wrong:**
+The existing export code calls `printToPDF` with `margins: { top: 0, bottom: 0, left: 0, right: 0 }` (zero Electron margins, letting CSS control all spacing). A template is designed with `@page { margin: 0.75in; }`. The PDF renders with correct margins. But on another template, the developer adds `@page { size: letter; }` without explicitly setting `margin: 0` in the `@page` block. Chromium's default `@page` margin (approximately 0.4in) is then applied on top of the explicit CSS padding on `<body>`. The document has double margins — too much whitespace on all sides — and content is pushed off the bottom.
+
+**Why it happens:**
+Two margin systems operate simultaneously: Electron's `printToPDF` `margins` option and the CSS `@page` margin rule. With Electron margins set to zero, the CSS `@page` margin is the sole control. But the CSS `@page` rule has a non-zero browser default if not explicitly declared. Developers who don't declare `@page { margin: 0; }` in their template CSS get unexpected margins.
+
+**How to avoid:**
+- Every template HTML must include an explicit `@page` block: either `@page { margin: 0.75in; }` (if using `@page` for margins) or `@page { margin: 0; }` (if using `body` padding for margins). Never leave `@page` undeclared
+- Never mix `@page` margin rules with `body` padding for margin control — choose one approach and use it consistently across all templates
+- Note from the official Electron docs: the `landscape` option in `printToPDF` is ignored if `@page` includes an orientation declaration — don't mix them
+- Document which margin control approach each template uses (Electron parameter vs. `@page` vs. `body` padding) as a comment in the CSS file
+
+**Warning signs:**
+- Page margins vary between templates with no intentional difference in the code
+- A template's body has explicit `padding: 40px` AND an undeclared `@page` rule (causing double margin)
+- `@media print { @page { ... } }` block is missing from one or more templates
+- PDF margins look correct in dev mode but differ after electron-builder packaging (different Chromium behavior)
+
+**Phase to address:**
+Template foundation phase — establish the margin control convention (single approach for all 5 templates) before writing any template's CSS.
+
+---
+
+### Pitfall 30: External Web Fonts Fail or Delay in the PDF Hidden Window
+
+**What goes wrong:**
+A template references Inter from Google Fonts via a `<link>` tag: `<link href="https://fonts.googleapis.com/css2?family=Inter">`. In the app preview, the font loads (the renderer window has a warm DNS cache). In the hidden PDF `BrowserWindow`, the Google Fonts request either times out (network is slow), fails (offline), or the font load hasn't completed when `printToPDF` fires (the 200ms settle delay is too short). The PDF exports in a system fallback font (Arial or Times New Roman), with completely different metrics than Inter — entirely different line breaks and page layout.
+
+**Why it happens:**
+The hidden `BrowserWindow` is a new window with a cold network state. Font files are not cached between it and the renderer window. The existing export code uses `setTimeout(resolve, 200)` after `did-finish-load` as the font settle delay — but WOFF2 font loads (especially from Google Fonts) can take longer than 200ms or may be blocked by CSP rules on the hidden window.
+
+**How to avoid:**
+- Bundle fonts as local files inside the app package — do not use Google Fonts CDN or any external URL for template fonts. Self-host WOFF2 files at a path that resolves correctly inside the ASAR (or unpack them). Load via `@font-face` pointing to a relative path or a `file://` URL constructed using `app.getAppPath()`
+- In the template HTML, use `font-display: block` in all `@font-face` rules — this forces the browser to wait for the font before rendering rather than using a fallback
+- Extend the font settle delay from 200ms to 500–800ms if using bundled fonts, or use `document.fonts.ready` via script injection before triggering `printToPDF`
+- Verify font rendering by comparing the PDF output at the character level — not just visually — with different content lengths; a 1px font-metric difference causes different line wrapping throughout the document
+
+**Warning signs:**
+- PDF exports use a different font than the template preview
+- Line breaks in the PDF differ from the preview even though page dimensions are identical
+- Template CSS contains `<link>` tags pointing to `fonts.googleapis.com`
+- The hidden BrowserWindow's network requests in dev tools show font requests that return 304 or timeout
+- PDF font looks correct on the developer's machine (warm cache) but wrong on other machines
+
+**Phase to address:**
+Template foundation phase. Establish local font bundling before designing any template — font metrics are a layout dependency that affects every spacing and page break decision.
+
+---
+
+### Pitfall 31: Two-Column Template Layout Breaks ATS Parsing in Both PDF and DOCX
+
+**What goes wrong:**
+A "Modern" or "Executive" template uses a two-column CSS layout (sidebar with skills/contact on the left, experience on the right). The PDF looks polished. When recruiters upload the PDF to their ATS (Greenhouse, Workday, Lever, iCIMS), the parser reads across both columns simultaneously rather than reading the left column then the right. The result: job titles are merged with skill keywords, date ranges appear mid-sentence, and the experience section is scrambled or skipped. The resume fails ATS parsing for the majority of applicants who use these systems.
+
+The same issue occurs in DOCX: a two-column layout using `<w:tbl>` (Word table) or CSS columns generates DOCX XML where text cells are not in a linear reading order. Most ATS XML parsers read paragraph nodes in document order, not visual order.
+
+**Why it happens:**
+Two-column layouts look professional and are common in resume design templates. The ATS parsing problem is invisible to the designer — the PDF looks correct when opened in a viewer, but the ATS extracts text using the PDF's internal content stream order, which follows the layout order of positioned/floated elements rather than visual reading order.
+
+**How to avoid:**
+- For any template with a sidebar or multi-column layout: add a user-visible ATS warning in the template selector: "This template uses a two-column layout. Some ATS systems may parse it incorrectly. Use Classic or Minimal for maximum ATS compatibility."
+- Design the HTML structure so the main content column (experience, education) comes first in DOM order even if it appears on the right visually. Use CSS `order` property on flex children to swap visual position without changing DOM order — ATS parsers read DOM/content stream order, not visual order.
+- For DOCX export: never use `<w:tbl>` (Word table) for multi-column layout in the DOCX variant. When a two-column HTML template is exported to DOCX, the DOCX export should produce a single-column linear document — the visual design is HTML-only. The `docx` library's `Table` class should only be used for actual data tables (e.g., a skills grid), not layout columns.
+- Label templates explicitly in the UI: "ATS-Optimized" (single column) vs. "Visual" (two column, may have ATS issues)
+
+**Warning signs:**
+- Template HTML has `display: flex; flex-direction: row` with experience content in the second flex child while skills/contact is in the first
+- No ATS warning displayed in the template selector for multi-column designs
+- DOCX export for a two-column template produces a Table element wrapping experience content
+- Testing was done by opening the PDF in Preview/Acrobat, not by running it through an ATS parser
+
+**Phase to address:**
+Template design phase and DOCX export phase. The ATS warning and DOM order requirement must be baked into the template HTML structure, not added as a post-design patch.
+
+---
+
+### Pitfall 32: DOCX Export Uses `docx` Library Styles That ATS Cannot Recognize as Standard Headings
+
+**What goes wrong:**
+The existing `export:docx` handler creates `Paragraph` elements using custom `RunProperties` (bold, font size, color) to style section headers like "Work Experience" and "Skills" — but does not use Word's built-in named heading styles (`HeadingOne`, `HeadingTwo`, etc.). The document looks correct when opened in Word, but the DOCX XML contains no `<w:pStyle w:val="Heading1"/>` node. ATS parsers that use heading styles to identify resume sections (a common heuristic) skip these headers, treat all paragraphs as body text, and fail to segment the resume into named sections. Keyword extraction and section matching break.
+
+**Why it happens:**
+The `docx` npm library allows creating visually identical headers without using named styles — just set `bold: true; size: 28`. This is the default approach shown in most `docx` tutorials. Developers assume the visual appearance is what ATS cares about, not the underlying XML style node.
+
+**How to avoid:**
+- For section headers (Work Experience, Skills, Education, etc.), use the `docx` library's built-in heading style: `new Paragraph({ text: "Work Experience", heading: HeadingLevel.HEADING_1 })`
+- Override the default heading style's visual appearance using `styles` in the `Document` constructor to match the design — this preserves the semantic `Heading1` node in the XML while controlling visual output
+- For the `docx` library: `HeadingLevel.HEADING_1` through `HeadingLevel.HEADING_6` map to Word's standard `Heading 1` through `Heading 6` styles, which all major ATS systems recognize
+- Verify with a DOCX parser: open the generated `.docx` in a tool that shows XML (e.g., rename to `.zip`, inspect `word/document.xml`) and confirm `<w:pStyle w:val="Heading1"/>` nodes exist for section headers
+
+**Warning signs:**
+- Section headers in DOCX use `bold: true` + custom font size but no `heading: HeadingLevel.HEADING_1` property
+- Running the DOCX through an ATS resume parser returns sections as unlabeled or merged
+- ATS-extracted resume text shows Work Experience bullets directly following contact info with no section boundary
+- No style override in the `Document` constructor's `styles` option
+
+**Phase to address:**
+DOCX export phase. Audit the existing `export:docx` handler — it currently uses manual bold/size styling for headers. Adding `heading: HeadingLevel.HEADING_1` is a one-line change per header paragraph but has a major ATS impact.
+
+---
+
+### Pitfall 33: printToPDF Background Colors and Images Not Rendering — Missing `printBackground: true`
+
+**What goes wrong:**
+A template uses accent colors: a colored header bar, a sidebar background, colored section dividers. The preview in the iframe renders them correctly. The exported PDF is black-and-white — all background colors and background-color CSS properties are absent. The template looks completely different from the preview.
+
+**Why it happens:**
+Chromium's print output defaults to `printBackground: false` for performance and ink-saving reasons. The existing export code in `export.ts` correctly sets `printBackground: true`, but when a new template path or a new PDF generation code path is added during v2.1, it's easy to forget this option on the new call or on a secondary export path. The bug only manifests on templates with background colors (Classic might use none; Modern and Executive will).
+
+There was also a historical Electron bug (fixed in v28+) where `printBackground` was incorrectly wired to a `shouldPrintBackgrounds` parameter in C++. The project uses Electron 39 — this bug is resolved.
+
+**How to avoid:**
+- Make `printBackground: true` a required constant in a shared PDF options object, never an inline object literal that could be omitted
+- Add a regression check to the "Looks Done" phase checklist: export a template with a colored header to PDF and confirm the header color appears
+- For any template that relies on background colors for visual identity, mark it as "requires printBackground: true" in a code comment so future maintainers don't inadvertently remove the option
+
+**Warning signs:**
+- PDF output is entirely black-and-white when the template preview shows colors
+- A new PDF export code path was added without copying the shared options object
+- `printBackground` is missing from a `printToPDF` call (grep for `printToPDF` across the codebase to verify all calls include it)
+
+**Phase to address:**
+Template implementation phase — add the regression check to the first template that uses background color. Catch it on template 1, not template 5.
+
+---
+
+### Pitfall 34: PDF Scale Mismatch From System Display Scaling — Content Appears Smaller Than Intended
+
+**What goes wrong:**
+On a Windows machine with 125% or 150% display scaling, Electron creates windows at a different device pixel ratio. The hidden `BrowserWindow` for PDF export is created at `width: 816, height: 1056` but these are logical pixels — on a 150% DPI display, the actual rendering surface is 1224×1584 physical pixels. The `printToPDF` output has content scaled to 66% of the intended size (fitting the scaled-up physical canvas into the Letter page). The PDF is valid and not clipped, but text is tiny and the layout looks unprofessional.
+
+**Why it happens:**
+`BrowserWindow` dimensions are specified in logical CSS pixels. The device pixel ratio of the display affects how Chromium renders to the physical surface before PDF rasterization. This is a documented issue in Electron's GitHub (issue #9118: "printToPDF window content scales down in relation to page size if screen Display text/apps setting is greater than 100%").
+
+**How to avoid:**
+- Set `win.webContents.setZoomFactor(1.0)` on the hidden window before calling `printToPDF` — this forces 1:1 CSS pixel to PDF point mapping regardless of system DPI
+- Set `win.setSize(816, 1056)` using physical pixels by accounting for the primary display's scale factor: `const { scaleFactor } = require('electron').screen.getPrimaryDisplay(); win.setSize(Math.round(816 * scaleFactor), Math.round(1056 * scaleFactor))`
+- Alternatively, set the `<meta name="viewport" content="width=816, initial-scale=1">` in the resume HTML so the document layout is always anchored to 816px regardless of the window's actual pixel density
+- Add a verification step: after generating the first PDF, check that a known-width element (e.g., a horizontal rule set to `width: 6.5in`) in the PDF measures correctly using a PDF ruler
+
+**Warning signs:**
+- PDF text is legible but smaller than expected when printed on paper
+- PDF generated on a developer's 100% DPI machine is correct, but the same PDF generated on a 150% DPI machine is smaller
+- `setZoomFactor` is not called before `printToPDF` in the export handler
+- `screen.getPrimaryDisplay().scaleFactor` is never consulted
+
+**Phase to address:**
+Template export foundation phase — test PDF export on both 100% and 125% DPI displays before building 5 templates. If scale drift exists, the fix is in the BrowserWindow setup, not in individual template CSS.
+
+---
+
 ## Technical Debt Patterns
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
@@ -691,6 +902,12 @@ Job analysis core phase — prompt structure must be designed with injection def
 | Single LLM provider implementation with no interface | Fastest path to working feature | Full rewrite required to switch providers; untestable without mocking | Never if provider-agnostic is a stated requirement |
 | Use `temperature: 1.0` for analysis calls | Default; no action needed | Non-deterministic scores users cannot trust | Never for scoring/analysis; fine for bullet suggestions |
 | Redesign all pages simultaneously in one branch | Faster visual consistency | All regression risk in one merge; impossible to bisect regressions | Never — migrate one page at a time |
+| Using Google Fonts CDN for resume templates | Easy to add, looks professional | Fonts fail to load in hidden PDF BrowserWindow (no warm cache, possible network issue); PDF renders in fallback font | Never — bundle fonts locally |
+| Sharing CSS between app shell and resume templates | Fewer files | Template CSS bleeds into app or app CSS bleeds into template | Never — resume templates must be isolated documents |
+| Using `display: flex` on the outermost break-avoided element | Modern CSS layout | `break-inside: avoid` ignored on flex containers in Chromium print path | Never — wrap flex content in a `display: block` break-avoid container |
+| Using `docx` library bold/size styling for section headers | Visually identical result | No `Heading1` style node in XML; ATS cannot identify sections | Never for ATS-bound export — always use `heading: HeadingLevel.HEADING_1` |
+| Two-column layout with no ATS warning | Attractive design | ATS reads across columns; job titles and skills merge; resume fails parsing | Acceptable only if clearly labelled as "Visual/Non-ATS" in the UI |
+| Omitting `setZoomFactor(1.0)` on hidden PDF window | No extra code | PDF content scales incorrectly on 125%/150% DPI displays | Never — one-line call that prevents scale drift |
 
 ---
 
@@ -716,6 +933,13 @@ Job analysis core phase — prompt structure must be designed with injection def
 | Electron safeStorage timing | Calling `safeStorage.encryptString()` before `app.ready` fires | Guard all safeStorage calls with `app.whenReady()` — `ready` event is required |
 | LLM streaming + IPC | Streaming chunks to renderer without cleanup on window close | Use `event.sender.send()` guarded by `!event.sender.isDestroyed()`; support `llm:cancel` IPC |
 | Tailwind v4 in v2.0 redesign | Adding new `gap-`, `p-`, `m-` utility classes expecting them to apply | This project uses inline styles for layout spacing — do not introduce new Tailwind spacing utilities |
+| printToPDF + system DPI scaling | BrowserWindow at 816×1056 renders smaller on 125%/150% DPI | Call `win.webContents.setZoomFactor(1.0)` before `printToPDF`; account for `screen.getPrimaryDisplay().scaleFactor` |
+| printToPDF + background colors | Colors absent from PDF output | `printBackground: true` is required; use a shared PDF options constant, not inline objects |
+| printToPDF + @page rule | `@page` margin conflicts with Electron's `margins` option | Declare explicit `@page { margin: 0; }` or `@page { margin: X; }` in every template; never leave `@page` undeclared |
+| printToPDF + web fonts | Google Fonts fail in hidden window; PDF uses fallback font | Bundle WOFF2 files locally; load via `@font-face` with local path; use `font-display: block` |
+| CSS page breaks + flex layout | `break-inside: avoid` ignored on `display: flex` elements | Wrap flex content in a `display: block` outer container; apply `break-inside: avoid` to the block wrapper |
+| DOCX heading styles | Manual bold/size styling creates no ATS-readable heading structure | Use `heading: HeadingLevel.HEADING_1` for section headers; override visual style via Document `styles` config |
+| Two-column PDF layout + ATS | ATS reads across columns; content scrambled | DOM order must match reading order (experience before sidebar); provide ATS warning in UI |
 
 ---
 
@@ -734,6 +958,9 @@ Job analysis core phase — prompt structure must be designed with injection def
 | Re-analyzing on every state change | Fires dozens of expensive LLM calls | Require explicit "Analyze" button click; no auto-trigger on edit | From first user interaction |
 | No cancellation for in-flight LLM requests | Renderer hangs when user navigates away during analysis | Use AbortController; cancel on component unmount; show cancellable loading state | Every navigation during analysis |
 | Storing full raw LLM response JSON in SQLite unbounded | Analysis results table grows unbounded | Limit storage to parsed/summarized form; store raw response only in a debug mode flag | After ~100 submissions with analysis |
+| Creating a new hidden BrowserWindow for every PDF export | 2–4 second window creation overhead on every export | Reuse a single hidden BrowserWindow for the export lifetime; reload via `loadFile` rather than destroy/recreate | Noticeable from first export click |
+| Re-loading fonts in the hidden PDF window on every export | 200–800ms extra latency per export from font network/disk fetch | Pre-load fonts as local bundled assets; ensure font caching across reloaded PDF windows | Every export if fonts are remote |
+| Live preview re-renders on every character toggle | Visible lag when toggling bullets in the Variant Builder | Debounce preview re-render; only refresh when user pauses toggling (200ms debounce) | With 20+ experience items visible |
 
 ---
 
@@ -744,12 +971,12 @@ Job analysis core phase — prompt structure must be designed with injection def
 | `nodeIntegration: true` in renderer | Full Node.js access from renderer; XSS becomes remote code execution | Keep `nodeIntegration: false`, `contextIsolation: true`; use preload + contextBridge |
 | Exposing `ipcRenderer` directly via contextBridge | Any renderer code can send arbitrary IPC messages to main process | Expose only specific typed handler functions, never the raw `ipcRenderer` object |
 | LLM API key in source code or `localStorage` | Key exposed in packaged app (ASAR is inspectable); readable by any process | Use `safeStorage.encryptString()` + SQLite or OS keychain; key stays in main process only |
-| API key sent to renderer process in any IPC response | Key readable in devtools; any renderer-side bug exposes it | Keep key in main process only; renderer only sends payloads, never receives the key |
 | No input validation on IPC handlers | Malformed data reaches SQLite or filesystem | Validate and sanitize all IPC payloads before any DB or FS operation |
 | Logging job descriptions to disk unencrypted | Job search data (company names, roles, salary expectations) exposed in log files | Avoid logging sensitive content; if logs needed, redact company/role fields |
 | Job posting text injected into LLM without data boundary | Prompt injection — crafted posting overrides system prompt | Use system/user role separation; prefix job text with explicit data boundary marker |
 | LLM response content rendered as raw HTML | XSS if LLM returns HTML/JS in suggestion | Always render LLM output as text (React's default); never use `dangerouslySetInnerHTML` with LLM content |
 | Executing resume.json theme code from user-supplied npm package | User imports a theme with malicious code; runs in main process with full Node access | Only support a curated list of known-good themes; never execute arbitrary theme code |
+| Resume HTML template loaded in hidden BrowserWindow without sandbox | Malicious template could execute JS in main process context | Set `sandbox: true` on hidden PDF BrowserWindow when loading raw HTML templates (no preload needed for static HTML) |
 
 ---
 
@@ -771,6 +998,10 @@ Job analysis core phase — prompt structure must be designed with injection def
 | No "save to submission" flow after analysis | User completes analysis but has no clear next action | Analysis page includes CTA: "Create submission from this analysis" |
 | Raw API error messages shown to user | "429 Too Many Requests" confuses non-technical users | Map API errors to plain language: "You've reached your API rate limit. Wait a minute and try again." |
 | Settings page with no API key test connection | User enters wrong key; first failure happens during a real analysis | "Test Connection" button in settings validates key immediately after entry |
+| Template selector shows no ATS warning for multi-column templates | User submits a two-column resume to an ATS-heavy job board without realizing parsing risks | Show ATS risk indicator on multi-column template options; single-column templates show "ATS optimized" badge |
+| Preview iframe at wrong scale makes template look unfinished | User can't tell if page break will be in the right place | Preview must render at paper scale — use `transform: scale()` on outer container, never on document content; show page boundary rulers |
+| No indication of page count in preview | User doesn't know if resume is 1 or 2 pages | Show page count (e.g., "1 of 1 pages") and a visible page break line in the preview |
+| Compact margin toggle has no visible effect in preview | User toggles but can't tell what changed | Preview must re-render immediately on any template control change; margin difference must be visible |
 
 ---
 
@@ -800,6 +1031,15 @@ Job analysis core phase — prompt structure must be designed with injection def
 - [ ] **UI redesign regression:** After each page is migrated to the new design system, run: PDF export, DOCX export, snapshot viewer, variant builder preview. Confirm all are unaffected.
 - [ ] **Analysis persistence:** Complete an analysis, close and reopen the app. Confirm analysis results are reloaded from the database, not just in-memory.
 - [ ] **Streaming cancellation:** Start analysis, navigate away immediately. Confirm no hanging IPC listeners and no memory growth.
+- [ ] **Preview/PDF parity:** Export the same template to PDF and compare against the preview at 1:1 scale. Line breaks, page breaks, and font rendering must match. Test on both 100% and 125% display DPI.
+- [ ] **Background colors in PDF:** Export a template with a colored header bar. Confirm the color appears in the PDF (not white). Grep for all `printToPDF` calls and verify each has `printBackground: true`.
+- [ ] **Page breaks:** Export a resume with exactly enough content to fill 1.5 pages. Confirm experience blocks do not split mid-block. Confirm section headers do not appear as orphans at the bottom of a page.
+- [ ] **Local fonts in PDF:** Disconnect from the internet. Export PDF. Confirm the correct font is used (not a fallback like Arial or Times New Roman).
+- [ ] **DPI scaling:** On a Windows machine set to 125% display scaling, export a PDF. Measure that a known-width element (e.g., a full-width horizontal rule) spans the full text area width in the PDF.
+- [ ] **DOCX heading structure:** Open a generated DOCX and rename it to `.zip`. Inspect `word/document.xml`. Confirm `<w:pStyle w:val="Heading1"/>` nodes exist for section headers like "Work Experience."
+- [ ] **Two-column ATS warning:** Open the template selector. Confirm any multi-column template shows a visible ATS risk indicator. Confirm single-column templates are labelled as ATS-optimized.
+- [ ] **DOCX two-column layout:** For a two-column HTML template, export to DOCX. Open in Word. Confirm the DOCX is single-column and linear — no `<w:tbl>` wrapping experience content.
+- [ ] **@page margins:** In each of the 5 templates, inspect the `@page` CSS rule. Confirm it is explicitly declared (not relying on browser defaults). Confirm PDF margins match the declared value.
 
 ---
 
@@ -824,6 +1064,13 @@ Job analysis core phase — prompt structure must be designed with injection def
 | Match score not deterministic (user trust eroded) | MEDIUM | Set temperature: 0; switch to component-based scoring; rebuild score derivation; may require re-running historical analyses |
 | UI redesign breaks PDF export (post-merge) | MEDIUM | Git bisect to identify breaking commit; isolate CSS change; restore inline style patterns for export path |
 | Provider abstraction leaks (switching providers fails) | HIGH | Refactor provider interface to app-semantic methods; extract provider-specific concepts into adapter classes; retest all analysis paths |
+| Preview/PDF parity failure (layout drift) | MEDIUM | Audit iframe vs. BrowserWindow dimensions; add `setZoomFactor(1.0)`; ensure same HTML/CSS for both paths |
+| Background colors absent in PDF | LOW | Add `printBackground: true` to the missing `printToPDF` call; one-line fix but requires visual re-verification of all templates |
+| Page breaks splitting experience blocks | LOW-MEDIUM | Add `break-inside: avoid` to the block-level wrapper (not the flex container); re-test all 5 templates with 1.5-page content |
+| PDF content scaled small due to DPI | LOW | Add `setZoomFactor(1.0)` call in BrowserWindow setup; no template CSS changes required |
+| Web fonts absent from PDF (fallback used) | MEDIUM | Bundle WOFF2 files locally and update `@font-face` src; re-export all templates to verify; layout will shift if metrics differ from CDN version |
+| DOCX has no heading structure (ATS fails) | LOW | Change bold paragraphs to `heading: HeadingLevel.HEADING_1` in the export handler; verify in `document.xml`; no user data loss |
+| Two-column template scrambles ATS | LOW | Add ATS warning badge to template UI; no code fix needed for HTML template (ATS warning is sufficient); DOCX export should already be linear |
 
 ---
 
@@ -857,11 +1104,36 @@ Job analysis core phase — prompt structure must be designed with injection def
 | Submission pipeline inconsistency | Submission pipeline / schema phase | Transaction test for each stage transition; cascade delete test |
 | No streaming cancellation | Job analysis core phase | Navigate away during in-flight analysis; verify no hanging IPC listener |
 | Prompt injection via job posting | Job analysis core phase | Test with adversarial job posting text; confirm system prompt boundary holds |
+| Preview/PDF layout drift | Template foundation phase (v2.1) | Compare preview and exported PDF at 1:1; test on 100% and 125% DPI; line breaks must match |
+| CSS page breaks failing on flex containers | Template CSS foundation phase (v2.1) | Export 1.5-page content; confirm no experience block splits mid-block; section header never orphaned |
+| @page margin double-margin | Template foundation phase (v2.1) | Inspect `@page` rule in each template; verify PDF margins match declared value; no unintended whitespace |
+| External web fonts in PDF | Template foundation phase (v2.1) | Disconnect from internet; export PDF; confirm correct font appears, not Arial or Times New Roman |
+| DPI scaling distorts PDF content | Template export setup phase (v2.1) | Test export on 125% DPI machine; verify content width matches expected paper width |
+| Two-column layout scrambles ATS | Template design phase (v2.1) | Run exported PDF through an ATS text extractor; confirm experience section is coherent and not interleaved with skills |
+| DOCX missing heading structure | DOCX export phase (v2.1) | Inspect `document.xml`; confirm `<w:pStyle w:val="Heading1"/>` for all section headers |
+| Background colors absent in PDF | Template implementation phase (v2.1) | Export template with colored elements; open PDF; confirm colors render; grep all `printToPDF` calls |
 
 ---
 
 ## Sources
 
+- [Electron printToPDF page break issue #10086 — GitHub](https://github.com/electron/electron/issues/10086)
+- [Electron printToPDF content breaks in half #10013 — GitHub](https://github.com/electron/electron/issues/10013)
+- [Electron printToPDF not respecting CSS print media rules #20927 — GitHub](https://github.com/electron/electron/issues/20927)
+- [Electron printToPDF background colors #4708 — GitHub](https://github.com/electron/electron/issues/4708)
+- [Electron fix shouldPrintBackgrounds PR #41161 — GitHub](https://github.com/electron/electron/pull/41161)
+- [Electron printToPDF window content scales down at 125% DPI #9118 — GitHub](https://github.com/electron/electron/issues/9118)
+- [Electron webContents printToPDF API — Official Docs](https://www.electronjs.org/docs/latest/api/web-contents)
+- [HTML/CSS to PDF page break guide — DEV Community](https://dev.to/resumemind/htmlcss-to-pdf-how-i-solved-the-page-break-nightmare-mdg)
+- [Avoiding awkward element breaks in print HTML — DEV Community (Amruth Pillai, Reactive Resume author)](https://dev.to/amruthpillai/avoiding-awkward-element-breaks-in-print-html-5goe)
+- [Print CSS cheatsheet — CustomJS](https://www.customjs.space/blog/print-css-cheatsheet/)
+- [Chrome print margins blog — Chrome for Developers (2025)](https://developer.chrome.com/blog/print-margins)
+- [Can ATS read two-column resumes? — Yotru (2026 guide)](https://yotru.com/blog/resume-columns-ats-single-vs-double-column)
+- [ATS and tables/columns — Jobscan](https://www.jobscan.co/blog/resume-tables-columns-ats/)
+- [Two-column resume ATS problems — ResumeGyani](https://resumegyani.in/ats-guides/two-column-resume-ats-problem)
+- [ATS resume formatting guide 2025 — ATS Resume AI](https://atsresumeai.com/blog/ats-resume-formatting-guide/)
+- [PDF vs DOCX for resumes 2025 — Resumemate](https://www.resumemate.io/blog/pdf-vs-docx-for-resumes-in-2025-what-recruiters-ats-really-prefer/)
+- [docx library heading styles — GitHub (dolanmiu/docx)](https://github.com/dolanmiu/docx/blob/master/docs/usage/styling-with-js.md)
 - [Post-mortems referenced]
 - [JSON Resume Theme Development — Official Docs](https://jsonresume.org/theme-development)
 - [JSON Resume Schema — Official Docs](https://jsonresume.org/schema)
@@ -895,5 +1167,5 @@ Job analysis core phase — prompt structure must be designed with injection def
 - Codebase audit: `src/main/db/index.ts`, `src/main/db/schema.ts`, `src/main/handlers/export.ts`, `src/main/handlers/templates.ts`, `src/renderer/src/components/TagInput.tsx`, `src/preload/index.d.ts`
 
 ---
-*Pitfalls research for: Resume management desktop app (Electron + SQLite + AI matching + PDF/DOCX export)*
-*Researched: 2026-03-14 (v1.1 update: projects section, resume.json import/themes, tag autocomplete) / 2026-03-23 (v2.0 update: LLM integration, API key security, provider abstraction, match scoring, bullet rewrites, UI redesign)*
+*Pitfalls research for: Resume management desktop app (Electron + SQLite + AI matching + PDF/DOCX export + HTML/CSS templates)*
+*Researched: 2026-03-14 (v1.1 update: projects section, resume.json import/themes, tag autocomplete) / 2026-03-23 (v2.0 update: LLM integration, API key security, provider abstraction, match scoring, bullet rewrites, UI redesign) / 2026-03-25 (v2.1 update: HTML/CSS templates, printToPDF, DOCX ATS compliance)*

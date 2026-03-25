@@ -48,9 +48,9 @@ Requirements for AI Analysis Integration milestone. Each maps to roadmap phases.
 - [x] **UI-02**: Navigation uses sidebar with Experience, Variants, Analysis, Submissions, and Settings tabs
 - [x] **UI-03**: Experience page has collapsible job cards with inline editing and drag reorder
 - [x] **UI-04**: Variant builder uses split pane layout (builder on left, live preview on right)
-- [ ] **UI-05**: Analysis dashboard shows 4 metric cards (match score, keyword coverage, skill gaps, ATS compatibility)
-- [ ] **UI-06**: Analysis dashboard has two-column layout: keyword analysis + gap details on left, suggested rewrites on right
-- [ ] **UI-07**: Submissions tracker shows metric cards (total, in progress, interviews, response rate) with filter pills and searchable table
+- [x] **UI-05**: Analysis dashboard shows 4 metric cards (match score, keyword coverage, skill gaps, ATS compatibility)
+- [x] **UI-06**: Analysis dashboard has two-column layout: keyword analysis + gap details on left, suggested rewrites on right
+- [x] **UI-07**: Submissions tracker shows metric cards (total, in progress, interviews, response rate) with filter pills and searchable table
 - [x] **UI-08**: All components follow the design system tokens (4px grid, border radius scale, consistent button/input heights)
 
 ## v2.1 Requirements
@@ -121,9 +121,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-02 | Phase 8 | Complete |
 | UI-03 | Phase 12 | Complete |
 | UI-04 | Phase 12 | Complete |
-| UI-05 | Phase 12 | Pending |
-| UI-06 | Phase 12 | Pending |
-| UI-07 | Phase 12 | Pending |
+| UI-05 | Phase 12 | Complete |
+| UI-06 | Phase 12 | Complete |
+| UI-07 | Phase 12 | Complete |
 | UI-08 | Phase 12 | Complete |
 
 **Coverage:**

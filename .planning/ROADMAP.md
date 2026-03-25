@@ -4,7 +4,8 @@
 
 - ✅ **v1.0 MVP** - Phases 1-6 (shipped 2026-03-13)
 - ✅ **v1.1 Enhancements** - Phase 7 (shipped 2026-03-23)
-- 🚧 **v2.0 AI Analysis Integration** - Phases 8-12 (in progress)
+- ✅ **v2.0 AI Analysis Integration** - Phases 8-12 (shipped 2026-03-24)
+- 🚧 **v2.1 Resume Templates** - Phases 13-16 (in progress)
 
 ## Phases
 
@@ -15,101 +16,83 @@ Phases 1-7 covered: Experience DB, Template Variants, Submissions with snapshots
 
 </details>
 
-### 🚧 v2.0 AI Analysis Integration (In Progress)
+<details>
+<summary>✅ v2.0 AI Analysis Integration (Phases 8-12) - SHIPPED 2026-03-24</summary>
 
-**Milestone Goal:** Add AI-powered job posting analysis, match scoring, bullet rewrite suggestions, submission pipeline stages, and a full dark-theme UI redesign.
+Phases 8-12 covered: Design system + sidebar navigation, AI provider settings, job posting analysis with match scoring and keyword coverage, per-bullet rewrite suggestions, submission pipeline tracking with activity timeline, Experience page redesign with collapsible cards and drag reorder, Variant Builder split-pane with live preview.
+
+5 phases, 14 plans, 31 requirements. Full details in `.planning/milestones/v2.0-ROADMAP.md`.
+
+</details>
+
+### 🚧 v2.1 Resume Templates (In Progress)
+
+**Milestone Goal:** Replace bundled resume.json themes with 5 purpose-built HTML/CSS templates (Classic, Modern, Jake, Minimal, Executive) with proper page break handling, margin controls, accent color customization, and matching PDF/DOCX export — preview matches export exactly.
+
+- [ ] **Phase 13: Pipeline Foundation** - Unified print.html rendering path with Classic template end-to-end
+- [ ] **Phase 14: Templates Complete** - All 5 templates with per-template fonts and DOCX support
+- [ ] **Phase 15: Controls + Page Break Overlay** - Accent color, margin toggle, skills mode, page boundary visualization
+- [ ] **Phase 16: Cleanup** - Remove old resume.json themes, migrate snapshot PDF path
 
 ## Phase Details
 
-### Phase 8: Foundation
-**Goal**: Users can configure their AI provider and the app has the design system and navigation shell in place to support all subsequent v2.0 work
-**Depends on**: Phase 7 (v1.1 complete)
-**Requirements**: UI-01, UI-02, AI-01, AI-02, AI-03, AI-04, AI-05
+### Phase 13: Pipeline Foundation
+**Goal**: A single unified rendering path (PrintApp + VariantPreview + export.ts) proven end-to-end with the Classic template — no bifurcated preview/PDF branches
+**Depends on**: Nothing (first phase of v2.1)
+**Requirements**: TMPL-02, TMPL-03, PREV-03, EXPRT-04
 **Success Criteria** (what must be TRUE):
-  1. User can open Settings tab, select a provider (Claude or OpenAI), enter their API key, and see a masked display with a test button
-  2. Clicking "Test Connection" shows a clear success or failure message without exposing the raw key to any UI element
-  3. The app navigation sidebar shows Experience, Variants, Analysis, Submissions, and Settings tabs and routes between them
-  4. CSS custom property tokens (colors, spacing, typography) are active in the app and all new components use them
-  5. All LLM-bound IPC channels are registered in the main process and return a structured error if the provider is not yet configured
-**Plans:** 2/3 plans executed
+  1. Classic template renders inside the variant builder preview pane as a full HTML/CSS page at paper scale
+  2. Exporting to PDF produces output that matches the preview — same layout, same fonts, same spacing
+  3. Preview iframe and PDF export use the exact same rendering surface (print.html BrowserWindow) — no separate code path
+  4. Font files (Inter, Lato, EB Garamond) are bundled as woff2 and load correctly in both preview and PDF export
+**Plans**: 3 plans
 Plans:
-- [ ] 08-01-PLAN.md — Design system tokens (tokens.css, Inter font) and collapsible sidebar navigation shell
-- [ ] 08-02-PLAN.md — DB schema (ai_settings, job_postings, analysis_results), IPC handlers, AI SDK install
-- [ ] 08-03-PLAN.md — Settings tab UI with AI provider config, key management, and test connection
+- [ ] 13-01-PLAN.md — Template types, filterResumeData, ClassicTemplate, resolveTemplate registry
+- [ ] 13-02-PLAN.md — Font bundling (woff2), print.html @font-face + CSP, __printBase preload global
+- [ ] 13-03-PLAN.md — Wire PrintApp + VariantPreview + export.ts unified pipeline
 
-### Phase 9: Analysis Core
-**Goal**: Users can paste a job posting, trigger analysis against a specific variant, and see match score, keyword coverage, and gap details — with results persisted to the database
-**Depends on**: Phase 8
-**Requirements**: ANLYS-01, ANLYS-02, ANLYS-03, ANLYS-04, ANLYS-05, ANLYS-06, ANLYS-07
+### Phase 14: Templates Complete
+**Goal**: All 5 resume templates (Classic, Modern, Jake, Minimal, Executive) are available, each with distinct visual style, and DOCX export uses the correct font per template
+**Depends on**: Phase 13
+**Requirements**: TMPL-01, TMPL-04, TMPL-05, EXPRT-01, EXPRT-02, EXPRT-03
 **Success Criteria** (what must be TRUE):
-  1. User can paste job posting text, select a variant, and click Analyze — a loading state with progress indication appears during the LLM call
-  2. Analysis returns a 0-100 match score that is the same every time the same inputs are submitted (deterministic, temperature 0)
-  3. Keyword results are split into three labeled groups: exact matches, semantic matches, and missing keywords
-  4. Gap analysis lists items with critical (required) and moderate (preferred) severity tiers sourced from posting language
-  5. Analysis results are saved to the database linked to the job posting and the specific variant used
-**Plans:** 3/3 plans complete
-Plans:
-- [ ] 09-01-PLAN.md — Backend: DB schema extension, Zod schemas, LLM two-call pipeline, job postings CRUD
-- [ ] 09-02-PLAN.md — UI: Analysis list (Screen 1) and New Analysis form (Screen 2) with variant selection
-- [ ] 09-03-PLAN.md — UI: Analyzing progress stepper (Screen 3) and Results dashboard (Screen 4), full wiring
+  1. User can select any of 5 templates (Classic, Modern, Jake, Minimal, Executive) — each has visually distinct typography, spacing, and style
+  2. All 5 templates produce PDF output matching their preview — no layout drift for any template
+  3. DOCX export for each template uses the appropriate font family (serif for Classic/Executive, sans-serif for Modern/Jake/Minimal) with proper Word heading styles
+  4. Professional summary section renders in templates when present and is skipped cleanly when not included
+  5. Skills section renders in both inline comma-separated and grouped-by-category modes
+**Plans**: TBD
 
-### Phase 10: Bullet Suggestions
-**Goal**: Users can review per-bullet rewrite suggestions from the analysis, compare original and proposed text side by side, and accept or dismiss each suggestion individually — accepted suggestions write back to the database
-**Depends on**: Phase 9
-**Requirements**: SUGG-01, SUGG-02, SUGG-03, SUGG-04, SUGG-05
+### Phase 15: Controls + Page Break Overlay
+**Goal**: Users can customize accent color, margins, and skills display mode per variant, and the preview pane shows visible page boundaries
+**Depends on**: Phase 14
+**Requirements**: CTRL-01, CTRL-02, CTRL-03, CTRL-04, CTRL-05, CTRL-06, PREV-01, PREV-02
 **Success Criteria** (what must be TRUE):
-  1. Analysis results include per-bullet rewrite suggestions that incorporate job posting language
-  2. User sees original bullet text and suggested rewrite displayed side by side for each suggestion
-  3. User can accept or dismiss each suggestion independently — no bulk accept button exists
-  4. Accepting a suggestion permanently updates the bullet text in the database
-  5. Suggestions never add technologies, metrics, or scope claims not present in the original bullet text
-**Plans:** 1/2 plans complete
-Plans:
-- [ ] 10-01-PLAN.md — Backend IPC handler + OptimizeVariant component (suggestion cards, skill suggestions, score ring, save flow)
-- [ ] 10-02-PLAN.md — Wire OptimizeVariant into AnalysisTab router, enable Optimize button, human verification
+  1. User can switch templates from a dropdown in the variant builder — preview re-renders immediately
+  2. User can pick an accent color from preset swatches — color applies to the template and persists per variant
+  3. User can toggle compact margins — layout tightens and persists per variant
+  4. User can switch skills display mode between inline and grouped — change reflects in preview and persists per variant
+  5. Preview pane shows page boundaries (page 1, gap, page 2) — jobs are never split across pages
+  6. Preview updates in real-time when any checkbox or template control changes
+**Plans**: TBD
 
-### Phase 11: Submission Pipeline
-**Goal**: Users can track each job application through fixed pipeline stages, add notes per submission, and filter and search the submissions list — with variant and match score stored at submission time
-**Depends on**: Phase 8
-**Requirements**: SUB-01, SUB-02, SUB-03, SUB-04, SUB-05, SUB-06
+### Phase 16: Cleanup
+**Goal**: Old resume.json themes (Even, Class, Elegant) are fully removed and the submission snapshot PDF path works cleanly with the new template system
+**Depends on**: Phase 15
+**Requirements**: CLEAN-01, CLEAN-02, CLEAN-03
 **Success Criteria** (what must be TRUE):
-  1. Every submission shows a status badge from fixed stages: Applied, Phone Screen, Technical, Offer, Rejected
-  2. User can change a submission's status via dropdown or badge interaction and the change persists
-  3. User can add and edit notes on a submission (recruiter name, dates, follow-up reminders)
-  4. Submissions list columns include status badge, variant tag, and match score (if analysis was run at submission)
-  5. User can filter submissions by status and search by company name
-**Plans:** 3/3 plans complete
-Plans:
-- [ ] 11-01-PLAN.md — Backend: DB schema migrations (submission_events, score_at_submit, analysis_id), new IPC handlers (events, metrics, updateStatus, snapshotPdf)
-- [ ] 11-02-PLAN.md — UI: SubmissionsTab router, SubmissionListView (metrics, filters, mini-dots table), SubmissionLogForm (both paths), cross-tab navigation from AnalysisResults
-- [ ] 11-03-PLAN.md — UI: SubmissionDetailView (pipeline bar, timeline, notes, status updates, snapshot viewer/export), human verification
-
-### Phase 12: UI Redesign
-**Goal**: All pages reflect the v2.0 dark-theme design system with the redesigned layouts — Experience uses collapsible cards with drag reorder, Variant Builder uses a split pane, and the Analysis and Submissions views match their HTML mockup layouts — without breaking any existing export or snapshot functionality
-**Depends on**: Phase 11
-**Requirements**: UI-03, UI-04, UI-05, UI-06, UI-07, UI-08
-**Success Criteria** (what must be TRUE):
-  1. Experience page shows collapsible job cards with inline editing and drag-to-reorder, all using design system tokens
-  2. Variant Builder shows a split-pane layout with the builder on the left and a live preview on the right
-  3. Analysis dashboard shows 4 metric cards and a two-column layout (keyword analysis + gap details on left, suggested rewrites on right)
-  4. Submissions tracker shows metric cards (total, in progress, interviews, response rate) above a filter-pill + searchable table layout
-  5. PDF export, DOCX export, snapshot viewer, and variant builder preview all function correctly after the redesign
-**Plans:** 2/3 plans executed
-Plans:
-- [ ] 12-01-PLAN.md — Experience page: collapsible job cards with drag reorder, jobs:reorder IPC, skills chip display
-- [ ] 12-02-PLAN.md — Variant Builder: 50/50 split-pane layout with live preview, export controls in header, analysis score badge
-- [ ] 12-03-PLAN.md — Analysis/Submissions token polish (RGBA fixes) and export regression smoke test
+  1. Even, Class, and Elegant theme npm packages are uninstalled and all theme registry wiring is gone — no dead code paths remain
+  2. ProfessionalLayout component is deleted — Classic template is the replacement and works identically for existing variants
+  3. Exporting a PDF from a submission snapshot (old or new) completes without error
+**Plans**: TBD
 
 ## Progress
 
-**Execution Order:**
-Phases execute in order: 8 → 9 → 10 → 11 → 12
-Note: Phase 11 depends only on Phase 8 (no AI dependency) — can begin after Phase 8 completes, in parallel with Phases 9-10 if desired.
-
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 8. Foundation | 2/3 | In Progress|  | - |
-| 9. Analysis Core | 3/3 | Complete   | 2026-03-23 | - |
-| 10. Bullet Suggestions | 1/2 | Complete    | 2026-03-24 | - |
-| 11. Submission Pipeline | 3/3 | Complete    | 2026-03-24 | - |
-| 12. UI Redesign | 2/3 | In Progress|  | - |
+| 1-7 | v1.0 + v1.1 | - | Complete | 2026-03-23 |
+| 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
+| 13. Pipeline Foundation | v2.1 | 0/3 | Planned | - |
+| 14. Templates Complete | v2.1 | 0/? | Not started | - |
+| 15. Controls + Page Break Overlay | v2.1 | 0/? | Not started | - |
+| 16. Cleanup | v2.1 | 0/? | Not started | - |

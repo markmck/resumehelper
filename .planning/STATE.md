@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Analysis Integration
 status: planning
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-03-24T21:01:15.448Z"
+stopped_at: Completed 12-03-PLAN.md
+last_updated: "2026-03-24T21:36:33.801Z"
 last_activity: 2026-03-23 — Roadmap created, 31 requirements mapped across 5 phases
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 14
-  completed_plans: 11
+  completed_plans: 12
   percent: 87
 ---
 
@@ -89,6 +89,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 11-submission-pipeline P03 | 45min | 2 tasks | 3 files |
 | Phase 12-ui-redesign P01 | 5min | 2 tasks | 9 files |
 | Phase 12-ui-redesign P02 | 4min | 2 tasks | 6 files |
+| Phase 12-ui-redesign P03 | 30min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -130,6 +131,8 @@ Recent decisions affecting current work:
 - [Phase 12-ui-redesign]: jobs:reorder IPC with sort_order column added to jobs schema — missing from original schema despite plan claiming it was there
 - [Phase 12-ui-redesign]: previewVersion counter as refreshKey — supports rapid toggles without race conditions
 - [Phase 12-ui-redesign]: onOptimizeVariant callback chain + pendingOptimizeAnalysis mirrors pendingLogAnalysis pattern for cross-tab deep navigation
+- [Phase 12-ui-redesign]: rgba(239, 68, 68, 0.3) danger border kept as-is — no token equivalent for 30% opacity danger border
+- [Phase 12-ui-redesign]: Post-checkpoint visual regressions (collapsible, PDF breaks, card gap, sidebar) fixed in commits 91e5dbb and 7d3440c after smoke test approval
 
 ### Pending Todos
 
@@ -143,6 +146,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-24T21:01:15.446Z
-Stopped at: Completed 12-02-PLAN.md
+Last session: 2026-03-24T21:36:30.049Z
+Stopped at: Completed 12-03-PLAN.md
 Resume file: None

@@ -1,12 +1,258 @@
 # Stack Research
 
 **Domain:** Desktop resume management app — PDF/DOCX export, resume templating, AI-assisted job matching
-**Researched:** 2026-03-13 (v1.0), updated 2026-03-14 (v1.1 additions), updated 2026-03-23 (v2.0 AI analysis additions)
-**Confidence:** MEDIUM (core choices HIGH, AI/vector layer MEDIUM due to alpha-stage packages)
+**Researched:** 2026-03-13 (v1.0), updated 2026-03-14 (v1.1 additions), updated 2026-03-23 (v2.0 AI analysis additions), updated 2026-03-25 (v2.1 template rendering additions)
+**Confidence:** MEDIUM-HIGH for v2.1 section (core font/CSS claims backed by official docs and Chromium behavior; react-colorful React 19 compatibility is MEDIUM — untested, but hooks-only implementation has no known breakage)
 
-> **Scope note:** This document covers ONLY the additional libraries needed on top of the existing
-> scaffold. The existing stack (Electron 39, React 19, TypeScript, Tailwind CSS 4, Drizzle ORM,
-> better-sqlite3, electron-builder) is already decided and not re-researched here.
+---
+
+## v2.1 Additions — Template Rendering and Export
+
+These additions cover: 5 purpose-built HTML/CSS templates (Classic, Modern, Jake, Minimal, Executive), font loading for Lato/EB Garamond/Inter, CSS page break control, accent color picker, and DOCX per-template font selection. The base stack (Electron 39, React 19, TypeScript, Drizzle, SQLite, docx 9.6.1, electron-vite 5) is unchanged.
+
+---
+
+### Font Loading for Electron PDF Export (No New Library)
+
+**Problem:** New templates need Lato (Modern/Minimal), EB Garamond (Executive), and Inter (Jake) in addition to the existing Calibri fallback. These fonts must render correctly in both the live preview pane and the hidden BrowserWindow used by `printToPDF`. Google Fonts CDN calls are unreliable in hidden BrowserWindows and fail offline.
+
+**Recommended approach: bundle woff2 files in `src/renderer/public/fonts/`**
+
+electron-vite copies `src/renderer/public/` as-is into the renderer's output root during build. Files placed there are served at `/` in dev (`http://localhost:5173/fonts/...`) and bundled into the output at the same relative path in production (`app://./fonts/...`). The hidden BrowserWindow for export shares the same Electron renderer origin, so `/fonts/...` paths resolve identically for preview and PDF export.
+
+```
+src/renderer/public/
+  fonts/
+    inter-regular.woff2
+    inter-bold.woff2
+    lato-light.woff2       (weight 300)
+    lato-regular.woff2     (weight 400)
+    lato-bold.woff2        (weight 700)
+    eb-garamond-regular.woff2
+    eb-garamond-italic.woff2
+```
+
+```css
+/* Declare in a <style> block within each template component that needs it,
+   OR in a shared fonts.css imported once in main.tsx */
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Lato';
+  src: url('/fonts/lato-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+/* etc. */
+```
+
+**Font sources:** Google Fonts — all three are OFL-licensed (open source, redistribution allowed).
+- Inter: https://fonts.google.com/specimen/Inter
+- Lato: https://fonts.google.com/specimen/Lato
+- EB Garamond: https://fonts.google.com/specimen/EB+Garamond
+
+**Why "EB Garamond" and not "Garamond":** The system font named "Garamond" only exists on some Windows machines. EB Garamond is the open-source revival and is bundleable. Reference it as `font-family: 'EB Garamond'` in template CSS.
+
+**Why NOT base64 inline fonts:** Causes "OTS parsing error: Failed to convert WOFF 2.0 font to SFNT" in some Chromium versions. Makes CSS files enormous and unmaintainable. No advantage over woff2 file references in an Electron app where the filesystem is always available.
+
+**Why NOT Google Fonts @import:** Network-dependent. Fails if the user is offline. Race condition possible in the hidden BrowserWindow's 200ms settle window. Not reproducible across environments.
+
+**PrintToPDF font settle time:** The existing `print:ready` IPC signal + 200ms settle delay in export.ts is sufficient for woff2 fonts to load in the Chromium renderer. Do not increase the timeout speculatively — only increase if visual testing shows font fallback actually occurring.
+
+**Confidence: MEDIUM-HIGH** — electron-vite public asset behavior from official docs; woff2 path resolution in Electron is standard Chromium behavior; OTS error with base64 fonts from community reports.
+
+---
+
+### CSS Page Break Techniques for printToPDF
+
+**Context:** Electron 39 uses Chromium ~130+. Modern Chromium has full CSS Fragmentation Level 3 support. The existing ProfessionalLayout already uses `pageBreakInside: 'avoid'` on job/project/education entries — this pattern is proven to work with the existing printToPDF call.
+
+**Extend this pattern for new templates:**
+
+```typescript
+// On job/project/education/volunteer entry containers — prevent splitting mid-entry
+style={{
+  breakInside: 'avoid',       // CSS Fragmentation Level 3 (modern)
+  pageBreakInside: 'avoid',   // CSS2.1 alias — include both for safety
+}}
+
+// On section heading (h2) — prevent heading orphaned at page bottom
+style={{
+  breakAfter: 'avoid',
+  pageBreakAfter: 'avoid',
+}}
+
+// Forced page break (e.g., if Executive template needs a two-region layout)
+style={{
+  breakBefore: 'page',
+  pageBreakBefore: 'always',
+}}
+```
+
+**What does NOT work reliably:**
+
+- `@page` CSS margin rules **conflict with** `printToPDF`'s `margins` option (confirmed Electron issue #8138). The existing export.ts uses `margins: { top: 0, bottom: 0, left: 0, right: 0 }`. Do NOT add `@page` rules to new templates — they cause layout drift between preview and PDF.
+- `break-inside: avoid-page` — only `avoid` is reliably supported in Chromium's print engine; `avoid-page` is spec but not reliably implemented.
+- `orphans`/`widows` CSS properties — apply only to text nodes inside block containers, not to block elements like sections. Useless for resume section control.
+
+**Page break simulation in preview:** The live preview pane shows continuous scroll, not paginated pages. To show visible page break markers in preview (one of the v2.1 requirements), inject visual dividers at fixed page height intervals using JavaScript (`document.querySelector` after render, or a React `useEffect` that computes element positions relative to page height). This is a UI overlay — it does not affect printToPDF output.
+
+**Confidence: MEDIUM** — CSS Fragmentation support confirmed via MDN and caniuse; `@page` conflict confirmed via Electron GitHub issue #8138; page-break-inside behavior in ProfessionalLayout is already validated in production.
+
+---
+
+### Accent Color Picker — react-colorful
+
+**Add:** `react-colorful` 5.6.1
+
+```bash
+npm install react-colorful
+```
+
+**Usage in Variant Builder:**
+
+```tsx
+import { HexColorPicker, HexColorInput } from 'react-colorful'
+
+<HexColorPicker color={accentColor} onChange={setAccentColor} />
+<HexColorInput color={accentColor} onChange={setAccentColor} prefixed />
+```
+
+**Why react-colorful:**
+- 2.8 KB — smallest available hex color picker
+- Zero dependencies
+- No CSS import required (since v5)
+- Uses only stable React hooks — compatible with React 19 (no class component patterns, no deprecated lifecycle methods)
+- Provides both a visual swatch picker and a text hex input
+
+**Caveat:** Last npm publish was ~2022. The library is functionally complete and not actively developed, which is acceptable for a mature, stable UI primitive. If peer dependency warnings appear with React 19, the fallback is a native `<input type="color">` + a separate text input — both are natively supported in Chromium with no library needed.
+
+**Why NOT react-color (older library):** Uses deprecated React class component patterns, last updated 2018, 25x larger bundle.
+
+**Why NOT @uiw/react-color:** 5x larger, more components than needed for a single accent picker.
+
+**Why NOT native `<input type="color">` as first choice:** The OS-native color picker chrome (the system color dialog) does not match the dark design system. It also lacks an inline hex text input companion without additional code.
+
+**Confidence: MEDIUM** — version and features from npm registry; React 19 compatibility inferred from hooks-only implementation (no official compatibility test found).
+
+---
+
+### DOCX Per-Template Font Selection (No New Library)
+
+The existing `docx` 9.6.1 implementation is sufficient. For v2.1, pass a `fontName` parameter to the DOCX builder to allow per-template font selection:
+
+```typescript
+// In export.ts — DOCX builder receives fontName from variant's template selection
+new TextRun({ text: job.role, bold: true, size: 22, font: fontName })
+```
+
+**Recommended DOCX font mapping by template:**
+
+| Template | HTML/PDF Font | DOCX Font | Rationale |
+|----------|--------------|-----------|-----------|
+| Classic | Times New Roman | Times New Roman | ATS-safe, built into Word |
+| Modern | Calibri / Inter | Calibri | Inter not available in Word; Calibri is the ATS-standard |
+| Jake | Calibri | Calibri | Same as Modern |
+| Minimal | Calibri | Calibri | Same |
+| Executive | EB Garamond | Garamond | Garamond is built into Word on Windows and macOS; ATS-safe |
+
+**Font embedding in DOCX:** The `docx` library does not support font embedding (GitHub issue #239, open since 2019, no resolution). DOCX files reference fonts by name — Word loads them from the system. This is acceptable because:
+1. All DOCX fonts listed above (Calibri, Times New Roman, Garamond) are built into Word on all supported platforms
+2. ATS systems parse text content, not font rendering — font embedding is irrelevant for ATS compliance
+3. Adding font embedding would require manually post-processing the DOCX ZIP structure — disproportionate complexity
+
+**ATS compliance principles (already followed by existing implementation):**
+- Use standard section headings: WORK EXPERIENCE, EDUCATION, SKILLS (not creative alternatives)
+- Plain text bullets — no tables, text boxes, columns, or headers/footers with critical info
+- Single-column layout for all DOCX output regardless of template visual style
+- Font sizes: body text 10–11pt (size: 20–22 in docx), section headers 11–12pt (size: 22–24), name 14–16pt (size: 28–32)
+
+**Confidence: HIGH** — docx font embedding limitation confirmed via official GitHub; ATS font recommendations from multiple 2025 ATS guides agree on Calibri/Times New Roman/Garamond as safe choices.
+
+---
+
+### Template Schema Changes (No New Library)
+
+The existing `templateVariants` table needs two new columns to support per-variant template and accent color persistence:
+
+```typescript
+// In src/main/db/schema.ts — additions to templateVariants table
+templateId: text('template_id').notNull().default('classic'),  // 'classic' | 'modern' | 'jake' | 'minimal' | 'executive'
+accentColor: text('accent_color').notNull().default('#2563eb'),  // hex string
+compactMargins: integer('compact_margins', { mode: 'boolean' }).notNull().default(false),
+skillsDisplayMode: text('skills_display_mode').notNull().default('grouped'),  // 'grouped' | 'tags' | 'columns'
+```
+
+These are Drizzle schema additions only — no new library.
+
+---
+
+## v2.1 Installation
+
+```bash
+# New dependency
+npm install react-colorful
+
+# Font files — download from Google Fonts (OFL license), place in:
+# src/renderer/public/fonts/
+# Required files:
+#   inter-regular.woff2, inter-bold.woff2
+#   lato-light.woff2, lato-regular.woff2, lato-bold.woff2
+#   eb-garamond-regular.woff2, eb-garamond-italic.woff2
+
+# No new npm packages for:
+# - Font loading (static files in public/)
+# - Page break control (CSS inline styles, existing pattern)
+# - DOCX font selection (parameter addition to existing docx builder)
+# - Template schema (Drizzle column additions only)
+```
+
+---
+
+## v2.1 What NOT to Add
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| puppeteer / puppeteer-core | ~200MB Chrome download, redundant with existing Electron Chromium | Existing `webContents.printToPDF` |
+| html2canvas + jsPDF | Rasterizes text to image — destroys ATS parsability and search-in-PDF | `printToPDF` (vector text output) |
+| pdfmake / pdf-lib | Coordinate-based layout — templates would need a parallel programmatic implementation alongside the HTML/CSS version | `printToPDF` (renders existing HTML/CSS templates directly) |
+| @react-pdf/renderer | Separate React renderer — templates would need two implementations (one for preview, one for PDF). Different CSS support from browser | Single template component + `printToPDF` |
+| docxtemplater | Requires .docx template files on disk — same ESM/path problem that killed the old resume.json themes. Overkill for programmatic generation | `docx` 9.6.1 (already in use) |
+| CSS @page rules in templates | Conflicts with printToPDF's `margins` option (Electron issue #8138) — causes layout drift | printToPDF `margins` option (already used) |
+| Google Fonts @import CDN | Network-dependent, offline failure, race condition in hidden BrowserWindow | Bundled woff2 in `src/renderer/public/fonts/` |
+| Base64 inline fonts | OTS parsing errors in some Chromium versions; unmaintainable | woff2 file references |
+| vite-plugin-webfont-dl | Downloads fonts at build time but same result as manually placing woff2 files; adds a build-time plugin dependency | Manual download of woff2 files into public/fonts/ |
+| react-color (old library) | Deprecated class component API, 2018-vintage, 25x larger than react-colorful | react-colorful |
+
+---
+
+## v2.1 Version Compatibility
+
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| react-colorful@5.6.1 | React 19.2.x | Hooks only; no deprecated APIs; peer dep listed as React >=16.8.0 |
+| docx@9.6.1 (existing) | Electron main process | `Packer.toBuffer()` confirmed working; font embedding not supported by design |
+| woff2 font files | Electron 39 / Chromium 130+ | woff2 natively supported in Chromium — no loader or plugin needed |
+| CSS break-inside/pageBreakInside | Chromium 130+ | Both legacy and modern properties work — use both for safety |
+
+---
+
+## v2.1 Sources
+
+- electron-vite.org/guide/assets — public directory behavior for renderer process (MEDIUM confidence — official docs)
+- github.com/electron/electron/issues/8138 — `@page` margin CSS conflicts with printToPDF margins option (MEDIUM confidence — confirmed issue)
+- github.com/dolanmiu/docx/issues/239 — font embedding not supported in docx library (HIGH confidence — open issue, no progress since 2019)
+- github.com/omgovich/react-colorful — react-colorful 5.6.1, zero deps, hooks API (HIGH confidence — official repo)
+- developer.mozilla.org/en-US/docs/Web/CSS/break-inside — CSS Fragmentation support (HIGH confidence — MDN)
+- caniuse.com/css-page-break — page-break property browser support tables (HIGH confidence)
+- fonts.google.com/specimen/Inter, /Lato, /EB+Garamond — OFL license confirmed (HIGH confidence)
+- ATS font guides 2025 — multiple sources (enhancv, jobscan, resumeoptimizerpro) agree on Calibri/Times New Roman/Garamond (MEDIUM confidence — marketing content but consistent across sources)
+
+---
 
 ---
 
@@ -33,7 +279,7 @@ score, gaps, keyword coverage, rewrite suggestions) as typed TypeScript objects.
 |------------|---------|---------|-----------------|
 | `ai` | ^6.0.135 | AI SDK Core — provider-agnostic `generateText`, `generateObject`, `streamText`, `streamObject` with Zod schema enforcement | Released Dec 2025. Works in Node.js (no Next.js required). Single API surface for all providers. `generateObject` + Zod schema produces fully-typed, validated TypeScript objects from LLM responses — critical for reliable match scores and structured analysis output. |
 | `@ai-sdk/anthropic` | ^3.0.63 | Anthropic Claude provider adapter | Drop-in provider. User supplies their own API key. Swap without changing call-site code. |
-| `@ai-sdk/openai` | ^3.0.47 | OpenAI (GPT-4o, o1, etc.) provider adapter | Same interface as Anthropic adapter. User supplies their own API key. |
+| `@ai-sdk/openai` | ^3.0.48 | OpenAI (GPT-4o, o1, etc.) provider adapter | Same interface as Anthropic adapter. User supplies their own API key. |
 | `zod` | ^4.3.6 | Schema definition for structured LLM output + runtime validation | AI SDK natively consumes Zod schemas in `generateObject`. Already a peer dependency of AI SDK. Produces TypeScript types automatically — no manual type declarations for LLM output shapes. |
 
 **Architecture pattern — all AI calls run in the Electron main process:**
@@ -199,12 +445,7 @@ For v2.0, this pipeline adds significant complexity and first-run latency with n
 the LLM-based approach — the user is already paying for API calls for the analysis itself. The
 match score comes from the same LLM call that produces all other analysis, not a separate step.
 
-**Defer to v2.1:** If offline matching (no API key required) becomes a requirement, revisit
-`@huggingface/transformers` + `sqlite-vec`. The v2.1 scope already includes "AI-powered
-auto-variant generation" which would justify the embedding pipeline investment.
-
-**Confidence:** HIGH — This is an architectural decision, not a library question. Confirmed by
-reviewing AI SDK `generateObject` capabilities.
+**Confidence:** HIGH — This is an architectural decision, not a library question.
 
 ---
 
@@ -218,47 +459,6 @@ semantic color tokens, consistent typography scale.
 The existing Tailwind CSS 4 installation provides everything needed. No new CSS-in-JS library or
 design token tool is required.
 
-**Approach:**
-
-```css
-/* src/renderer/src/assets/tokens.css — imported once in main.tsx */
-:root {
-  /* Surface tokens */
-  --color-bg-base: #0a0a0a;
-  --color-bg-surface: #111111;
-  --color-bg-elevated: #1a1a1a;
-  --color-bg-overlay: #222222;
-
-  /* Text tokens */
-  --color-text-primary: #f5f5f5;
-  --color-text-secondary: #a3a3a3;
-  --color-text-muted: #525252;
-
-  /* Accent tokens */
-  --color-accent-primary: #3b82f6;
-  --color-accent-hover: #2563eb;
-
-  /* Border tokens */
-  --color-border-subtle: #262626;
-  --color-border-default: #404040;
-
-  /* Spacing — 4px grid */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --space-8: 32px;
-
-  /* Typography */
-  --font-size-xs: 11px;
-  --font-size-sm: 13px;
-  --font-size-base: 14px;
-  --font-size-lg: 16px;
-  --font-size-xl: 20px;
-}
-```
-
 **Why NOT Style Dictionary or other token tools:**
 Style Dictionary transforms design tokens stored in JSON/YAML into platform-specific outputs. This
 app already has a design system document and HTML mockups defining the token system — the tokens are
@@ -269,53 +469,22 @@ payoff for a single-platform app.
 The existing project has a documented constraint: "Inline styles over Tailwind for spacing — Tailwind
 v4 utility classes not applying reliably." CSS custom properties consumed directly via inline styles
 (`style={{ color: 'var(--color-text-primary)' }}`) are reliable regardless of Tailwind's utility
-class application behavior. Define tokens as CSS custom properties, reference them via inline styles
-for layout/spacing (consistent with existing pattern), use Tailwind classes only for structural
-utilities where they reliably apply.
+class application behavior.
 
-**Dark mode activation in Electron:**
-Since this is a dark-first app (not a toggle), set `data-theme="dark"` on `<html>` unconditionally.
-If a light mode is added later, use Tailwind v4's `@custom-variant dark` with attribute selector:
-
-```css
-/* In global CSS — only needed if light mode toggle is added */
-@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
-```
-
-**Confidence:** HIGH — CSS custom properties are a baseline web platform feature. Tailwind v4
-`@custom-variant` verified at https://tailwindcss.com/docs/dark-mode. The inline style constraint
-is an existing documented project decision.
+**Confidence:** HIGH — CSS custom properties are a baseline web platform feature.
 
 ---
 
 ### Drag Reorder — Already Installed
 
-**Feature:** Drag-to-reorder work experience cards on the redesigned Experience page.
-
 `@dnd-kit/core` ^6.3.1 and `@dnd-kit/sortable` ^10.0.0 are **already installed** (confirmed in
-`package.json`). No new installation needed. The v2.0 redesign extends the existing drag-reorder
-pattern already used for bullet points to the card level.
-
-**Confidence:** HIGH — Confirmed in package.json.
+`package.json`). No new installation needed.
 
 ---
 
 ### Submission Pipeline Status — Database Only
 
-**Feature:** Fixed pipeline stages (Applied → Phone Screen → Technical → Offer → Rejected) on each
-submission record.
-
-**No new library required.** This is a Drizzle schema change only:
-
-```typescript
-// Add to submissions table
-status: text('status', {
-  enum: ['applied', 'phone_screen', 'technical', 'offer', 'rejected']
-}).notNull().default('applied'),
-```
-
-Drizzle ORM's enum constraint on a text column enforces valid values at the ORM layer. The status
-column is a simple string — no state machine library needed.
+**No new library required.** This is a Drizzle schema change only — a `status` text column with enum constraint on the submissions table.
 
 **Confidence:** HIGH — This is a schema design decision, not a library question.
 
@@ -344,10 +513,10 @@ npm install ai @ai-sdk/anthropic @ai-sdk/openai zod
 | Raw `openai` or `@anthropic-ai/sdk` | Provider-specific API surface — switching providers requires call-site changes. No structured output enforcement | `ai` + `@ai-sdk/openai` / `@ai-sdk/anthropic` |
 | LiteLLM / OpenRouter | Requires a running server process. Incompatible with local Electron app architecture | AI SDK handles provider switching in-process |
 | `@huggingface/transformers` + `sqlite-vec` for embeddings | Downloads 100MB–1GB model weights. CPU-bound inference. Adds a separate embedding pipeline when the LLM call already performs semantic analysis | LLM prompt-based semantic analysis via `generateObject` |
-| `electron-store` v11 | Pure ESM only — conflicts with electron-vite CJS main process bundle. Project does not use it yet; adding it now creates ESM/CJS friction | `safeStorage` + Drizzle for API key storage |
+| `electron-store` v11 | Pure ESM only — conflicts with electron-vite CJS main process bundle | `safeStorage` + Drizzle for API key storage |
 | `electron-conf` | No encryption support (stated explicitly in README). Unsuitable for storing API keys | `safeStorage` + Drizzle |
 | Style Dictionary / design-token tools | Build-time token pipeline for multi-platform. Overkill for a single-platform app with known tokens | CSS custom properties directly in a `tokens.css` file |
-| CSS-in-JS libraries (styled-components, emotion) | Runtime style injection conflicts with existing Tailwind + inline style pattern. No SSR requirement that would justify them | CSS custom properties + inline styles (existing pattern) |
+| CSS-in-JS libraries (styled-components, emotion) | Runtime style injection conflicts with existing Tailwind + inline style pattern | CSS custom properties + inline styles (existing pattern) |
 | `react-query` / `@tanstack/react-query` | Caching library designed for network requests. All data in this app comes from local SQLite via IPC — no network latency to cache | Direct IPC calls with React state (existing pattern) |
 
 ---
@@ -358,7 +527,7 @@ npm install ai @ai-sdk/anthropic @ai-sdk/openai zod
 |---------|-----------------|-------|
 | `ai` ^6.0.135 | Node.js 18+, TypeScript 5.x | Electron 39 runs Node.js 22 — fully compatible. No Next.js required. |
 | `@ai-sdk/anthropic` ^3.0.63 | `ai` ^6.x | Provider adapter — must match `ai` major version. |
-| `@ai-sdk/openai` ^3.0.47 | `ai` ^6.x | Provider adapter — must match `ai` major version. |
+| `@ai-sdk/openai` ^3.0.48 | `ai` ^6.x | Provider adapter — must match `ai` major version. |
 | `zod` ^4.3.6 | `ai` ^6.x (peer dep) | AI SDK natively consumes Zod schemas. zod v4 is the current major. |
 | `electron.safeStorage` | Electron 15+ | Available in Electron 39. Main process only — cannot call from renderer or preload. |
 
@@ -379,21 +548,12 @@ everything else.
 |------------|---------|---------|-----------------|
 | `resume-schema` | ^1.0.0 | Validate imported JSON against the official JSON Resume schema before mapping | Authoritative — maintained by the jsonresume org. Wraps `jsonschema` validation internally. Calling `resumeSchema.validate(obj, callback)` gives a structured error list that can surface user-readable import warnings. Zero-dependency validator. |
 
-**Approach:** In the Electron main process, after `dialog.showOpenDialog` picks the `.json` file,
-read it with `fs.readFileSync`, `JSON.parse`, call `resumeSchema.validate()`, then map conforming
-fields to internal Drizzle schema models. Validation errors should be collected and shown to the
-user as import warnings (not hard failures) — partial imports are acceptable.
-
 **No parsing library needed:** The resume.json format is plain JSON. `JSON.parse` is sufficient.
 `resume-schema` adds only schema validation on top of that — it is not a parser.
 
-**Confidence:** HIGH — Official jsonresume package. Schema is at stable v1.0.0. The validate()
-API is well-documented and callback-based (no async complications for the main process).
+**Confidence:** HIGH — Official jsonresume package. Schema is at stable v1.0.0.
 
-**Alternative considered:** `@jsonresume/schema` (v1.2.1) — a newer scoped package from the same
-org. Use `resume-schema` (the older package) instead: it is the canonical reference implementation
-explicitly linked from the official schema docs, and its v1.0.0 stable tag signals intentional API
-stability. The newer scoped package has no substantial API advantage for simple validation.
+**Alternative considered:** `@jsonresume/schema` (v1.2.1) — use `resume-schema` instead: it is the canonical reference implementation explicitly linked from the official schema docs.
 
 ---
 
@@ -402,50 +562,31 @@ stability. The newer scoped package has no substantial API advantage for simple 
 **Feature:** Allow users to select an installed jsonresume theme, render their resume data through
 it, and display or export the resulting HTML.
 
-This is the most architecturally complex of the four new features. The theme contract is:
+The theme contract is:
 
 ```javascript
-// All jsonresume themes export a render() function:
 import * as theme from 'jsonresume-theme-even';
 const html = theme.render(resumeObject); // returns complete HTML string
 ```
 
-The HTML string is self-contained (inlined CSS, no external requests required by well-written
-themes). The challenge is loading theme modules at runtime in Electron's main process.
-
 #### Theme Module Loading Strategy
 
-**Recommended approach: bundle 2–3 curated themes at install time (not dynamic user-installed plugins)**
+**Recommended approach: bundle 2–3 curated themes at install time**
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| `jsonresume-theme-even` | ^0.14.x | First-party bundled theme — flat, modern layout, dual ESM/CJS builds | Most actively maintained community theme. Explicitly supports both ESM and CJS. Full CSS inlined in output. Wide adoption. |
-| `jsonresume-theme-class` | latest | Official jsonresume org theme — self-contained, offline-safe | Published under the jsonresume org. Documented as "self-contained" and designed to work offline — directly relevant to an Electron desktop app. |
-
-**Why NOT dynamic user-installed themes (require/import at arbitrary user-provided paths):**
-Electron's main process CJS bundle (`electron-vite` default output) can call `require()` on a
-known node_modules path, but arbitrary user-installed npm packages introduce: (1) path resolution
-complexity on packaged apps where `node_modules` is bundled differently, (2) ESM/CJS conflicts —
-many newer themes are ESM-only, requiring `import()` inside an async function which complicates
-IPC handler design, (3) no sandboxing — a theme module runs in the main process with full Node.js
-access. For v1.1, bundle 2–3 known-good themes. Expose a theme selector in UI. Dynamic plugin
-loading is a v2+ concern.
+| `jsonresume-theme-even` | ^0.14.x | First-party bundled theme — flat, modern layout, dual ESM/CJS builds | Most actively maintained community theme. Explicitly supports both ESM and CJS. |
+| `jsonresume-theme-class` | latest | Official jsonresume org theme — self-contained, offline-safe | Published under the jsonresume org. Designed to work offline. |
 
 **ESM caveat for theme packages:** `electron-vite` compiles the main process as CJS by default.
 Themes that are ESM-only require `await import('jsonresume-theme-X')` inside an async IPC handler.
-`jsonresume-theme-even` provides both CJS and ESM builds, making it safe for either approach.
-Verify the target theme's `package.json` `"type"` field before adding it — if `"type": "module"`,
-use dynamic `import()`.
+Verify the target theme's `package.json` `"type"` field before adding it.
 
 #### Rendering the HTML in the UI
 
 **Recommended approach: `<iframe srcdoc={html}>`**
 
-Render the HTML string from the theme's `render()` call inside an `<iframe>` with the `srcdoc`
-attribute. No new library needed — this is built-in browser/Electron behavior.
-
 ```tsx
-// In the renderer process:
 <iframe
   srcdoc={themeHtml}
   sandbox="allow-same-origin"
@@ -453,97 +594,36 @@ attribute. No new library needed — this is built-in browser/Electron behavior.
 />
 ```
 
-The `sandbox="allow-same-origin"` attribute blocks scripts inside the theme HTML (appropriate
-since theme HTML is CSS-only presentation) while allowing CSS to apply correctly.
-
-**Why NOT a hidden BrowserWindow + loadURL:** A separate BrowserWindow for preview is heavyweight
-(additional process, IPC round-trip, window management). The `srcdoc` approach renders inline in
-the existing renderer process, which is sufficient for a preview panel. Reserve the separate-window
-approach for PDF export (which already uses it via `printToPDF`).
-
-**Why NOT dangerouslySetInnerHTML:** Theme HTML includes `<html>`, `<head>`, and `<body>` tags.
-Injecting a full document tree into a React component via `innerHTML` produces malformed DOM.
-An `<iframe>` is the correct container for a complete foreign HTML document.
-
-**Confidence:** MEDIUM — The `srcdoc` + `sandbox` iframe pattern is well-established for
-embedding foreign HTML. The specific behavior of Electron's renderer process with `srcdoc` iframes
-matches standard Chromium. The ESM/CJS theme loading concern is a REAL issue that needs
-verification per-theme during integration.
+**Confidence:** MEDIUM — The `srcdoc` + `sandbox` iframe pattern is well-established.
 
 ---
 
 ### Projects Section
 
-**Feature:** New database entity (`projects` table) with the same toggleable-bullet pattern as
-`work_experience`. CRUD UI in the Experience tab.
-
-**No new libraries required.** This is entirely implemented using the existing stack:
-
-- Drizzle ORM + better-sqlite3 → schema migration for the `projects` table
-- React 19 + TypeScript → CRUD UI components (mirrors the existing work experience pattern)
-- Tailwind CSS 4 / inline styles → styling (follow existing patterns)
-- @dnd-kit/sortable → bullet reordering (already installed, already used for work experience)
-
-The projects section is a database + UI concern, not a library concern.
+**No new libraries required.** Uses existing Drizzle + @dnd-kit + React.
 
 ---
 
 ### Tag Autocomplete
 
-**Feature:** When typing a tag in skill or project tag inputs, suggest existing tags already in
-the database.
-
 **Recommended approach: custom component (no new library)**
 
-The existing stack provides everything needed. The autocomplete behavior is:
-1. On input change → query SQLite for all existing tag strings (via IPC → Drizzle)
-2. Filter client-side with `Array.filter` + `String.includes` (or `startsWith`)
-3. Render a `<ul>` dropdown with keyboard navigation (arrow keys, Enter, Escape)
-4. On selection → append tag to field
-
-This is a ~60–80 line component. The complexity does not justify a library dependency.
-
-**Why NOT `react-tag-autocomplete` (v7.5.1):**
-The library is solid (React 18+ compatible, accessible, well-maintained at v7.5.1), but it imposes
-its own data model (`{ label, value }` tag objects with `id` fields) that conflicts with the app's
-existing freeform string-based tag storage. Adapting the library's model to the DB schema requires
-as much code as a custom implementation, with the added cost of a dependency that owns the input
-styling and interaction model — difficult to reconcile with the existing Tailwind/inline style
-approach.
-
-**Why NOT `@headlessui/react` Combobox:**
-Headless UI's Combobox is excellent for standalone combobox fields but is optimized for
-single-selection scenarios. Tag inputs require multi-value selection with chip display, which
-Headless UI does not handle out of the box. Would require significant wrapper code anyway.
-
-**If a library becomes necessary** (e.g., accessibility requirements for WCAG compliance surface
-during implementation), use `react-tag-autocomplete` v7.5.1. It is the only actively-maintained
-library specifically designed for this pattern (React 18+, accessible, allows new tags via
-`allowNew` prop).
-
-**Confidence:** HIGH — Custom implementation is the established practice for tag inputs in
-apps with existing design systems. The data model mismatch with `react-tag-autocomplete` is
-a concrete technical reason, not a preference.
+A ~60–80 line component using React state + IPC query. The autocomplete behavior does not justify a library dependency. The data model (freeform strings) conflicts with `react-tag-autocomplete`'s `{ label, value }` object model.
 
 ---
 
 ## Full Updated Installation
 
 ```bash
+# v2.1 — Template rendering additions
+npm install react-colorful
+# + manually place woff2 font files in src/renderer/public/fonts/
+
 # v2.0 — AI analysis additions
 npm install ai @ai-sdk/anthropic @ai-sdk/openai zod
 
-# v1.1 — resume.json import and themes (already installed per git history)
-# npm install resume-schema
-# npm install jsonresume-theme-even jsonresume-theme-class
-
-# No new installs needed for:
-# - Settings storage (safeStorage built-in + existing Drizzle)
-# - Dark theme design system (CSS custom properties in tokens.css)
-# - Drag reorder (@dnd-kit already at ^6.3.1 / ^10.0.0)
-# - Submission pipeline status (Drizzle schema column only)
-# - Projects section (uses existing Drizzle + @dnd-kit)
-# - Tag autocomplete (custom component, no library)
+# v1.1 — resume.json import and themes (already installed)
+# npm install resume-schema jsonresume-theme-even jsonresume-theme-class
 ```
 
 ---
@@ -552,19 +632,26 @@ npm install ai @ai-sdk/anthropic @ai-sdk/openai zod
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `langchain` / `@langchain/core` | Heavyweight multi-step agent framework. v2.0 uses single structured calls — no chains | `ai` + `generateObject` |
+| puppeteer / puppeteer-core | ~200MB Chrome download, redundant with existing Electron Chromium | `webContents.printToPDF` (existing) |
+| html2canvas + jsPDF | Rasterizes text — destroys ATS parsability | `printToPDF` (vector output) |
+| pdfmake / pdf-lib | Coordinate-based layout — requires parallel implementation alongside HTML/CSS templates | `printToPDF` |
+| @react-pdf/renderer | Separate React renderer — templates need two implementations | Single template + `printToPDF` |
+| docxtemplater | Requires .docx template files on disk; path resolution issues in packaged Electron apps | `docx` 9.6.1 (existing) |
+| CSS `@page` rules in templates | Conflicts with `printToPDF` margins option (Electron issue #8138) | `printToPDF` margins option |
+| Google Fonts @import CDN | Network-dependent, offline failure, race condition in hidden BrowserWindow | Bundled woff2 in public/fonts/ |
+| Base64 inline fonts | OTS parsing errors in Chromium; unmaintainable | woff2 file references |
+| `langchain` / `@langchain/core` | Heavyweight multi-step agent framework. Single structured calls need no chain | `ai` + `generateObject` |
 | Raw `openai` or `@anthropic-ai/sdk` | Provider-specific; no structured output enforcement | `ai` + provider adapters |
-| LiteLLM / OpenRouter | Requires a running server process | AI SDK in-process |
-| `@huggingface/transformers` + `sqlite-vec` | 100MB–1GB model download; complex pipeline for no benefit over LLM-based analysis | LLM prompt-based semantic analysis |
-| `electron-store` v11 | Pure ESM; conflicts with electron-vite CJS main process bundle | `safeStorage` + Drizzle |
+| `@huggingface/transformers` + `sqlite-vec` | 100MB–1GB model download; complex pipeline | LLM prompt-based semantic analysis |
+| `electron-store` v11 | Pure ESM — conflicts with electron-vite CJS main process | `safeStorage` + Drizzle |
 | `electron-conf` | No encryption — unsuitable for API keys | `safeStorage` + Drizzle |
-| Style Dictionary / design-token tools | Overkill for a single-platform app with known tokens | CSS custom properties in `tokens.css` |
+| Style Dictionary / design-token tools | Overkill for single-platform app with known tokens | CSS custom properties in `tokens.css` |
 | CSS-in-JS (styled-components, emotion) | Runtime injection conflicts with existing pattern | CSS custom properties + inline styles |
-| `react-query` / TanStack Query | Designed for network request caching; all data is local SQLite via IPC | Direct IPC calls with React state |
-| `@jsonresume/schema` | No API advantage over `resume-schema` for validation; less stable versioning history | `resume-schema` ^1.0.0 |
-| Dynamic theme plugin system | Main process security liability; complex path resolution in packaged apps | Bundle curated themes at build time |
-| `react-tag-autocomplete` | Data model conflicts with freeform string tags; owns styling | Custom ~70-line component |
+| `react-query` / TanStack Query | Caching for network requests — all data is local SQLite | Direct IPC calls with React state |
+| `react-tag-autocomplete` | Data model conflicts with freeform string tags | Custom ~70-line component |
 | `dangerouslySetInnerHTML` for theme HTML | Cannot inject full `<html><head><body>` into React DOM | `<iframe srcdoc={html}>` |
+| react-color (old library) | Deprecated class components, 2018-vintage, 25x larger | react-colorful |
+| vite-plugin-webfont-dl | Same outcome as placing woff2 manually; adds build plugin complexity | Manual woff2 download into public/fonts/ |
 
 ---
 
@@ -572,48 +659,41 @@ npm install ai @ai-sdk/anthropic @ai-sdk/openai zod
 
 | Package | Compatible With | Notes |
 |---------|-----------------|-------|
+| react-colorful@5.6.1 | React 19.2.x | Hooks only; peer dep >=16.8.0; no deprecated APIs |
 | `ai` ^6.0.135 | Node.js 18+, TypeScript 5.x | Electron 39 runs Node.js 22 — fully compatible. |
 | `@ai-sdk/anthropic` ^3.0.63 | `ai` ^6.x | Must match `ai` major version. |
-| `@ai-sdk/openai` ^3.0.47 | `ai` ^6.x | Must match `ai` major version. |
-| `zod` ^4.3.6 | `ai` ^6.x (peer dep) | AI SDK natively consumes Zod schemas. zod v4 is current major. |
+| `@ai-sdk/openai` ^3.0.48 | `ai` ^6.x | Must match `ai` major version. |
+| `zod` ^4.3.6 | `ai` ^6.x (peer dep) | zod v4 is current major. |
 | `electron.safeStorage` | Electron 15+ | Main process only. Available in Electron 39. |
-| `resume-schema` ^1.0.0 | Node.js >=12, CJS | No native dependencies. Works in Electron main process. |
+| `resume-schema` ^1.0.0 | Node.js >=12, CJS | Works in Electron main process. |
 | `jsonresume-theme-even` ^0.14.x | Node.js >=14, ESM + CJS | Dual build — safe for electron-vite CJS main process. |
-| `jsonresume-theme-class` latest | Node.js >=14 | Official jsonresume org theme. Verify module format after install. |
-| `react-tag-autocomplete` 7.5.1 (if needed) | React 18+, React 19 compatible | TypeScript types included. `allowNew` prop enables freeform tags. |
-
----
-
-## Existing Stack (Not Re-Researched)
-
-The following remain unchanged from v1.0:
-
-- **PDF export** — `webContents.printToPDF()` (built-in Electron)
-- **DOCX export** — `docx` ^9.6.1
-- **Drag reorder** — `@dnd-kit/core` ^6.3.1 + `@dnd-kit/sortable` ^10.0.0 (already installed)
-- **Database** — Drizzle ORM ^0.45.1 + better-sqlite3 ^12.8.0
+| `jsonresume-theme-class` latest | Node.js >=14 | Official jsonresume org theme. |
+| woff2 font files | Electron 39 / Chromium 130+ | Natively supported; no loader needed. |
+| CSS break-inside/pageBreakInside | Chromium 130+ | Use both legacy and modern — confirmed working. |
 
 ---
 
 ## Sources
 
-- AI SDK official docs — https://ai-sdk.dev/docs/introduction — Node.js compatibility, provider list confirmed (HIGH confidence)
-- AI SDK Node.js getting started — https://ai-sdk.dev/docs/getting-started/nodejs — install commands, v6 confirmed (HIGH confidence)
-- AI SDK providers — https://ai-sdk.dev/docs/foundations/providers-and-models — full provider list confirmed (HIGH confidence)
-- AI SDK generateObject — https://ai-sdk.dev/docs/ai-sdk-core/generating-structured-data — Zod schema integration confirmed (HIGH confidence)
-- AI SDK v6 release — https://vercel.com/blog/ai-sdk-6 — Dec 2025 release, feature set confirmed (HIGH confidence)
-- `ai` package version — `npm show ai version` → 6.0.135 (HIGH confidence, verified live)
-- `@ai-sdk/anthropic` version — `npm show @ai-sdk/anthropic version` → 3.0.63 (HIGH confidence, verified live)
-- `@ai-sdk/openai` version — `npm show @ai-sdk/openai version` → 3.0.47 (HIGH confidence, verified live)
-- `zod` version — `npm show zod version` → 4.3.6 (HIGH confidence, verified live)
-- Electron `safeStorage` API — https://www.electronjs.org/docs/latest/api/safe-storage — encrypt/decrypt API confirmed (HIGH confidence)
-- `electron-conf` README — https://github.com/alex8088/electron-conf — "❌ No encryption" confirmed (HIGH confidence)
-- `electron-store` README — https://github.com/sindresorhus/electron-store — ESM-only v11, Electron 30+ confirmed (HIGH confidence)
-- Tailwind CSS 4 dark mode — https://tailwindcss.com/docs/dark-mode — `@custom-variant` approach confirmed (HIGH confidence)
-- JSON Resume schema docs — https://docs.jsonresume.org/schema — validate() API confirmed (HIGH confidence)
-- JSON Resume theme development — https://jsonresume.org/theme-development — render() signature confirmed (HIGH confidence)
+**v2.1:**
+- electron-vite.org/guide/assets — public directory behavior for renderer (MEDIUM confidence)
+- github.com/electron/electron/issues/8138 — @page CSS conflicts with printToPDF margins (MEDIUM confidence)
+- github.com/dolanmiu/docx/issues/239 — font embedding not supported in docx (HIGH confidence)
+- github.com/omgovich/react-colorful — react-colorful 5.6.1 features (HIGH confidence)
+- developer.mozilla.org/en-US/docs/Web/CSS/break-inside — CSS Fragmentation (HIGH confidence)
+- caniuse.com/css-page-break — page-break property browser support (HIGH confidence)
+- fonts.google.com — OFL license for Inter, Lato, EB Garamond (HIGH confidence)
+
+**v2.0:**
+- AI SDK official docs — https://ai-sdk.dev/docs/introduction (HIGH confidence)
+- AI SDK generateObject — https://ai-sdk.dev/docs/ai-sdk-core/generating-structured-data (HIGH confidence)
+- Electron `safeStorage` API — https://www.electronjs.org/docs/latest/api/safe-storage (HIGH confidence)
+
+**v1.1:**
+- JSON Resume schema docs — https://docs.jsonresume.org/schema (HIGH confidence)
+- JSON Resume theme development — https://jsonresume.org/theme-development (HIGH confidence)
 
 ---
 
-*Stack research for: ResumeHelper — v1.0 export/AI + v1.1 resume.json import/themes + v2.0 AI analysis*
-*Researched: 2026-03-13 (v1.0), 2026-03-14 (v1.1 additions), 2026-03-23 (v2.0 AI analysis additions)*
+*Stack research for: ResumeHelper — v1.0 export + v1.1 resume.json import/themes + v2.0 AI analysis + v2.1 template rendering*
+*Researched: 2026-03-13 (v1.0), 2026-03-14 (v1.1), 2026-03-23 (v2.0), 2026-03-25 (v2.1)*

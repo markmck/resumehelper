@@ -1,8 +1,254 @@
 # Feature Research
 
 **Domain:** Personal resume management and job application tracking desktop app
-**Researched:** 2026-03-13 (v1.0) / 2026-03-14 (v1.1 additions) / 2026-03-23 (v2.0 additions)
+**Researched:** 2026-03-13 (v1.0) / 2026-03-14 (v1.1 additions) / 2026-03-23 (v2.0 additions) / 2026-03-25 (v2.1 additions)
 **Confidence:** HIGH (core patterns verified against competing tools), MEDIUM (UX detail estimates)
+
+---
+
+## v2.1 Feature Landscape (Current Milestone: Resume Template System)
+
+### Context: What Already Exists
+
+The following are already shipped and must NOT be rebuilt:
+
+- `ProfessionalLayout` — React component rendering resume content; uses `pageBreakInside: 'avoid'` per job block
+- `VariantPreview` — renders either `ProfessionalLayout` (built-in path) or iframe with HTML string (resume.json themes path)
+- `VariantEditor` — split-pane: Builder pane left, Preview pane right; template dropdown in preview header
+- `VariantBuilder` — checkbox toggle for bullets, jobs, skills, projects, education, and all resume.json entities
+- PDF export via Electron `printToPDF` through a hidden BrowserWindow (`PrintApp.tsx` render path)
+- DOCX export via built-in formatter (unaffected by template choice)
+- `layoutTemplate` text column on `templateVariants` table (defaults to `'traditional'`)
+- `window.api.themes.*` IPC handlers (list, renderHtml) wrapping external resume.json theme packages
+
+The v2.1 milestone **replaces** the three resume.json themes (Even, Class, Elegant) with 5 purpose-built React template components. The iframe path in `VariantPreview` will be replaced by a React component dispatch.
+
+---
+
+### Table Stakes (Users Expect These — v2.1)
+
+Features users assume will exist. Missing any of these makes the template system feel unfinished.
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| 5 distinct template styles (Classic, Modern, Jake, Minimal, Executive) | Users expect visual variety; a single layout is not a "template system" | MEDIUM | Each needs distinct typography and header treatment. Jake (MIT-licensed, most-forked resume template on GitHub) is the most recognized format among SWEs. All must be single-column — multi-column breaks ATS parsing. |
+| Preview matches PDF export exactly (no layout drift) | Core trust failure with v1.1 — resume.json themes rendered differently in preview vs PDF | HIGH | Root cause of old bug: iframe HTML rendering != Chromium print engine. Fix: new templates are React components registered in both `VariantPreview` and `PrintApp.tsx`. Same component = same output. |
+| Page break visualization in preview pane | Users need to know if content spills to page 2 before exporting; without this they export blind | MEDIUM | Overlay approach: compute page boundaries as `n * PAGE_HEIGHT_PX` (1056px for US Letter at 96dpi) and render dashed divider lines with page number labels. This is a React overlay, NOT a CSS print feature — it must NOT appear in the `printToPDF` output. |
+| Template persists per variant | Each variant targets a different role/company; different templates make sense | LOW | `layoutTemplate` column already exists. Needs companion `templateOptions` JSON column for accent color, margin, and skills mode. |
+| Accent color persists per variant | Tech role vs executive role warrants different color choices | LOW | Add `templateOptions TEXT DEFAULT '{}'` JSON column to `templateVariants`. Parse at runtime as `{ accentColor?, compactMargins?, skillsDisplayMode? }`. |
+| ATS-clean output (single-column, text-based) | Recruiters submit to ATS; multi-column PDF and table-based layouts break parsing | MEDIUM | All 5 templates must be single-column. Skills rendered as comma-separated text in DOCX regardless of display mode. No tables for layout structure. |
+
+### Differentiators (Competitive Advantage — v2.1)
+
+Features that make the template system feel polished beyond typical resume builders.
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Page break overlay with page number labels | "Page 1 / Page 2" at each break line — instantly shows if resume is running long before export | LOW | Pure React overlay (`position: absolute`, `pointer-events: none`) over the scrollable preview container. Draw horizontal rules at `n * 1056px`. Add label "Page 2 starts here" at each line. Must be excluded from PrintApp render path. |
+| Compact margin toggle (normal / tight) | Two-state is faster than a slider; maps to clear use cases (tech-dense vs executive-spacious) | LOW | CSS variable swap: `--page-margin: 0.75in` (normal) vs `--page-margin: 0.5in` (tight). Toggling changes content height → page break overlay must re-measure via `ResizeObserver`. |
+| Accent color picker with preset palette | Lets user match industry convention without a full color wheel | LOW | 8-10 curated hex swatches (navy, teal, forest green, slate, burgundy, charcoal, royal blue, black). No freeform hex input for v2.1 — constrains choices to resume-safe colors. |
+| Skills display mode switcher | Different roles suit different skills layouts without re-selecting the whole template | LOW | Two modes for v2.1: `grouped` (bold category + comma list, current behavior) and `inline` (all skills comma-separated, maximum space efficiency). Add `pills` in v2.2 after verifying DOCX degradation logic. |
+| Template thumbnail grid picker | Visual thumbnails make template selection faster than reading names in a dropdown | MEDIUM | Static PNG thumbnails per template in a popover grid. Can defer to v2.2 — text dropdown is acceptable for v2.1 launch. |
+
+### Anti-Features (v2.1 — Commonly Requested, Often Problematic)
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Freeform margin sliders (px/in input) | "I want exactly 0.6in margins" | Unlimited values break template visual integrity; users over-tweak; print margin edge cases accumulate | Compact toggle (2 values: normal / tight) is sufficient and safe |
+| Per-section font size controls | "This section looks too big" | Creates incoherent typography; font scale is load-bearing in each template's design | Let each template own its type scale; user switches templates to get different density |
+| Custom font upload or URL loading | "I want my brand font" | Font loading in Electron print context is unreliable; web fonts require explicit `@font-face` blob loading; DOCX cannot use custom fonts | Bundle 2-3 system fonts per template (Georgia, Calibri, Helvetica) |
+| Multi-column layout templates | Visually striking; common in designer resumes | Two-column HTML breaks ATS parsing; `page-break-inside` behaves unpredictably across CSS columns in Chromium print; DOCX cannot represent columns | Single-column only. Modern/Executive can use a left border accent line for visual structure without true columns |
+| Live font-size scaling to force one page | "Shrink everything to fit" | Fractional font sizes cause pixel rounding issues in PDF; hides content problem | Page break overlay shows overflow; user trims bullets in VariantBuilder — the correct solution |
+| Template-specific section ordering UI | "I want Education before Experience" | Section order is a template concern; exposing it creates combinatorial complexity per template | Templates have opinionated section orders; user picks a template whose order fits their background |
+| Runtime theme install from URL or file | "I found a template I like" | Security risk (arbitrary HTML/CSS execution in Electron); no sandboxing for loaded CSS | Bundle 5 curated templates; user requests new ones via GitHub issue |
+| Skills `pills` display mode in v2.1 | Visual chip layout is common in modern resume builders | Requires non-trivial DOCX degradation logic (pills are HTML-only; DOCX must silently fall back to inline); adds scope risk to v2.1 | Deliver `grouped` and `inline` in v2.1; add `pills` with explicit DOCX fallback in v2.2 |
+
+---
+
+### v2.1 Feature Dependencies
+
+```
+[5 Template React Components]
+    └──requires──> [TemplateProps interface] (shared data contract)
+                       └──built on──> [BuilderData (already exists)]
+    └──requires──> [PrintApp.tsx registration] (for PDF fidelity)
+    └──requires──> [VariantPreview dispatch] (replaces iframe path)
+
+[Page Break Overlay]
+    └──requires──> [Templates render at fixed page width (8.5in)]
+    └──requires──> [Single-column layout] (height measurement is reliable)
+    └──requires──> [ResizeObserver on template container] (to re-measure on option changes)
+    └──must NOT appear in──> [PrintApp.tsx render path]
+
+[Accent Color Picker]
+    └──requires──> [templateOptions JSON column on templateVariants]
+    └──requires──> [CSS variable system inside each template component]
+
+[Compact Margin Toggle]
+    └──requires──> [templateOptions JSON column on templateVariants]
+    └──requires──> [CSS variable system inside each template component]
+    └──affects──> [Page Break Overlay] (margin change shifts content height → re-measure breaks)
+
+[Skills Display Mode]
+    └──requires──> [templateOptions JSON column on templateVariants]
+    └──requires──> [Template component respects skillsDisplayMode prop]
+    └──DOCX export ignores mode──> [Always renders skills as inline comma-separated in DOCX]
+
+[templateOptions persistence]
+    └──requires──> [Schema migration: ALTER TABLE template_variants ADD COLUMN template_options TEXT DEFAULT '{}']
+    └──requires──> [try/catch guard for idempotency] (SQLite throws if column already exists)
+
+[PDF Export fidelity]
+    └──requires──> [Templates registered in PrintApp.tsx]
+    └──requires──> [No external font loading] (system fonts only)
+
+[Remove Even/Class/Elegant themes]
+    └──requires──> [All 5 new templates working] (must not remove old path before new path is ready)
+    └──deletes──> [window.api.themes.* IPC handlers] (or leaves them dormant)
+    └──deletes──> [iframe path in VariantPreview]
+```
+
+#### Dependency Notes
+
+- **`templateOptions` column is the gate for all three controls.** Accent color, margin toggle, and skills mode all store to the same JSON field. This schema migration must land before any control can persist across sessions.
+- **PrintApp.tsx registration is required for PDF fidelity.** The old bug (preview != export) came from the iframe path bypassing PrintApp entirely. Every new template component must be added to PrintApp's dispatch logic.
+- **Page break overlay must be invisible to printToPDF.** Achieved with a conditional render: `if (isPrintContext) return null`. The `PrintApp.tsx` context is the print path; `VariantPreview` is the preview path. They are different React trees.
+- **Compact margins toggle triggers a page break re-measurement.** After any `templateOptions` change that affects rendered height, the overlay must recalculate. Use `ResizeObserver` on the template container div — fires when height changes.
+- **Remove old theme wiring last.** Even/Class/Elegant removal should be a cleanup step after all 5 new templates are confirmed working, not done upfront.
+
+---
+
+### v2.1 MVP Definition
+
+#### Launch With (v2.1)
+
+- [ ] 5 React template components (Classic, Modern, Jake, Minimal, Executive) — the core deliverable; all single-column
+- [ ] Page break overlay in preview pane — users must see page 2 boundary before exporting; non-negotiable UX
+- [ ] `templateOptions` JSON column migration — gates accent color, margin, and skills mode persistence
+- [ ] Accent color picker (preset swatches, 8-10 colors) — highest-visibility customization
+- [ ] Compact margin toggle (normal / tight) — low complexity, clear value
+- [ ] Skills display mode: `grouped` and `inline` (defer `pills` to v2.2) — `grouped` already works; `inline` adds space efficiency
+- [ ] PDF export via PrintApp.tsx for all 5 templates — preview-to-export fidelity is the core trust requirement
+- [ ] Remove Even/Class/Elegant theme wiring (and iframe path in VariantPreview) — explicitly in milestone goal
+
+#### Add After Validation (v2.1.x)
+
+- [ ] Skills `pills` display mode with explicit DOCX inline fallback — visually appealing; lower priority; defer until DOCX degradation tested
+- [ ] Template thumbnail grid picker — better than dropdown text; requires thumbnail assets; acceptable to ship text dropdown for v2.1
+
+#### Future Consideration (v2.2+)
+
+- [ ] A4 page size option — US Letter only for v2.1; A4 needs different page-height calculations for overlay
+- [ ] User-requested additional templates — based on feedback after 5 templates ship
+- [ ] AI-powered auto-variant generation — already scoped to v2.2 in PROJECT.md
+
+---
+
+### v2.1 Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| 5 template components | HIGH | MEDIUM | P1 |
+| Page break overlay | HIGH | LOW | P1 |
+| PDF export fidelity (PrintApp wiring) | HIGH | LOW | P1 |
+| `templateOptions` DB migration | HIGH | LOW | P1 |
+| Accent color picker | MEDIUM | LOW | P1 |
+| Compact margin toggle | MEDIUM | LOW | P1 |
+| Skills display mode (grouped + inline) | MEDIUM | LOW | P1 |
+| Remove old theme wiring | LOW | LOW | P1 (cleanup) |
+| Skills pills mode | LOW | MEDIUM | P2 |
+| Template thumbnail grid | MEDIUM | MEDIUM | P2 |
+| A4 page size | LOW | MEDIUM | P3 |
+
+**Priority key:**
+- P1: Must have for v2.1 launch
+- P2: Should have, add when validated
+- P3: Nice to have, future milestone
+
+---
+
+### v2.1 Implementation Notes for Phase Authors
+
+#### Page Break Overlay
+
+Two approaches:
+
+**Option A — React overlay div (recommended):** Absolute-positioned div over the preview container with `pointer-events: none`. Draw `<hr>` or div rules at `n * 1056px` intervals (US Letter at 96dpi). Add page number labels ("Page 2" etc.) at each line. Excluded from PrintApp render path by a `if (isPrintContext) return null` guard.
+
+**Option B — CSS background-image:** `repeating-linear-gradient` on the scroll container at 1056px intervals. Simpler code but harder to add page number labels.
+
+Option A is preferred — page number labels are high-value UX and Option B cannot support them cleanly.
+
+The correct PAGE_HEIGHT_PX for US Letter at 96dpi is 1056px (11in * 96px/in). Content height adjusts by margin: with 0.75in top+bottom margins, usable height per page is approximately 912px. The overlay lines mark the full page boundary at 1056px intervals, not the usable-content boundary.
+
+#### `templateOptions` Schema Migration
+
+Add to `db/index.ts` initialization block:
+
+```typescript
+try {
+  db.run(sql`ALTER TABLE template_variants ADD COLUMN template_options TEXT DEFAULT '{}'`)
+} catch {
+  // column already exists — safe to ignore
+}
+```
+
+Runtime type:
+
+```typescript
+interface TemplateOptions {
+  accentColor?: string        // hex, e.g. '#1a56db'
+  compactMargins?: boolean    // default false
+  skillsDisplayMode?: 'grouped' | 'inline' | 'pills'  // default 'grouped'
+}
+```
+
+#### Template Component Interface
+
+All 5 templates share the same props interface extending `ProfessionalLayoutProps`:
+
+```typescript
+interface TemplateProps extends ProfessionalLayoutProps {
+  options?: TemplateOptions
+}
+```
+
+`VariantPreview` and `PrintApp` both dispatch to a `templateComponents` map keyed by `layoutTemplate` value. This replaces the current `isBuiltIn()` check and iframe path.
+
+#### Skills Display Mode and ATS Safety
+
+- `grouped`: bold category label + comma list (current behavior in ProfessionalLayout). ATS-safe.
+- `inline`: all skills as single comma-separated string. Maximum ATS compatibility. Minimal vertical space.
+- `pills`: visual chip elements. DOCX export path MUST override to `inline` regardless of stored mode. Print/PDF is fine with pills.
+
+#### Accent Color Implementation
+
+Each template component uses CSS custom properties scoped to its container: `--template-accent: {accentColor}`. Template JSX applies `style={{ '--template-accent': options?.accentColor ?? '#1a56db' } as React.CSSProperties}` at the root element. Section headers, rule lines, and name highlight consume this variable.
+
+---
+
+### v2.1 Competitor Feature Analysis
+
+| Feature | Kickresume / Canva | Enhancv | Our Approach |
+|---------|-------------------|---------|--------------|
+| Template selection | Visual grid of 40+ templates | Visual grid with category filter | 5 curated templates; text dropdown for v2.1, thumbnail grid for v2.2 |
+| Color customization | Full color wheel per template | Preset palette plus custom hex | 8-10 preset swatches only (safer for resume context; fewer bad choices) |
+| Margin/spacing | Slider or presets | Spacing scale | Two-state toggle (normal / tight) |
+| Skills display | Categorized list | Progress bars (ATS-hostile) | grouped / inline for v2.1; pills in v2.2 |
+| Page break visibility | Live paged preview (Canva) | No explicit indicator | Overlay dividers with page numbers in preview |
+| Preview-to-export fidelity | Strong (SaaS-controlled render) | Strong | Achievable via shared React component in PrintApp |
+
+---
+
+### v2.1 Sources
+
+- Jake's Resume template (MIT license, most-forked on GitHub): [https://github.com/jakegut/resume](https://github.com/jakegut/resume)
+- Jake's Resume on Overleaf: [https://www.overleaf.com/latex/templates/jakes-resume/syzfjbzwjncs](https://www.overleaf.com/latex/templates/jakes-resume/syzfjbzwjncs)
+- CSS page-break properties (MDN): [https://developer.mozilla.org/en-US/docs/Web/CSS/page-break-inside](https://developer.mozilla.org/en-US/docs/Web/CSS/page-break-inside)
+- Electron printToPDF page-break issues: [https://github.com/electron/electron/issues/10086](https://github.com/electron/electron/issues/10086)
+- ATS skills section guidance: [https://blog.theinterviewguys.com/how-to-list-skills-on-a-resume/](https://blog.theinterviewguys.com/how-to-list-skills-on-a-resume/)
+- Resume color scheme ATS compatibility: [https://www.resumly.ai/blog/resume-color-scheme-for-ats-compatibility-and-readability](https://www.resumly.ai/blog/resume-color-scheme-for-ats-compatibility-and-readability)
+- Codebase analysis: `ProfessionalLayout.tsx`, `VariantPreview.tsx`, `VariantEditor.tsx`, `schema.ts` (read directly — HIGH confidence)
 
 ---
 
@@ -420,5 +666,5 @@ Themes export `render(resume: ResumeJson): string`. Output is self-contained HTM
 
 ---
 
-*Feature research for: ResumeHelper v1.0, v1.1, and v2.0*
-*Last updated: 2026-03-23*
+*Feature research for: ResumeHelper v1.0, v1.1, v2.0, and v2.1*
+*Last updated: 2026-03-25*
