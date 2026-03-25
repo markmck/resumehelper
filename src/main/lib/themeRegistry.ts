@@ -10,6 +10,7 @@ export interface ThemeEntry {
 
 export const THEMES: ThemeEntry[] = [
   { key: 'professional', displayName: 'Professional (built-in)' },
+  { key: 'classic', displayName: 'Classic' },
   { key: 'even', displayName: 'Even' },
   { key: 'class', displayName: 'Class' },
   { key: 'elegant', displayName: 'Elegant' },

@@ -215,7 +215,7 @@ export function registerExportHandlers(): void {
     // 2. Determine layout: professional (built-in) vs theme
     const variant = db.select().from(templateVariants).where(eq(templateVariants.id, variantId)).get()
     const layoutTemplate = variant?.layoutTemplate ?? 'professional'
-    const isProfessional = !layoutTemplate || layoutTemplate === 'professional' || layoutTemplate === 'traditional'
+    const isProfessional = !layoutTemplate || layoutTemplate === 'professional' || layoutTemplate === 'traditional' || layoutTemplate === 'classic'
 
     if (isProfessional) {
       // Professional path: load print.html + wait for print:ready signal
@@ -231,11 +231,11 @@ export function registerExportHandlers(): void {
 
       if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
         await win.loadURL(
-          `${process.env['ELECTRON_RENDERER_URL']}/print.html?variantId=${variantId}`
+          `${process.env['ELECTRON_RENDERER_URL']}/print.html?variantId=${variantId}&template=${layoutTemplate ?? 'classic'}`
         )
       } else {
         await win.loadFile(join(__dirname, '../renderer/print.html'), {
-          query: { variantId: String(variantId) },
+          query: { variantId: String(variantId), template: layoutTemplate ?? 'classic' },
         })
       }
 

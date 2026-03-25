@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
-import ProfessionalLayout from './components/ProfessionalLayout'
+import { resolveTemplate } from './components/templates/resolveTemplate'
 import {
   BuilderJob,
   BuilderProject,
@@ -31,10 +31,13 @@ interface PrintData {
 
 function PrintApp(): React.JSX.Element {
   const [data, setData] = useState<PrintData | null>(null)
+  const [templateKey, setTemplateKey] = useState<string>('classic')
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const variantId = Number(params.get('variantId'))
+    const key = params.get('template') ?? 'classic'
+    setTemplateKey(key)
 
     Promise.all([window.api.profile.get(), window.api.templates.getBuilderData(variantId)]).then(
       ([profileData, builderData]) => {
@@ -70,8 +73,10 @@ function PrintApp(): React.JSX.Element {
     return <div style={{ background: 'white' }} />
   }
 
+  const TemplateComponent = resolveTemplate(templateKey)
+
   return (
-    <ProfessionalLayout
+    <TemplateComponent
       profile={data.profile}
       jobs={data.jobs}
       skills={data.skills}
@@ -83,6 +88,7 @@ function PrintApp(): React.JSX.Element {
       languages={data.languages}
       interests={data.interests}
       references={data.references}
+      accentColor="#cccccc"
     />
   )
 }
