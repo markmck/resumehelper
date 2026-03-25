@@ -27,4 +27,5 @@ export interface ResumeTemplateProps {
   accentColor?: string
   compact?: boolean
   skillsDisplay?: 'grouped' | 'inline'
+  showSummary?: boolean
 }

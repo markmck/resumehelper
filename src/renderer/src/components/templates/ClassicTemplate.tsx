@@ -3,11 +3,14 @@ import { filterResumeData } from './filterResumeData'
 
 export default function ClassicTemplate({
   profile,
-  accentColor = '#cccccc',
+  accentColor = '#000000',
+  skillsDisplay = 'grouped',
+  showSummary = false,
   ...props
 }: ResumeTemplateProps): React.JSX.Element {
   const {
     includedJobs,
+    includedSkills,
     includedProjects,
     includedEducation,
     includedVolunteer,
@@ -17,7 +20,7 @@ export default function ClassicTemplate({
     includedInterests,
     includedReferences,
     skillGroups,
-  } = filterResumeData({ profile, accentColor, ...props })
+  } = filterResumeData({ profile, accentColor, skillsDisplay, showSummary, ...props })
 
   const hasProfile =
     profile &&
@@ -58,7 +61,7 @@ export default function ClassicTemplate({
       style={{
         backgroundColor: '#ffffff',
         color: '#1a1a1a',
-        fontFamily: "'Times New Roman', 'Times', serif",
+        fontFamily: "'Georgia', 'Times New Roman', serif",
         maxWidth: '8.5in',
         margin: '0 auto',
         padding: '0.5in',
@@ -110,7 +113,7 @@ export default function ClassicTemplate({
       </div>
 
       {/* Summary — plain paragraph, no heading */}
-      {profile?.summary && (
+      {showSummary && profile?.summary && (
         <div
           style={{
             fontSize: '11px',
@@ -190,23 +193,29 @@ export default function ClassicTemplate({
       )}
 
       {/* Skills */}
-      {Object.keys(skillGroups).length > 0 && (
+      {(skillsDisplay === 'inline' ? includedSkills.length > 0 : Object.keys(skillGroups).length > 0) && (
         <section>
           <h2 style={sectionHeadingStyle}>Skills</h2>
           <div>
-            {Object.entries(skillGroups).map(([group, groupSkills]) => (
-              <div
-                key={group}
-                style={{
-                  fontSize: '11px',
-                  marginBottom: '4px',
-                  color: '#1a1a1a',
-                }}
-              >
-                <span style={{ fontWeight: 'bold' }}>{group}: </span>
-                <span>{groupSkills.map((s) => s.name).join(', ')}</span>
+            {skillsDisplay === 'inline' ? (
+              <div style={{ fontSize: '11px', color: '#1a1a1a' }}>
+                {includedSkills.map((s) => s.name).join(', ')}
               </div>
-            ))}
+            ) : (
+              Object.entries(skillGroups).map(([group, groupSkills]) => (
+                <div
+                  key={group}
+                  style={{
+                    fontSize: '11px',
+                    marginBottom: '4px',
+                    color: '#1a1a1a',
+                  }}
+                >
+                  <span style={{ fontWeight: 'bold' }}>{group}: </span>
+                  <span>{groupSkills.map((s) => s.name).join(', ')}</span>
+                </div>
+              ))
+            )}
           </div>
         </section>
       )}
