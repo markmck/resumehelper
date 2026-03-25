@@ -28,7 +28,7 @@ Requirements for Resume Templates milestone. Each maps to roadmap phases.
 
 - [ ] **PREV-01**: Preview pane shows a full print preview with actual page boundaries (page 1, gap, page 2) — like a PDF viewer
 - [ ] **PREV-02**: Preview updates in real-time when builder checkboxes are toggled or template controls are changed
-- [ ] **PREV-03**: Preview and PDF export render identically — same component, same engine, no layout drift
+- [x] **PREV-03**: Preview and PDF export render identically — same component, same engine, no layout drift
 
 ### Export Quality
 
@@ -93,7 +93,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CTRL-06 | Phase 15 | Pending |
 | PREV-01 | Phase 15 | Pending |
 | PREV-02 | Phase 15 | Pending |
-| PREV-03 | Phase 13 | Pending |
+| PREV-03 | Phase 13 | Complete |
 | EXPRT-01 | Phase 14 | Pending |
 | EXPRT-02 | Phase 14 | Pending |
 | EXPRT-03 | Phase 14 | Pending |

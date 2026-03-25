@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Resume Templates
 status: planning
-stopped_at: Completed 13-pipeline-foundation/13-02-PLAN.md
-last_updated: "2026-03-25T17:33:39.898Z"
+stopped_at: Checkpoint 13-03-PLAN.md Task 3 (human-verify)
+last_updated: "2026-03-25T17:37:40.745Z"
 last_activity: 2026-03-25 — v2.1 roadmap created, 21 requirements mapped across 4 phases
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 *Updated after each plan completion*
 | Phase 13-pipeline-foundation P01 | 8 | 2 tasks | 4 files |
 | Phase 13-pipeline-foundation P02 | 10 | 2 tasks | 10 files |
+| Phase 13-pipeline-foundation P03 | 12 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,8 @@ Recent decisions affecting current work:
 - [Phase 13-01]: filterResumeData pre-filters excluded bullets within jobs/projects — templates never receive excluded bullets
 - [Phase 13-pipeline-foundation]: Used @fontsource npm packages for font woff2 files (separate per-weight latin subset), not Google Fonts CDN
 - [Phase 13-pipeline-foundation]: window.__printBase preload global resolves via ELECTRON_RENDERER_URL in dev, file:// renderer dir in prod
+- [Phase 13-pipeline-foundation]: VariantPreview uses --color-bg-raised for gray PDF-viewer background; plan had wrong token name --color-surface-raised
+- [Phase 13-pipeline-foundation]: accentColor hardcoded as #cccccc in PrintApp for Phase 13; Phase 15 reads from DB
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-25T17:33:39.896Z
-Stopped at: Completed 13-pipeline-foundation/13-02-PLAN.md
+Last session: 2026-03-25T17:37:40.743Z
+Stopped at: Checkpoint 13-03-PLAN.md Task 3 (human-verify)
 Resume file: None
