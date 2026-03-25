@@ -35,7 +35,7 @@ Requirements for Resume Templates milestone. Each maps to roadmap phases.
 - [ ] **EXPRT-01**: PDF export matches the preview exactly for all 5 templates — no layout differences
 - [ ] **EXPRT-02**: DOCX export produces clean ATS-parseable documents with proper Word heading styles (HeadingLevel.HEADING_1 for section headers)
 - [ ] **EXPRT-03**: DOCX export uses the correct font family per template (serif for Classic/Executive, sans-serif for Modern/Jake/Minimal)
-- [ ] **EXPRT-04**: Template fonts are bundled as woff2 files for consistent rendering across platforms (Lato, EB Garamond, Inter already bundled)
+- [x] **EXPRT-04**: Template fonts are bundled as woff2 files for consistent rendering across platforms (Lato, EB Garamond, Inter already bundled)
 
 ### Cleanup
 
@@ -97,7 +97,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXPRT-01 | Phase 14 | Pending |
 | EXPRT-02 | Phase 14 | Pending |
 | EXPRT-03 | Phase 14 | Pending |
-| EXPRT-04 | Phase 13 | Pending |
+| EXPRT-04 | Phase 13 | Complete |
 | CLEAN-01 | Phase 16 | Pending |
 | CLEAN-02 | Phase 16 | Pending |
 | CLEAN-03 | Phase 16 | Pending |
