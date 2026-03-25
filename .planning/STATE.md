@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Resume Templates
 status: planning
-stopped_at: Checkpoint 13-03-PLAN.md Task 3 (human-verify)
-last_updated: "2026-03-25T17:37:40.745Z"
+stopped_at: Completed 13-03-PLAN.md (Phase 13 pipeline-foundation complete)
+last_updated: "2026-03-25T18:55:07.622Z"
 last_activity: 2026-03-25 — v2.1 roadmap created, 21 requirements mapped across 4 phases
 progress:
   total_phases: 4
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 13-pipeline-foundation P01 | 8 | 2 tasks | 4 files |
 | Phase 13-pipeline-foundation P02 | 10 | 2 tasks | 10 files |
 | Phase 13-pipeline-foundation P03 | 12 | 2 tasks | 4 files |
+| Phase 13-pipeline-foundation P03 | 35 | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Recent decisions affecting current work:
 - [Phase 13-pipeline-foundation]: window.__printBase preload global resolves via ELECTRON_RENDERER_URL in dev, file:// renderer dir in prod
 - [Phase 13-pipeline-foundation]: VariantPreview uses --color-bg-raised for gray PDF-viewer background; plan had wrong token name --color-surface-raised
 - [Phase 13-pipeline-foundation]: accentColor hardcoded as #cccccc in PrintApp for Phase 13; Phase 15 reads from DB
+- [Phase 13-pipeline-foundation]: iframe postMessage replaces window.api in PrintApp — Electron preload does not inject into iframes; VariantPreview fetches data and sends via postMessage
+- [Phase 13-pipeline-foundation]: PagedContent splits resume into 1056px discrete page boxes — single scrolling iframe had no visual page boundaries
 
 ### Pending Todos
 
@@ -89,6 +92,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-25T17:37:40.743Z
-Stopped at: Checkpoint 13-03-PLAN.md Task 3 (human-verify)
+Last session: 2026-03-25T18:55:07.621Z
+Stopped at: Completed 13-03-PLAN.md (Phase 13 pipeline-foundation complete)
 Resume file: None
