@@ -97,6 +97,6 @@ Plans:
 | 1-7 | v1.0 + v1.1 | - | Complete | 2026-03-23 |
 | 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
 | 13. Pipeline Foundation | 3/3 | Complete    | 2026-03-25 | - |
-| 14. Templates Complete | v2.1 | 0/3 | Planning | - |
+| 14. Templates Complete | 2/3 | In Progress|  | - |
 | 15. Controls + Page Break Overlay | v2.1 | 0/? | Not started | - |
 | 16. Cleanup | v2.1 | 0/? | Not started | - |

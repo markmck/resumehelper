@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Resume Templates
 status: planning
-stopped_at: Completed 13-03-PLAN.md (Phase 13 pipeline-foundation complete)
-last_updated: "2026-03-25T18:55:07.622Z"
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-03-25T20:51:42.871Z"
 last_activity: 2026-03-25 — v2.1 roadmap created, 21 requirements mapped across 4 phases
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 5
   percent: 0
 ---
 
@@ -54,6 +54,8 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 13-pipeline-foundation P02 | 10 | 2 tasks | 10 files |
 | Phase 13-pipeline-foundation P03 | 12 | 2 tasks | 4 files |
 | Phase 13-pipeline-foundation P03 | 35 | 3 tasks | 6 files |
+| Phase 14-templates-complete P02 | 2 | 2 tasks | 2 files |
+| Phase 14-templates-complete P01 | 3 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -79,6 +81,11 @@ Recent decisions affecting current work:
 - [Phase 13-pipeline-foundation]: accentColor hardcoded as #cccccc in PrintApp for Phase 13; Phase 15 reads from DB
 - [Phase 13-pipeline-foundation]: iframe postMessage replaces window.api in PrintApp — Electron preload does not inject into iframes; VariantPreview fetches data and sends via postMessage
 - [Phase 13-pipeline-foundation]: PagedContent splits resume into 1056px discrete page boxes — single scrolling iframe had no visual page boundaries
+- [Phase 14-templates-complete]: Profile.label not in preload interface; used (profile as any)?.label for Executive subtitle — label field deferred
+- [Phase 14-templates-complete]: ExecutiveTemplate showSummary defaults true — the only template with summary on by default
+- [Phase 14-templates-complete]: ClassicTemplate updated: Georgia font, #000000 accent, showSummary guard, skillsDisplay support
+- [Phase 14-templates-complete]: ModernTemplate: Calibri, 40px accent underline, #2563EB default, inline skillsDisplay with accent category labels
+- [Phase 14-templates-complete]: JakeTemplate: Lato, dense 0.6/0.5in margins, Company em-dash Title single-line entry, #333333 default
 
 ### Pending Todos
 
@@ -92,6 +99,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-25T18:55:07.621Z
-Stopped at: Completed 13-03-PLAN.md (Phase 13 pipeline-foundation complete)
+Last session: 2026-03-25T20:51:42.869Z
+Stopped at: Completed 14-01-PLAN.md
 Resume file: None

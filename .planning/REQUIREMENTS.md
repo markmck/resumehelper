@@ -9,11 +9,11 @@ Requirements for Resume Templates milestone. Each maps to roadmap phases.
 
 ### Template Rendering
 
-- [ ] **TMPL-01**: App includes 5 resume templates: Classic, Modern, Jake, Minimal, Executive — each with distinct typography, spacing, and visual style
+- [x] **TMPL-01**: App includes 5 resume templates: Classic, Modern, Jake, Minimal, Executive — each with distinct typography, spacing, and visual style
 - [x] **TMPL-02**: Templates render as HTML/CSS inside the preview pane at page scale, showing actual page boundaries
 - [x] **TMPL-03**: All templates use single-column ATS-friendly layout with standard section headings (Work Experience, Education, Skills, etc.)
-- [ ] **TMPL-04**: Templates support professional summary section (optional, user-toggleable)
-- [ ] **TMPL-05**: Skills section supports two display modes per template: inline comma-separated and grouped by category
+- [x] **TMPL-04**: Templates support professional summary section (optional, user-toggleable)
+- [x] **TMPL-05**: Skills section supports two display modes per template: inline comma-separated and grouped by category
 
 ### Template Controls
 
@@ -80,11 +80,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TMPL-01 | Phase 14 | Pending |
+| TMPL-01 | Phase 14 | Complete |
 | TMPL-02 | Phase 13 | Complete |
 | TMPL-03 | Phase 13 | Complete |
-| TMPL-04 | Phase 14 | Pending |
-| TMPL-05 | Phase 14 | Pending |
+| TMPL-04 | Phase 14 | Complete |
+| TMPL-05 | Phase 14 | Complete |
 | CTRL-01 | Phase 15 | Pending |
 | CTRL-02 | Phase 15 | Pending |
 | CTRL-03 | Phase 15 | Pending |
