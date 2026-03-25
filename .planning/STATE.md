@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Resume Templates
 status: planning
-stopped_at: Completed 14-01-PLAN.md
-last_updated: "2026-03-25T20:51:42.871Z"
+stopped_at: Completed 14-03-PLAN.md
+last_updated: "2026-03-25T20:55:59.261Z"
 last_activity: 2026-03-25 — v2.1 roadmap created, 21 requirements mapped across 4 phases
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -56,6 +56,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 13-pipeline-foundation P03 | 35 | 3 tasks | 6 files |
 | Phase 14-templates-complete P02 | 2 | 2 tasks | 2 files |
 | Phase 14-templates-complete P01 | 3 | 3 tasks | 4 files |
+| Phase 14-templates-complete P03 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,8 @@ Recent decisions affecting current work:
 - [Phase 14-templates-complete]: ClassicTemplate updated: Georgia font, #000000 accent, showSummary guard, skillsDisplay support
 - [Phase 14-templates-complete]: ModernTemplate: Calibri, 40px accent underline, #2563EB default, inline skillsDisplay with accent category labels
 - [Phase 14-templates-complete]: JakeTemplate: Lato, dense 0.6/0.5in margins, Company em-dash Title single-line entry, #333333 default
+- [Phase 14-templates-complete]: DOCX_FONT_MAP: Georgia for Classic, Calibri for Modern/Jake/Minimal, Garamond for Executive — per-template Word fonts
+- [Phase 14-templates-complete]: HeadingLevel.HEADING_1 on all 10 DOCX section headings for ATS parsing alongside visual TextRun styling
 
 ### Pending Todos
 
@@ -99,6 +102,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-25T20:51:42.869Z
-Stopped at: Completed 14-01-PLAN.md
+Last session: 2026-03-25T20:55:59.259Z
+Stopped at: Completed 14-03-PLAN.md
 Resume file: None
