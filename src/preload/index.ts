@@ -258,6 +258,16 @@ const api = {
   },
 }
 
+// Print URL base for iframe src in both dev and prod.
+// In dev: ELECTRON_RENDERER_URL = "http://localhost:5173"
+// In prod: file:// URL pointing to the renderer directory (which contains print.html)
+const printBase: string = process.env['ELECTRON_RENDERER_URL']
+  ?? (() => {
+    const path = require('path') as typeof import('path')
+    const rendererDir = path.join(__dirname, '../renderer')
+    return 'file://' + rendererDir.replace(/\\/g, '/')
+  })()
+
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
@@ -265,6 +275,7 @@ if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
+    contextBridge.exposeInMainWorld('__printBase', printBase)
   } catch (error) {
     console.error(error)
   }
@@ -273,4 +284,6 @@ if (process.contextIsolated) {
   window.electron = electronAPI
   // @ts-ignore (define in dts)
   window.api = api
+  // @ts-ignore (define in dts)
+  window.__printBase = printBase
 }
