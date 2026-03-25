@@ -222,7 +222,7 @@ function PrintApp(): React.JSX.Element {
           languages={data.languages}
           interests={data.interests}
           references={data.references}
-          accentColor="#cccccc"
+          showSummary
         />
       </PagedContent>
     </div>

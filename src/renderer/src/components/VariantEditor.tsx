@@ -39,9 +39,9 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
   const [themes, setThemes] = useState<Array<{ key: string; displayName: string }>>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [layoutTemplate, setLayoutTemplate] = useState(
-    variant.layoutTemplate && variant.layoutTemplate !== 'traditional'
+    variant.layoutTemplate && variant.layoutTemplate !== 'traditional' && variant.layoutTemplate !== 'professional'
       ? variant.layoutTemplate
-      : 'professional'
+      : 'classic'
   )
   const [analysisScore, setAnalysisScore] = useState<number | null>(null)
   const [analysisId, setAnalysisId] = useState<number | null>(null)
@@ -53,7 +53,7 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
 
   useEffect(() => {
     const tpl = variant.layoutTemplate
-    setLayoutTemplate(tpl && tpl !== 'traditional' ? tpl : 'professional')
+    setLayoutTemplate(tpl && tpl !== 'traditional' && tpl !== 'professional' ? tpl : 'classic')
   }, [variant.id])
 
   // Look up analysis score for this variant
