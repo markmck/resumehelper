@@ -43,6 +43,7 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
       ? variant.layoutTemplate
       : 'classic'
   )
+  const [showSummary, setShowSummary] = useState(true)
   const [analysisScore, setAnalysisScore] = useState<number | null>(null)
   const [analysisId, setAnalysisId] = useState<number | null>(null)
   const { showToast } = useToast()
@@ -263,6 +264,29 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
 
             <div style={{ flex: 1 }} />
 
+            <label
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: 'var(--font-size-xs)',
+                color: 'var(--color-text-secondary)',
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showSummary}
+                onChange={(e) => {
+                  setShowSummary(e.target.checked)
+                  setPreviewVersion((v) => v + 1)
+                }}
+                style={{ margin: 0 }}
+              />
+              Summary
+            </label>
+
             {themes.length > 0 && (
               <select
                 value={layoutTemplate}
@@ -343,6 +367,7 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
               variantId={variant.id}
               layoutTemplate={layoutTemplate}
               refreshKey={previewVersion}
+              showSummary={showSummary}
             />
           </div>
         </div>

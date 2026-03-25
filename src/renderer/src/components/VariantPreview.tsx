@@ -5,9 +5,10 @@ interface VariantPreviewProps {
   variantId: number
   layoutTemplate?: string
   refreshKey?: number
+  showSummary?: boolean
 }
 
-function VariantPreview({ variantId, layoutTemplate, refreshKey }: VariantPreviewProps): React.JSX.Element {
+function VariantPreview({ variantId, layoutTemplate, refreshKey, showSummary = true }: VariantPreviewProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [scale, setScale] = useState<number>(0)
@@ -49,6 +50,7 @@ function VariantPreview({ variantId, layoutTemplate, refreshKey }: VariantPrevie
     iframe.contentWindow.postMessage({
       type: 'print-data',
       template: layoutTemplate ?? 'classic',
+      showSummary,
       payload: {
         profile: profileData,
         jobs: builderData.jobs,
@@ -63,7 +65,7 @@ function VariantPreview({ variantId, layoutTemplate, refreshKey }: VariantPrevie
         references: builderData.references,
       },
     }, '*')
-  }, [builderData, profileData, layoutTemplate])
+  }, [builderData, profileData, layoutTemplate, showSummary])
 
   // Listen for iframe messages (ready signal + content height)
   useEffect(() => {

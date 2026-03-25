@@ -103,6 +103,7 @@ interface PrintData {
 function PrintApp(): React.JSX.Element {
   const [data, setData] = useState<PrintData | null>(null)
   const [templateKey, setTemplateKey] = useState<string>('classic')
+  const [showSummary, setShowSummary] = useState<boolean>(true)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -138,6 +139,9 @@ function PrintApp(): React.JSX.Element {
           setData(event.data.payload)
           if (event.data.template) {
             setTemplateKey(event.data.template)
+          }
+          if (typeof event.data.showSummary === 'boolean') {
+            setShowSummary(event.data.showSummary)
           }
         }
       }
@@ -222,7 +226,7 @@ function PrintApp(): React.JSX.Element {
           languages={data.languages}
           interests={data.interests}
           references={data.references}
-          showSummary
+          showSummary={showSummary}
         />
       </PagedContent>
     </div>
