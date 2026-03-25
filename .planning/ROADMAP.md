@@ -29,7 +29,7 @@ Phases 8-12 covered: Design system + sidebar navigation, AI provider settings, j
 
 **Milestone Goal:** Replace bundled resume.json themes with 5 purpose-built HTML/CSS templates (Classic, Modern, Jake, Minimal, Executive) with proper page break handling, margin controls, accent color customization, and matching PDF/DOCX export — preview matches export exactly.
 
-- [x] **Phase 13: Pipeline Foundation** - Unified print.html rendering path with Classic template end-to-end (completed 2026-03-25)
+- [x] **Phase 13: Pipeline Foundation** - Unified print.html rendering path with Classic template end-to-end (completed 2026-03-25)
 - [ ] **Phase 14: Templates Complete** - All 5 templates with per-template fonts and DOCX support
 - [ ] **Phase 15: Controls + Page Break Overlay** - Accent color, margin toggle, skills mode, page boundary visualization
 - [ ] **Phase 16: Cleanup** - Remove old resume.json themes, migrate snapshot PDF path
@@ -61,7 +61,11 @@ Plans:
   3. DOCX export for each template uses the appropriate font family (serif for Classic/Executive, sans-serif for Modern/Jake/Minimal) with proper Word heading styles
   4. Professional summary section renders in templates when present and is skipped cleanly when not included
   5. Skills section renders in both inline comma-separated and grouped-by-category modes
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 14-01-PLAN.md — Types update, Classic font/accent fix, Modern + Jake templates
+- [ ] 14-02-PLAN.md — Minimal + Executive templates
+- [ ] 14-03-PLAN.md — Registry wiring (resolveTemplate + themeRegistry) + DOCX export upgrade
 
 ### Phase 15: Controls + Page Break Overlay
 **Goal**: Users can customize accent color, margins, and skills display mode per variant, and the preview pane shows visible page boundaries
@@ -92,7 +96,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1-7 | v1.0 + v1.1 | - | Complete | 2026-03-23 |
 | 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
-| 13. Pipeline Foundation | 3/3 | Complete   | 2026-03-25 | - |
-| 14. Templates Complete | v2.1 | 0/? | Not started | - |
+| 13. Pipeline Foundation | 3/3 | Complete    | 2026-03-25 | - |
+| 14. Templates Complete | v2.1 | 0/3 | Planning | - |
 | 15. Controls + Page Break Overlay | v2.1 | 0/? | Not started | - |
 | 16. Cleanup | v2.1 | 0/? | Not started | - |
