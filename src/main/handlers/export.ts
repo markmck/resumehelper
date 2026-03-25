@@ -11,8 +11,17 @@ import {
   AlignmentType,
   BorderStyle,
   TabStopType,
-  TabStopPosition
+  TabStopPosition,
+  HeadingLevel
 } from 'docx'
+
+const DOCX_FONT_MAP: Record<string, string> = {
+  classic: 'Georgia',
+  modern: 'Calibri',
+  jake: 'Calibri',
+  minimal: 'Calibri',
+  executive: 'Garamond',
+}
 import { db } from '../db'
 import { profile, jobs, jobBullets, skills, projects, projectBullets, templateVariantItems, templateVariants, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
 import { eq, asc, desc } from 'drizzle-orm'
@@ -310,7 +319,12 @@ export function registerExportHandlers(): void {
     })
     if (canceled || !filePath) return { canceled: true }
 
-    // 2. Fetch data directly from DB
+    // 2. Determine template font
+    const variant = db.select().from(templateVariants).where(eq(templateVariants.id, variantId)).get()
+    const layoutTemplate = variant?.layoutTemplate ?? 'classic'
+    const fontName = DOCX_FONT_MAP[layoutTemplate] ?? 'Calibri'
+
+    // 3. Fetch data directly from DB
     const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
     const builderData = await getBuilderDataForVariant(variantId)
 
@@ -325,7 +339,7 @@ export function registerExportHandlers(): void {
     const includedInterests = builderData.interests.filter((i) => !i.excluded)
     const includedReferences = builderData.references.filter((r) => !r.excluded)
 
-    // 3. Build DOCX document
+    // 4. Build DOCX document
     const doc = new Document({
       sections: [
         {
@@ -340,7 +354,7 @@ export function registerExportHandlers(): void {
                   text: profileRow?.name || 'Your Name',
                   bold: true,
                   size: 32,
-                  font: 'Calibri',
+                  font: fontName,
                 }),
               ],
               alignment: AlignmentType.CENTER,
@@ -358,23 +372,33 @@ export function registerExportHandlers(): void {
                     .filter(Boolean)
                     .join('  |  '),
                   size: 20,
-                  font: 'Calibri',
+                  font: fontName,
                   color: '555555',
                 }),
               ],
               alignment: AlignmentType.CENTER,
               spacing: { after: 200 },
             }),
+            // Professional summary — rendered when profile has summary content
+            ...(profileRow?.summary ? [
+              new Paragraph({
+                children: [
+                  new TextRun({ text: profileRow.summary, size: 21, font: fontName }),
+                ],
+                spacing: { before: 120, after: 200 },
+              }),
+            ] : []),
             // WORK EXPERIENCE section
             ...(includedJobs.length > 0
               ? [
                   new Paragraph({
+                    heading: HeadingLevel.HEADING_1,
                     children: [
                       new TextRun({
                         text: 'WORK EXPERIENCE',
                         bold: true,
                         size: 22,
-                        font: 'Calibri',
+                        font: fontName,
                         color: '333333',
                       }),
                     ],
@@ -388,11 +412,11 @@ export function registerExportHandlers(): void {
                     return [
                       new Paragraph({
                         children: [
-                          new TextRun({ text: job.role, bold: true, size: 22, font: 'Calibri' }),
+                          new TextRun({ text: job.role, bold: true, size: 22, font: fontName }),
                           new TextRun({
                             text: `\t${job.startDate} \u2014 ${job.endDate || 'Present'}`,
                             size: 20,
-                            font: 'Calibri',
+                            font: fontName,
                             color: '555555',
                           }),
                         ],
@@ -403,7 +427,7 @@ export function registerExportHandlers(): void {
                           new TextRun({
                             text: job.company,
                             size: 20,
-                            font: 'Calibri',
+                            font: fontName,
                             color: '555555',
                           }),
                         ],
@@ -413,7 +437,7 @@ export function registerExportHandlers(): void {
                         (b) =>
                           new Paragraph({
                             children: [
-                              new TextRun({ text: b.text, size: 22, font: 'Calibri' }),
+                              new TextRun({ text: b.text, size: 22, font: fontName }),
                             ],
                             bullet: { level: 0 },
                             spacing: { after: 40 },
@@ -428,12 +452,13 @@ export function registerExportHandlers(): void {
             ...(includedSkills.length > 0
               ? [
                   new Paragraph({
+                    heading: HeadingLevel.HEADING_1,
                     children: [
                       new TextRun({
                         text: 'SKILLS',
                         bold: true,
                         size: 22,
-                        font: 'Calibri',
+                        font: fontName,
                         color: '333333',
                       }),
                     ],
@@ -453,8 +478,8 @@ export function registerExportHandlers(): void {
                     ([group, names]) =>
                       new Paragraph({
                         children: [
-                          new TextRun({ text: `${group}: `, bold: true, size: 22, font: 'Calibri' }),
-                          new TextRun({ text: names.join(', '), size: 22, font: 'Calibri' }),
+                          new TextRun({ text: `${group}: `, bold: true, size: 22, font: fontName }),
+                          new TextRun({ text: names.join(', '), size: 22, font: fontName }),
                         ],
                         spacing: { after: 60 },
                       })
@@ -465,12 +490,13 @@ export function registerExportHandlers(): void {
             ...(includedProjects.length > 0
               ? [
                   new Paragraph({
+                    heading: HeadingLevel.HEADING_1,
                     children: [
                       new TextRun({
                         text: 'PROJECTS',
                         bold: true,
                         size: 22,
-                        font: 'Calibri',
+                        font: fontName,
                         color: '333333',
                       }),
                     ],
@@ -484,7 +510,7 @@ export function registerExportHandlers(): void {
                     return [
                       new Paragraph({
                         children: [
-                          new TextRun({ text: project.name, bold: true, size: 22, font: 'Calibri' }),
+                          new TextRun({ text: project.name, bold: true, size: 22, font: fontName }),
                         ],
                         spacing: { after: 60 },
                       }),
@@ -492,7 +518,7 @@ export function registerExportHandlers(): void {
                         (b) =>
                           new Paragraph({
                             children: [
-                              new TextRun({ text: b.text, size: 22, font: 'Calibri' }),
+                              new TextRun({ text: b.text, size: 22, font: fontName }),
                             ],
                             bullet: { level: 0 },
                             spacing: { after: 40 },
@@ -507,8 +533,9 @@ export function registerExportHandlers(): void {
             ...(includedEducation.length > 0
               ? [
                   new Paragraph({
+                    heading: HeadingLevel.HEADING_1,
                     children: [
-                      new TextRun({ text: 'EDUCATION', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                      new TextRun({ text: 'EDUCATION', bold: true, size: 22, font: fontName, color: '333333' }),
                     ],
                     border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
                     spacing: { before: 240, after: 120 },
@@ -520,12 +547,12 @@ export function registerExportHandlers(): void {
                           text: `${edu.studyType}${edu.studyType && edu.area ? ' in ' : ''}${edu.area}${edu.institution ? ` \u2014 ${edu.institution}` : ''}`,
                           bold: true,
                           size: 22,
-                          font: 'Calibri',
+                          font: fontName,
                         }),
                         new TextRun({
                           text: `\t${edu.startDate}${edu.startDate ? ' \u2014 ' : ''}${edu.endDate || 'Present'}`,
                           size: 20,
-                          font: 'Calibri',
+                          font: fontName,
                           color: '555555',
                         }),
                       ],
@@ -533,13 +560,13 @@ export function registerExportHandlers(): void {
                     }),
                     ...(edu.score
                       ? [new Paragraph({
-                          children: [new TextRun({ text: `Score: ${edu.score}`, size: 20, font: 'Calibri', color: '555555' })],
+                          children: [new TextRun({ text: `Score: ${edu.score}`, size: 20, font: fontName, color: '555555' })],
                           spacing: { after: 40 },
                         })]
                       : []),
                     ...(edu.courses.length > 0
                       ? [new Paragraph({
-                          children: [new TextRun({ text: `Courses: ${edu.courses.join(', ')}`, size: 20, font: 'Calibri', color: '555555' })],
+                          children: [new TextRun({ text: `Courses: ${edu.courses.join(', ')}`, size: 20, font: fontName, color: '555555' })],
                           spacing: { after: 40 },
                         })]
                       : []),
@@ -551,8 +578,9 @@ export function registerExportHandlers(): void {
             ...(includedVolunteer.length > 0
               ? [
                   new Paragraph({
+                    heading: HeadingLevel.HEADING_1,
                     children: [
-                      new TextRun({ text: 'VOLUNTEER EXPERIENCE', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                      new TextRun({ text: 'VOLUNTEER EXPERIENCE', bold: true, size: 22, font: fontName, color: '333333' }),
                     ],
                     border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
                     spacing: { before: 240, after: 120 },
@@ -560,29 +588,29 @@ export function registerExportHandlers(): void {
                   ...includedVolunteer.flatMap((vol) => [
                     new Paragraph({
                       children: [
-                        new TextRun({ text: vol.position, bold: true, size: 22, font: 'Calibri' }),
+                        new TextRun({ text: vol.position, bold: true, size: 22, font: fontName }),
                         new TextRun({
                           text: `\t${vol.startDate}${vol.startDate ? ' \u2014 ' : ''}${vol.endDate || 'Present'}`,
                           size: 20,
-                          font: 'Calibri',
+                          font: fontName,
                           color: '555555',
                         }),
                       ],
                       tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
                     }),
                     new Paragraph({
-                      children: [new TextRun({ text: vol.organization, size: 20, font: 'Calibri', color: '555555' })],
+                      children: [new TextRun({ text: vol.organization, size: 20, font: fontName, color: '555555' })],
                       spacing: { after: 60 },
                     }),
                     ...(vol.summary
                       ? [new Paragraph({
-                          children: [new TextRun({ text: vol.summary, size: 22, font: 'Calibri' })],
+                          children: [new TextRun({ text: vol.summary, size: 22, font: fontName })],
                           spacing: { after: 40 },
                         })]
                       : []),
                     ...vol.highlights.map(
                       (h) => new Paragraph({
-                        children: [new TextRun({ text: h, size: 22, font: 'Calibri' })],
+                        children: [new TextRun({ text: h, size: 22, font: fontName })],
                         bullet: { level: 0 },
                         spacing: { after: 40 },
                       })
@@ -595,8 +623,9 @@ export function registerExportHandlers(): void {
             ...(includedAwards.length > 0
               ? [
                   new Paragraph({
+                    heading: HeadingLevel.HEADING_1,
                     children: [
-                      new TextRun({ text: 'AWARDS', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                      new TextRun({ text: 'AWARDS', bold: true, size: 22, font: fontName, color: '333333' }),
                     ],
                     border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
                     spacing: { before: 240, after: 120 },
@@ -604,11 +633,11 @@ export function registerExportHandlers(): void {
                   ...includedAwards.flatMap((award) => [
                     new Paragraph({
                       children: [
-                        new TextRun({ text: award.title, bold: true, size: 22, font: 'Calibri' }),
+                        new TextRun({ text: award.title, bold: true, size: 22, font: fontName }),
                         new TextRun({
                           text: ` \u2014 ${award.awarder}${award.date ? ` (${award.date})` : ''}`,
                           size: 20,
-                          font: 'Calibri',
+                          font: fontName,
                           color: '555555',
                         }),
                       ],
@@ -616,7 +645,7 @@ export function registerExportHandlers(): void {
                     }),
                     ...(award.summary
                       ? [new Paragraph({
-                          children: [new TextRun({ text: award.summary, size: 20, font: 'Calibri', color: '555555' })],
+                          children: [new TextRun({ text: award.summary, size: 20, font: fontName, color: '555555' })],
                           spacing: { after: 40 },
                         })]
                       : []),
@@ -628,8 +657,9 @@ export function registerExportHandlers(): void {
             ...(includedPublications.length > 0
               ? [
                   new Paragraph({
+                    heading: HeadingLevel.HEADING_1,
                     children: [
-                      new TextRun({ text: 'PUBLICATIONS', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                      new TextRun({ text: 'PUBLICATIONS', bold: true, size: 22, font: fontName, color: '333333' }),
                     ],
                     border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
                     spacing: { before: 240, after: 120 },
@@ -637,11 +667,11 @@ export function registerExportHandlers(): void {
                   ...includedPublications.flatMap((pub) => [
                     new Paragraph({
                       children: [
-                        new TextRun({ text: pub.name, bold: true, size: 22, font: 'Calibri' }),
+                        new TextRun({ text: pub.name, bold: true, size: 22, font: fontName }),
                         new TextRun({
                           text: ` \u2014 ${pub.publisher}${pub.releaseDate ? ` (${pub.releaseDate})` : ''}`,
                           size: 20,
-                          font: 'Calibri',
+                          font: fontName,
                           color: '555555',
                         }),
                       ],
@@ -649,13 +679,13 @@ export function registerExportHandlers(): void {
                     }),
                     ...(pub.url
                       ? [new Paragraph({
-                          children: [new TextRun({ text: pub.url, size: 20, font: 'Calibri', color: '555555' })],
+                          children: [new TextRun({ text: pub.url, size: 20, font: fontName, color: '555555' })],
                           spacing: { after: 40 },
                         })]
                       : []),
                     ...(pub.summary
                       ? [new Paragraph({
-                          children: [new TextRun({ text: pub.summary, size: 20, font: 'Calibri', color: '555555' })],
+                          children: [new TextRun({ text: pub.summary, size: 20, font: fontName, color: '555555' })],
                           spacing: { after: 40 },
                         })]
                       : []),
@@ -667,8 +697,9 @@ export function registerExportHandlers(): void {
             ...(includedLanguages.length > 0
               ? [
                   new Paragraph({
+                    heading: HeadingLevel.HEADING_1,
                     children: [
-                      new TextRun({ text: 'LANGUAGES', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                      new TextRun({ text: 'LANGUAGES', bold: true, size: 22, font: fontName, color: '333333' }),
                     ],
                     border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
                     spacing: { before: 240, after: 120 },
@@ -678,7 +709,7 @@ export function registerExportHandlers(): void {
                       new TextRun({
                         text: includedLanguages.map((l) => `${l.language}${l.fluency ? ` (${l.fluency})` : ''}`).join(', '),
                         size: 22,
-                        font: 'Calibri',
+                        font: fontName,
                       }),
                     ],
                     spacing: { after: 120 },
@@ -689,8 +720,9 @@ export function registerExportHandlers(): void {
             ...(includedInterests.length > 0
               ? [
                   new Paragraph({
+                    heading: HeadingLevel.HEADING_1,
                     children: [
-                      new TextRun({ text: 'INTERESTS', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                      new TextRun({ text: 'INTERESTS', bold: true, size: 22, font: fontName, color: '333333' }),
                     ],
                     border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
                     spacing: { before: 240, after: 120 },
@@ -699,9 +731,9 @@ export function registerExportHandlers(): void {
                     (interest) =>
                       new Paragraph({
                         children: [
-                          new TextRun({ text: `${interest.name}`, bold: true, size: 22, font: 'Calibri' }),
+                          new TextRun({ text: `${interest.name}`, bold: true, size: 22, font: fontName }),
                           ...(interest.keywords.length > 0
-                            ? [new TextRun({ text: `: ${interest.keywords.join(', ')}`, size: 22, font: 'Calibri' })]
+                            ? [new TextRun({ text: `: ${interest.keywords.join(', ')}`, size: 22, font: fontName })]
                             : []),
                         ],
                         spacing: { after: 60 },
@@ -713,20 +745,21 @@ export function registerExportHandlers(): void {
             ...(includedReferences.length > 0
               ? [
                   new Paragraph({
+                    heading: HeadingLevel.HEADING_1,
                     children: [
-                      new TextRun({ text: 'REFERENCES', bold: true, size: 22, font: 'Calibri', color: '333333' }),
+                      new TextRun({ text: 'REFERENCES', bold: true, size: 22, font: fontName, color: '333333' }),
                     ],
                     border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' } },
                     spacing: { before: 240, after: 120 },
                   }),
                   ...includedReferences.flatMap((ref) => [
                     new Paragraph({
-                      children: [new TextRun({ text: ref.name, bold: true, size: 22, font: 'Calibri' })],
+                      children: [new TextRun({ text: ref.name, bold: true, size: 22, font: fontName })],
                       spacing: { after: 40 },
                     }),
                     ...(ref.reference
                       ? [new Paragraph({
-                          children: [new TextRun({ text: ref.reference, size: 20, font: 'Calibri', color: '555555' })],
+                          children: [new TextRun({ text: ref.reference, size: 20, font: fontName, color: '555555' })],
                           spacing: { after: 40 },
                         })]
                       : []),
