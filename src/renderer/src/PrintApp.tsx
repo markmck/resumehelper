@@ -130,6 +130,7 @@ function PrintApp(): React.JSX.Element {
           })
         }
       )
+      return
     } else {
       // iframe mode: listen for data from parent VariantPreview
       const handler = (event: MessageEvent): void => {
