@@ -5,15 +5,52 @@ import { eq, and, asc, desc, inArray } from 'drizzle-orm'
 
 export function registerTemplateHandlers(): void {
   ipcMain.handle('templates:list', async () => {
-    return db.select().from(templateVariants).orderBy(desc(templateVariants.createdAt))
+    const rows = await db.select().from(templateVariants).orderBy(desc(templateVariants.createdAt))
+    return rows.map((row) => ({
+      ...row,
+      templateOptions: (() => {
+        if (!row.templateOptions) return null
+        try { return JSON.parse(row.templateOptions) } catch { return null }
+      })(),
+    }))
   })
 
-  ipcMain.handle('templates:create', async (_, data: { name: string }) => {
+  ipcMain.handle('templates:create', async (_, data: { name: string; layoutTemplate?: string }) => {
+    const layoutTemplate = data.layoutTemplate ?? 'classic'
     const rows = await db
       .insert(templateVariants)
-      .values({ name: data.name })
+      .values({ name: data.name, layoutTemplate })
       .returning()
-    return rows[0]
+    const newRow = rows[0]
+    // Default summary to hidden for all non-executive templates
+    if (layoutTemplate !== 'executive') {
+      await db.insert(templateVariantItems).values({
+        variantId: newRow.id,
+        itemType: 'summary',
+        excluded: true,
+      })
+    }
+    return newRow
+  })
+
+  ipcMain.handle('templates:getOptions', async (_, variantId: number) => {
+    const rows = await db
+      .select({ templateOptions: templateVariants.templateOptions })
+      .from(templateVariants)
+      .where(eq(templateVariants.id, variantId))
+    if (!rows[0] || !rows[0].templateOptions) return null
+    try {
+      return JSON.parse(rows[0].templateOptions)
+    } catch {
+      return null
+    }
+  })
+
+  ipcMain.handle('templates:setOptions', async (_, variantId: number, options: object) => {
+    await db
+      .update(templateVariants)
+      .set({ templateOptions: JSON.stringify(options) })
+      .where(eq(templateVariants.id, variantId))
   })
 
   ipcMain.handle('templates:rename', async (_, id: number, name: string) => {
@@ -244,6 +281,11 @@ export function registerTemplateHandlers(): void {
       excluded: excludedReferenceIds.has(r.id),
     }))
 
+    const summaryExclusionRow = exclusionItems.find(
+      (item) => item.itemType === 'summary' && item.excluded,
+    )
+    const summaryExcluded = summaryExclusionRow != null
+
     return {
       jobs: jobsWithBullets,
       skills: skillsWithExcluded,
@@ -255,6 +297,7 @@ export function registerTemplateHandlers(): void {
       languages: languagesWithExcluded,
       interests: interestsWithExcluded,
       references: referencesWithExcluded,
+      summaryExcluded,
     }
   })
 
@@ -534,6 +577,23 @@ export function registerTemplateHandlers(): void {
             variantId,
             itemType: 'reference',
             referenceId: itemId,
+            excluded: true,
+          })
+        }
+      } else if (itemType === 'summary') {
+        // itemId is a sentinel (0) — summary has no real row ID
+        await db
+          .delete(templateVariantItems)
+          .where(
+            and(
+              eq(templateVariantItems.variantId, variantId),
+              eq(templateVariantItems.itemType, 'summary'),
+            ),
+          )
+        if (excluded) {
+          await db.insert(templateVariantItems).values({
+            variantId,
+            itemType: 'summary',
             excluded: true,
           })
         }

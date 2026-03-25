@@ -222,6 +222,7 @@ function ensureSchema(): void {
     'ALTER TABLE `submissions` ADD COLUMN `score_at_submit` integer',
     'ALTER TABLE `submissions` ADD COLUMN `analysis_id` integer REFERENCES `analysis_results`(`id`)',
     'ALTER TABLE `jobs` ADD COLUMN `sort_order` integer NOT NULL DEFAULT 0',
+    'ALTER TABLE `template_variants` ADD COLUMN `template_options` text',
   ]
   for (const sql of alterStatements) {
     try { sqlite.exec(sql) } catch { /* column already exists */ }

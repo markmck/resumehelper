@@ -31,6 +31,7 @@ export const templateVariants = sqliteTable('template_variants', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   layoutTemplate: text('layout_template').notNull().default('traditional'),
+  templateOptions: text('template_options'),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
