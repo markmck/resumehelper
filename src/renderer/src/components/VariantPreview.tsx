@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react'
-import { BuilderData, Profile } from '../../../preload/index.d'
-import ProfessionalLayout from './ProfessionalLayout'
+import { useEffect, useRef, useState } from 'react'
 
 interface VariantPreviewProps {
   variantId: number
@@ -8,85 +6,39 @@ interface VariantPreviewProps {
   refreshKey?: number
 }
 
-function isBuiltIn(layoutTemplate: string | undefined): boolean {
-  return !layoutTemplate || layoutTemplate === 'professional' || layoutTemplate === 'traditional'
-}
-
 function VariantPreview({ variantId, layoutTemplate, refreshKey }: VariantPreviewProps): React.JSX.Element {
-  const [builderData, setBuilderData] = useState<BuilderData | null>(null)
-  const [profileData, setProfileData] = useState<Profile | null>(null)
-  const [themeHtml, setThemeHtml] = useState<string | null>(null)
-  const [themeLoading, setThemeLoading] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState<number>(0)
 
-  // Load builder data + profile for the built-in layout
   useEffect(() => {
-    setBuilderData(null)
-    Promise.all([
-      window.api.templates.getBuilderData(variantId),
-      window.api.profile.get(),
-    ]).then(([builder, profile]) => {
-      setBuilderData(builder)
-      setProfileData(profile)
-    })
-  }, [variantId, refreshKey])
+    const container = containerRef.current
+    if (!container) return
 
-  // Load theme HTML when using a non-built-in theme
-  useEffect(() => {
-    if (isBuiltIn(layoutTemplate)) {
-      setThemeHtml(null)
-      return
-    }
-    setThemeLoading(true)
-    setThemeHtml(null)
-    window.api.themes.renderHtml(variantId, layoutTemplate!).then((result) => {
-      if (typeof result === 'string') {
-        setThemeHtml(result)
-      } else {
-        // Error from handler — show error message
-        setThemeHtml(`<html><body style="font-family:sans-serif;padding:2rem;color:#ef4444">
-          <h2>Theme render error</h2><p>${result.error}</p>
-        </body></html>`)
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const width = entry.contentRect.width - 32 // subtract padding (16px each side)
+        setScale(width / 816)
       }
-      setThemeLoading(false)
     })
-  }, [variantId, layoutTemplate, refreshKey])
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [])
 
-  if (!isBuiltIn(layoutTemplate)) {
-    // Theme iframe path
-    if (themeLoading || themeHtml === null) {
-      return (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            color: 'var(--color-text-tertiary)',
-            fontSize: 'var(--font-size-sm)',
-          }}
-        >
-          Loading theme...
-        </div>
-      )
-    }
-    return (
-      <iframe
-        srcDoc={themeHtml}
-        style={{ width: '100%', height: '100%', border: 'none' }}
-        sandbox="allow-same-origin allow-scripts"
-      />
-    )
-  }
+  const base = (window as Window & { __printBase?: string }).__printBase ?? window.location.origin
+  const printUrl = `${base}/print.html?variantId=${variantId}&template=${layoutTemplate ?? 'classic'}`
 
-  // Built-in ProfessionalLayout path
-  if (!builderData) {
+  if (scale === 0) {
     return (
       <div
+        ref={containerRef}
         style={{
+          background: 'var(--color-bg-raised)',
+          overflowY: 'auto',
+          height: '100%',
+          padding: '16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          height: '100%',
           color: 'var(--color-text-tertiary)',
           fontSize: 'var(--font-size-sm)',
         }}
@@ -97,20 +49,35 @@ function VariantPreview({ variantId, layoutTemplate, refreshKey }: VariantPrevie
   }
 
   return (
-    <div style={{ overflowY: 'auto', height: '100%' }}>
-      <ProfessionalLayout
-        profile={profileData ?? undefined}
-        jobs={builderData.jobs}
-        skills={builderData.skills}
-        projects={builderData.projects}
-        education={builderData.education}
-        volunteer={builderData.volunteer}
-        awards={builderData.awards}
-        publications={builderData.publications}
-        languages={builderData.languages}
-        interests={builderData.interests}
-        references={builderData.references}
-      />
+    <div
+      ref={containerRef}
+      style={{
+        background: 'var(--color-bg-raised)',
+        overflowY: 'auto',
+        height: '100%',
+        padding: '16px',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          height: `${1056 * scale}px`,
+          overflow: 'hidden',
+        }}
+      >
+        <iframe
+          key={`${variantId}-${layoutTemplate}-${refreshKey}`}
+          src={printUrl}
+          style={{
+            width: '816px',
+            height: '1056px',
+            border: 'none',
+            transformOrigin: 'top left',
+            transform: `scale(${scale})`,
+            display: 'block',
+          }}
+        />
+      </div>
     </div>
   )
 }
