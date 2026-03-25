@@ -26,10 +26,19 @@ export interface Skill {
   tags: string[]
 }
 
+export interface TemplateOptions {
+  accentColor?: string
+  skillsDisplay?: 'grouped' | 'inline'
+  marginTop?: number
+  marginBottom?: number
+  marginSides?: number
+}
+
 export interface TemplateVariant {
   id: number
   name: string
   layoutTemplate: string
+  templateOptions?: TemplateOptions | null
   createdAt: Date
 }
 
@@ -138,6 +147,7 @@ export interface BuilderData {
   languages?: BuilderLanguage[]
   interests?: BuilderInterest[]
   references?: BuilderReference[]
+  summaryExcluded?: boolean
 }
 
 export interface SubmissionSnapshot {
@@ -300,7 +310,7 @@ export interface Api {
   }
   templates: {
     list: () => Promise<TemplateVariant[]>
-    create: (data: { name: string }) => Promise<TemplateVariant>
+    create: (data: { name: string; layoutTemplate?: string }) => Promise<TemplateVariant>
     rename: (id: number, name: string) => Promise<TemplateVariant>
     duplicate: (id: number) => Promise<TemplateVariant>
     delete: (id: number) => Promise<void>
@@ -312,6 +322,8 @@ export interface Api {
       itemId: number,
       excluded: boolean,
     ) => Promise<void>
+    getOptions: (variantId: number) => Promise<TemplateOptions | null>
+    setOptions: (variantId: number, options: TemplateOptions) => Promise<void>
   }
   submissions: {
     list: () => Promise<Submission[]>

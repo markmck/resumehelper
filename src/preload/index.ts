@@ -45,6 +45,9 @@ const api = {
       itemId: number,
       excluded: boolean,
     ) => ipcRenderer.invoke('templates:setItemExcluded', variantId, itemType, itemId, excluded),
+    getOptions: (variantId: number) => ipcRenderer.invoke('templates:getOptions', variantId),
+    setOptions: (variantId: number, options: object) =>
+      ipcRenderer.invoke('templates:setOptions', variantId, options),
   },
   submissions: {
     list: () => ipcRenderer.invoke('submissions:list'),
