@@ -31,7 +31,7 @@ Phases 8-12 covered: Design system + sidebar navigation, AI provider settings, j
 
 - [x] **Phase 13: Pipeline Foundation** - Unified print.html rendering path with Classic template end-to-end (completed 2026-03-25)
 - [x] **Phase 14: Templates Complete** - All 5 templates with per-template fonts and DOCX support (completed 2026-03-25)
-- [ ] **Phase 15: Controls + Page Break Overlay** - Accent color, margin toggle, skills mode, page boundary visualization
+- [x] **Phase 15: Controls + Page Break Overlay** - Accent color, margin toggle, skills mode, page boundary visualization (completed 2026-03-26)
 - [ ] **Phase 16: Cleanup** - Remove old resume.json themes, migrate snapshot PDF path
 
 ## Phase Details
@@ -102,5 +102,5 @@ Plans:
 | 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
 | 13. Pipeline Foundation | 3/3 | Complete    | 2026-03-25 | - |
 | 14. Templates Complete | 3/3 | Complete    | 2026-03-25 | - |
-| 15. Controls + Page Break Overlay | 2/3 | In Progress|  | - |
+| 15. Controls + Page Break Overlay | 3/3 | Complete   | 2026-03-26 | - |
 | 16. Cleanup | v2.1 | 0/? | Not started | - |

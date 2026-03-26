@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Resume Templates
 status: planning
-stopped_at: Completed 15-controls-page-break-overlay-02-PLAN.md
-last_updated: "2026-03-26T00:05:44.630Z"
+stopped_at: Completed 15-controls-page-break-overlay-03-PLAN.md
+last_updated: "2026-03-26T00:11:21.058Z"
 last_activity: 2026-03-25 — v2.1 roadmap created, 21 requirements mapped across 4 phases
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 14-templates-complete P03 | 2 | 2 tasks | 3 files |
 | Phase 15-controls-page-break-overlay P01 | 8 | 2 tasks | 6 files |
 | Phase 15-controls-page-break-overlay P02 | 10 | 2 tasks | 8 files |
+| Phase 15-controls-page-break-overlay P03 | 4 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,9 @@ Recent decisions affecting current work:
 - [Phase 15-controls-page-break-overlay]: TEMPLATE_DEFAULTS in renderer types.ts is single source of truth for per-template margin/accent/skillsDisplay defaults
 - [Phase 15-controls-page-break-overlay]: Custom color picker popover — no react-colorful — project uses 100% inline styles, external CSS breaks in file:// context
 - [Phase 15-controls-page-break-overlay]: PDF export path loads templateOptions via getOptions IPC in the same Promise.all as profile/builderData
+- [Phase 15-controls-page-break-overlay]: LAYOUT section collapsed by default — shows margin summary inline when collapsed
+- [Phase 15-controls-page-break-overlay]: PDF routing fix: V2_TEMPLATES Set routes all 5 new templates through print.html PrintApp path
+- [Phase 15-controls-page-break-overlay]: marginsDirty flag: undefined margin = use template default; template switch snaps non-dirty margins to new defaults
 
 ### Pending Todos
 
@@ -109,6 +113,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-26T00:05:44.628Z
-Stopped at: Completed 15-controls-page-break-overlay-02-PLAN.md
+Last session: 2026-03-26T00:11:21.056Z
+Stopped at: Completed 15-controls-page-break-overlay-03-PLAN.md
 Resume file: None
