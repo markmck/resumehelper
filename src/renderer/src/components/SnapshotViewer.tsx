@@ -24,10 +24,14 @@ function SnapshotViewer({ snapshot, onClose, onReExport }: SnapshotViewerProps):
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  // Fetch profile on mount — snapshot data does not include profile info
+  // Use frozen profile from snapshot if available, fall back to live DB for old snapshots
   useEffect(() => {
-    window.api.profile.get().then(setProfileData)
-  }, [])
+    if (snapshot.profile) {
+      setProfileData(snapshot.profile as Profile)
+    } else {
+      window.api.profile.get().then(setProfileData)
+    }
+  }, [snapshot])
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>): void => {
     if (e.target === e.currentTarget) onClose()

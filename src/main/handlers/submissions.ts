@@ -1,12 +1,13 @@
 import { ipcMain } from 'electron'
 import { db } from '../db'
-import { submissions, submissionEvents, templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisResults, jobPostings } from '../db/schema'
+import { submissions, submissionEvents, templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisResults, jobPostings, profile } from '../db/schema'
 import { eq, desc, asc } from 'drizzle-orm'
 import type { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
 
 interface SubmissionSnapshot {
   layoutTemplate: string
   templateOptions?: { accentColor?: string; skillsDisplay?: string; marginTop?: number; marginBottom?: number; marginSides?: number; showSummary?: boolean }
+  profile?: { name: string; email: string; phone: string; location: string; linkedin: string; summary?: string }
   jobs: BuilderJob[]
   skills: BuilderSkill[]
   projects: BuilderProject[]
@@ -45,6 +46,12 @@ async function buildSnapshotForVariant(variantId: number): Promise<SubmissionSna
   } else {
     templateOptions = { showSummary }
   }
+
+  // Freeze profile at submission time
+  const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
+  const frozenProfile = profileRow
+    ? { name: profileRow.name, email: profileRow.email, phone: profileRow.phone, location: profileRow.location, linkedin: profileRow.linkedin, summary: profileRow.summary ?? undefined }
+    : undefined
 
   const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
   const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
@@ -204,6 +211,7 @@ async function buildSnapshotForVariant(variantId: number): Promise<SubmissionSna
   return {
     layoutTemplate,
     templateOptions,
+    profile: frozenProfile,
     jobs: jobsWithBullets,
     skills: skillsWithExcluded,
     projects: projectsWithBullets,

@@ -153,6 +153,7 @@ export interface BuilderData {
 export interface SubmissionSnapshot {
   layoutTemplate: string
   templateOptions?: { accentColor?: string; skillsDisplay?: string; marginTop?: number; marginBottom?: number; marginSides?: number; showSummary?: boolean }
+  profile?: { name: string; email: string; phone: string; location: string; linkedin: string; summary?: string }
   jobs: BuilderJob[]
   skills: BuilderSkill[]
   projects: BuilderProject[]

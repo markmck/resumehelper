@@ -815,8 +815,9 @@ export function registerExportHandlers(): void {
     const rawTemplate = snapshotData?.layoutTemplate ?? ''
     const resolvedTemplate = V2_TEMPLATES.has(rawTemplate) ? rawTemplate : 'classic'
 
-    // 3. Fetch current profile from DB (snapshot does not include profile data)
-    const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
+    // 3. Use frozen profile from snapshot, fall back to live DB for old snapshots
+    const frozenProfile = (snapshotData as { profile?: { name: string; email: string; phone: string; location: string; linkedin: string; summary?: string } }).profile
+    const profileRow = frozenProfile ?? db.select().from(profile).where(eq(profile.id, 1)).get()
 
     // 4. Build payload matching PrintApp's expected shape
     const payload = {
