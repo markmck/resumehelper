@@ -22,6 +22,16 @@ const DOCX_FONT_MAP: Record<string, string> = {
   minimal: 'Calibri',
   executive: 'Garamond',
 }
+
+// Per-template default margins in inches — mirrors TEMPLATE_DEFAULTS in renderer/types.ts
+// Main process cannot import renderer files, so we define these inline here.
+const DOCX_MARGIN_DEFAULTS: Record<string, { top: number; bottom: number; sides: number }> = {
+  classic:   { top: 1.00, bottom: 1.00, sides: 1.00 },
+  modern:    { top: 0.75, bottom: 0.75, sides: 0.75 },
+  jake:      { top: 0.60, bottom: 0.60, sides: 0.50 },
+  minimal:   { top: 1.00, bottom: 1.00, sides: 1.00 },
+  executive: { top: 0.80, bottom: 0.80, sides: 0.80 },
+}
 import { db } from '../db'
 import { profile, jobs, jobBullets, skills, projects, projectBullets, templateVariantItems, templateVariants, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
 import { eq, asc, desc } from 'drizzle-orm'
@@ -221,10 +231,12 @@ export function registerExportHandlers(): void {
     })
     if (canceled || !filePath) return { canceled: true }
 
-    // 2. Determine layout: professional (built-in) vs theme
+    // 2. Determine layout: new v2.1 templates (classic/modern/jake/minimal/executive) use print.html path;
+    //    legacy theme keys fall through to old themeRegistry path
     const variant = db.select().from(templateVariants).where(eq(templateVariants.id, variantId)).get()
-    const layoutTemplate = variant?.layoutTemplate ?? 'professional'
-    const isProfessional = !layoutTemplate || layoutTemplate === 'professional' || layoutTemplate === 'traditional' || layoutTemplate === 'classic'
+    const layoutTemplate = variant?.layoutTemplate ?? 'classic'
+    const V2_TEMPLATES = new Set(['classic', 'modern', 'jake', 'minimal', 'executive'])
+    const isProfessional = V2_TEMPLATES.has(layoutTemplate) || !layoutTemplate || layoutTemplate === 'professional'
 
     if (isProfessional) {
       // Professional path: load print.html + wait for print:ready signal
@@ -319,10 +331,31 @@ export function registerExportHandlers(): void {
     })
     if (canceled || !filePath) return { canceled: true }
 
-    // 2. Determine template font
+    // 2. Determine template font + margin values from variant options
     const variant = db.select().from(templateVariants).where(eq(templateVariants.id, variantId)).get()
     const layoutTemplate = variant?.layoutTemplate ?? 'classic'
     const fontName = DOCX_FONT_MAP[layoutTemplate] ?? 'Calibri'
+
+    // Parse templateOptions JSON for per-variant margin and display settings
+    let templateOptions: { marginTop?: number; marginBottom?: number; marginSides?: number; skillsDisplay?: string; accentColor?: string } = {}
+    if (variant?.templateOptions) {
+      try {
+        templateOptions = typeof variant.templateOptions === 'string'
+          ? JSON.parse(variant.templateOptions)
+          : (variant.templateOptions as typeof templateOptions)
+      } catch {
+        templateOptions = {}
+      }
+    }
+
+    // Compute margins in twips (1 inch = 1440 twips), falling back to per-template defaults
+    const marginDefaults = DOCX_MARGIN_DEFAULTS[layoutTemplate] ?? { top: 1.0, bottom: 1.0, sides: 1.0 }
+    const mt = Math.round((templateOptions.marginTop ?? marginDefaults.top) * 1440)
+    const mb = Math.round((templateOptions.marginBottom ?? marginDefaults.bottom) * 1440)
+    const ms = Math.round((templateOptions.marginSides ?? marginDefaults.sides) * 1440)
+
+    // skillsDisplay from options (accentColor not used in DOCX — Word docs are black/white)
+    const skillsDisplay = (templateOptions.skillsDisplay as 'grouped' | 'inline' | undefined) ?? 'grouped'
 
     // 3. Fetch data directly from DB
     const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
@@ -344,7 +377,7 @@ export function registerExportHandlers(): void {
       sections: [
         {
           properties: {
-            page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } }, // 0.5in all sides (720 twips)
+            page: { margin: { top: mt, bottom: mb, left: ms, right: ms } },
           },
           children: [
             // Name — centered, bold, 16pt (size: 32)
@@ -467,22 +500,33 @@ export function registerExportHandlers(): void {
                     },
                     spacing: { before: 240, after: 120 },
                   }),
-                  ...Object.entries(
-                    includedSkills.reduce<Record<string, string[]>>((acc, skill) => {
-                      const group = skill.tags.length > 0 ? skill.tags[0] : 'Other'
-                      if (!acc[group]) acc[group] = []
-                      acc[group].push(skill.name)
-                      return acc
-                    }, {})
-                  ).map(
-                    ([group, names]) =>
-                      new Paragraph({
-                        children: [
-                          new TextRun({ text: `${group}: `, bold: true, size: 22, font: fontName }),
-                          new TextRun({ text: names.join(', '), size: 22, font: fontName }),
-                        ],
-                        spacing: { after: 60 },
-                      })
+                  ...(skillsDisplay === 'inline'
+                    ? [
+                        // Inline: all skills as a single comma-separated paragraph
+                        new Paragraph({
+                          children: [
+                            new TextRun({ text: includedSkills.map((s) => s.name).join(', '), size: 22, font: fontName }),
+                          ],
+                          spacing: { after: 60 },
+                        }),
+                      ]
+                    : Object.entries(
+                        includedSkills.reduce<Record<string, string[]>>((acc, skill) => {
+                          const group = skill.tags.length > 0 ? skill.tags[0] : 'Other'
+                          if (!acc[group]) acc[group] = []
+                          acc[group].push(skill.name)
+                          return acc
+                        }, {})
+                      ).map(
+                        ([group, names]) =>
+                          new Paragraph({
+                            children: [
+                              new TextRun({ text: `${group}: `, bold: true, size: 22, font: fontName }),
+                              new TextRun({ text: names.join(', '), size: 22, font: fontName }),
+                            ],
+                            spacing: { after: 60 },
+                          })
+                      )
                   ),
                 ]
               : []),
