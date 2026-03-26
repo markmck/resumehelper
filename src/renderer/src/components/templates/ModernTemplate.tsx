@@ -12,8 +12,6 @@ export default function ModernTemplate({
   ...props
 }: ResumeTemplateProps): React.JSX.Element {
   const defaults = TEMPLATE_DEFAULTS['modern']
-  const pt = (marginTop ?? defaults.top) * 96
-  const pb = (marginBottom ?? defaults.bottom) * 96
   const ps = (marginSides ?? defaults.sides) * 96
   const {
     includedJobs,
@@ -73,7 +71,7 @@ export default function ModernTemplate({
         lineHeight: '1.25',
         maxWidth: '8.5in',
         margin: '0 auto',
-        padding: `${pt}px ${ps}px ${pb}px ${ps}px`,
+        padding: `0 ${ps}px`,
       }}
     >
       {/* Header */}
@@ -115,22 +113,10 @@ export default function ModernTemplate({
         </div>
       )}
 
-      {/* Summary */}
+      {/* Summary — plain paragraph, no heading */}
       {showSummary && profile?.summary && (
-        <div>
-          <h2 style={sectionHeadingStyle}>Summary</h2>
-          <div
-            style={{
-              width: '40px',
-              height: '2px',
-              backgroundColor: accentColor,
-              marginTop: '3px',
-              marginBottom: '8px',
-            }}
-          />
-          <div style={{ fontSize: '10.5px', lineHeight: '1.25', color: '#1a1a1a' }}>
-            {profile.summary}
-          </div>
+        <div style={{ fontSize: '10.5px', lineHeight: '1.25', color: '#1a1a1a', marginTop: '14px' }}>
+          {profile.summary}
         </div>
       )}
 

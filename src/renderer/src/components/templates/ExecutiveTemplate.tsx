@@ -12,8 +12,6 @@ export default function ExecutiveTemplate({
   ...props
 }: ResumeTemplateProps): React.JSX.Element {
   const defaults = TEMPLATE_DEFAULTS['executive']
-  const pt = (marginTop ?? defaults.top) * 96
-  const pb = (marginBottom ?? defaults.bottom) * 96
   const ps = (marginSides ?? defaults.sides) * 96
   const {
     includedJobs,
@@ -65,7 +63,7 @@ export default function ExecutiveTemplate({
         lineHeight: 1.25,
         maxWidth: '8.5in',
         margin: '0 auto',
-        padding: `${pt}px ${ps}px ${pb}px ${ps}px`,
+        padding: `0 ${ps}px`,
       }}
     >
       {/* 2-Column Header */}

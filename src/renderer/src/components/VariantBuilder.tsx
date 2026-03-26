@@ -238,7 +238,9 @@ function VariantBuilder({
     Math.abs(marginSides - defaultSides) > 0.001
 
   return (
-    <div style={{ overflow: 'auto', height: '100%', padding: 'var(--space-5)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    {/* Scrollable content area */}
+    <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-5)' }}>
       {/* Summary toggle — first in content area */}
       {profileSummary && (
         <div style={{ marginBottom: 'var(--space-4)' }}>
@@ -412,8 +414,10 @@ function VariantBuilder({
         </div>
       )}
 
-      {/* LAYOUT collapsible section */}
-      <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
+      </div>{/* end scrollable content */}
+
+      {/* LAYOUT sticky footer section */}
+      <div style={{ flexShrink: 0, borderTop: '1px solid var(--color-border-subtle)', padding: 'var(--space-4) var(--space-5)' }}>
         {/* Section header */}
         <div
           onClick={() => setLayoutOpen((o) => !o)}

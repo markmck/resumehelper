@@ -12,8 +12,6 @@ export default function JakeTemplate({
   ...props
 }: ResumeTemplateProps): React.JSX.Element {
   const defaults = TEMPLATE_DEFAULTS['jake']
-  const pt = (marginTop ?? defaults.top) * 96
-  const pb = (marginBottom ?? defaults.bottom) * 96
   const ps = (marginSides ?? defaults.sides) * 96
   const {
     includedJobs,
@@ -72,7 +70,7 @@ export default function JakeTemplate({
         lineHeight: '1.15',
         maxWidth: '8.5in',
         margin: '0 auto',
-        padding: `${pt}px ${ps}px ${pb}px ${ps}px`,
+        padding: `0 ${ps}px`,
       }}
     >
       {/* Header */}
@@ -113,14 +111,11 @@ export default function JakeTemplate({
         </div>
       )}
 
-      {/* Summary */}
+      {/* Summary — plain paragraph, no heading */}
       {showSummary && profile?.summary && (
-        <section>
-          <h2 style={sectionHeadingStyle}>Summary</h2>
-          <div style={{ fontSize: '10px', lineHeight: '1.15', color: '#1a1a1a', marginBottom: '6px' }}>
-            {profile.summary}
-          </div>
-        </section>
+        <div style={{ fontSize: '10px', lineHeight: '1.15', color: '#1a1a1a', marginTop: '8px', marginBottom: '6px' }}>
+          {profile.summary}
+        </div>
       )}
 
       {/* Work Experience */}

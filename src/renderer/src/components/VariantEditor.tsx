@@ -405,212 +405,212 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
             minWidth: 0,
           }}
         >
-          {/* Preview pane header — two rows */}
+          {/* Preview pane header — single row */}
           <div
             style={{
               flexShrink: 0,
               borderBottom: '1px solid var(--color-border-subtle)',
               padding: '8px 16px',
               backgroundColor: 'var(--color-bg-surface)',
-              flexDirection: 'column',
               display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              position: 'relative',
             }}
           >
-            {/* Row 1: Preview label + export buttons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={paneLabelStyle}>Preview</span>
-              <div style={{ flex: 1 }} />
-              <button
-                onClick={handleExportPdf}
-                disabled={exporting !== null}
-                style={{
-                  padding: '3px 10px',
-                  fontSize: 'var(--font-size-xs)',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--color-border-default)',
-                  backgroundColor: 'transparent',
-                  color: 'var(--color-text-secondary)',
-                  cursor: exporting ? 'not-allowed' : 'pointer',
-                  opacity: exporting ? 0.5 : 1,
-                  height: 26,
-                  fontFamily: 'var(--font-sans)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                }}
-              >
-                {exporting === 'pdf' ? 'Exporting...' : 'PDF'}
-              </button>
-              <button
-                onClick={handleExportDocx}
-                disabled={exporting !== null}
-                style={{
-                  padding: '3px 10px',
-                  fontSize: 'var(--font-size-xs)',
-                  borderRadius: 'var(--radius-sm)',
-                  border: 'none',
-                  backgroundColor: 'var(--color-success)',
-                  color: 'var(--color-text-on-accent, #fff)',
-                  cursor: exporting ? 'not-allowed' : 'pointer',
-                  opacity: exporting ? 0.5 : 1,
-                  height: 26,
-                  fontFamily: 'var(--font-sans)',
-                  fontWeight: 500,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                }}
-              >
-                {exporting === 'docx' ? 'Exporting...' : 'DOCX'}
-              </button>
-            </div>
+            <span style={paneLabelStyle}>Preview</span>
 
-            {/* Row 2: Template dropdown + color dot + skills dropdown */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, position: 'relative' }}>
-              {/* Template dropdown */}
-              {themes.length > 0 && (
-                <select
-                  value={layoutTemplate}
-                  onChange={(e) => handleThemeChange(e.target.value)}
-                  style={{
-                    backgroundColor: 'var(--color-bg-input)',
-                    border: '1px solid var(--color-border-default)',
-                    borderRadius: 'var(--radius-sm)',
-                    padding: '3px 8px',
-                    fontSize: 'var(--font-size-xs)',
-                    color: 'var(--color-text-secondary)',
-                    height: 26,
-                    outline: 'none',
-                    fontFamily: 'var(--font-sans)',
-                  }}
-                >
-                  {themes.map((t) => (
-                    <option key={t.key} value={t.key}>
-                      {t.displayName}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {/* Color dot trigger */}
-              <div
-                ref={colorDotRef}
-                onClick={() => setColorPickerOpen(!colorPickerOpen)}
-                style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: '50%',
-                  backgroundColor: effectiveAccentColor,
-                  border: '2px solid var(--color-border)',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  flexShrink: 0,
-                }}
-                title="Accent color"
-              />
-
-              {/* Color picker popover */}
-              {colorPickerOpen && (
-                <div
-                  ref={colorPickerRef}
-                  style={{
-                    position: 'absolute',
-                    top: 28,
-                    left: 0,
-                    zIndex: 50,
-                    background: 'var(--color-bg-raised)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 8,
-                    padding: 12,
-                    minWidth: 160,
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-                  }}
-                >
-                  {/* Swatch grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gap: 6, marginBottom: 10 }}>
-                    {PRESET_SWATCHES.map((swatch) => (
-                      <div
-                        key={swatch}
-                        onClick={() => setAccentColor(swatch)}
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 4,
-                          backgroundColor: swatch,
-                          cursor: 'pointer',
-                          border: effectiveAccentColor.toLowerCase() === swatch.toLowerCase()
-                            ? '3px solid var(--color-accent)'
-                            : '2px solid transparent',
-                          boxSizing: 'border-box',
-                        }}
-                        title={swatch}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Hex input */}
-                  <input
-                    type="text"
-                    value={hexInput}
-                    onChange={(e) => setHexInput(e.target.value)}
-                    onBlur={(e) => {
-                      const val = e.target.value.trim()
-                      if (isValidHex(val)) {
-                        setAccentColor(normalizeHex(val))
-                      } else {
-                        setHexInput(accentColor ?? '')
-                      }
-                    }}
-                    placeholder="#hex"
-                    style={{
-                      width: 120,
-                      fontSize: 12,
-                      fontFamily: 'monospace',
-                      padding: '3px 6px',
-                      borderRadius: 4,
-                      border: '1px solid var(--color-border)',
-                      background: 'var(--color-bg-input)',
-                      color: 'var(--color-text-primary)',
-                      display: 'block',
-                      marginBottom: accentColor !== undefined ? 6 : 0,
-                    }}
-                  />
-
-                  {/* Reset to template default */}
-                  {accentColor !== undefined && (
-                    <span
-                      onClick={() => setAccentColor(undefined)}
-                      style={{
-                        fontSize: 11,
-                        color: 'var(--color-text-muted)',
-                        cursor: 'pointer',
-                        textDecoration: 'underline',
-                        display: 'block',
-                      }}
-                    >
-                      Reset to template default
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Skills display dropdown */}
+            {/* Template dropdown — leftmost control */}
+            {themes.length > 0 && (
               <select
-                value={effectiveSkillsDisplay}
-                onChange={(e) => setSkillsDisplay(e.target.value as 'grouped' | 'inline')}
+                value={layoutTemplate}
+                onChange={(e) => handleThemeChange(e.target.value)}
                 style={{
-                  fontSize: 12,
-                  padding: '4px 8px',
-                  borderRadius: 4,
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-bg-raised)',
-                  color: 'var(--color-text-primary)',
-                  fontFamily: 'var(--font-sans)',
+                  backgroundColor: 'var(--color-bg-input)',
+                  border: '1px solid var(--color-border-default)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '3px 8px',
+                  fontSize: 'var(--font-size-xs)',
+                  color: 'var(--color-text-secondary)',
                   height: 26,
+                  outline: 'none',
+                  fontFamily: 'var(--font-sans)',
+                  marginLeft: 4,
                 }}
               >
-                <option value="grouped">Skills: Grouped</option>
-                <option value="inline">Skills: Inline</option>
+                {themes.map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.displayName}
+                  </option>
+                ))}
               </select>
-            </div>
+            )}
+
+            {/* Color dot trigger — white ring for visibility on dark colors */}
+            <div
+              ref={colorDotRef}
+              onClick={() => setColorPickerOpen(!colorPickerOpen)}
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: '50%',
+                backgroundColor: effectiveAccentColor,
+                border: '2px solid rgba(255,255,255,0.9)',
+                boxShadow: '0 0 0 1px var(--color-border-default)',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+              title="Accent color"
+            />
+
+            {/* Color picker popover */}
+            {colorPickerOpen && (
+              <div
+                ref={colorPickerRef}
+                style={{
+                  position: 'absolute',
+                  top: 40,
+                  left: 60,
+                  zIndex: 50,
+                  background: 'var(--color-bg-raised)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 8,
+                  padding: 12,
+                  minWidth: 160,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+                }}
+              >
+                {/* Swatch grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gap: 6, marginBottom: 10 }}>
+                  {PRESET_SWATCHES.map((swatch) => (
+                    <div
+                      key={swatch}
+                      onClick={() => setAccentColor(swatch)}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        backgroundColor: swatch,
+                        cursor: 'pointer',
+                        border: effectiveAccentColor.toLowerCase() === swatch.toLowerCase()
+                          ? '3px solid var(--color-accent)'
+                          : '2px solid transparent',
+                        boxSizing: 'border-box',
+                      }}
+                      title={swatch}
+                    />
+                  ))}
+                </div>
+
+                {/* Hex input */}
+                <input
+                  type="text"
+                  value={hexInput}
+                  onChange={(e) => setHexInput(e.target.value)}
+                  onBlur={(e) => {
+                    const val = e.target.value.trim()
+                    if (isValidHex(val)) {
+                      setAccentColor(normalizeHex(val))
+                    } else {
+                      setHexInput(accentColor ?? '')
+                    }
+                  }}
+                  placeholder="#hex"
+                  style={{
+                    width: 120,
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    padding: '3px 6px',
+                    borderRadius: 4,
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-bg-input)',
+                    color: 'var(--color-text-primary)',
+                    display: 'block',
+                    marginBottom: accentColor !== undefined ? 6 : 0,
+                  }}
+                />
+
+                {/* Reset to template default */}
+                {accentColor !== undefined && (
+                  <span
+                    onClick={() => setAccentColor(undefined)}
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--color-text-muted)',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      display: 'block',
+                    }}
+                  >
+                    Reset to template default
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Skills display dropdown */}
+            <select
+              value={effectiveSkillsDisplay}
+              onChange={(e) => setSkillsDisplay(e.target.value as 'grouped' | 'inline')}
+              style={{
+                fontSize: 'var(--font-size-xs)',
+                padding: '3px 8px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border-default)',
+                background: 'var(--color-bg-input)',
+                color: 'var(--color-text-secondary)',
+                fontFamily: 'var(--font-sans)',
+                height: 26,
+              }}
+            >
+              <option value="grouped">Skills: Grouped</option>
+              <option value="inline">Skills: Inline</option>
+            </select>
+
+            <div style={{ flex: 1 }} />
+
+            {/* Export buttons — right side */}
+            <button
+              onClick={handleExportPdf}
+              disabled={exporting !== null}
+              style={{
+                padding: '3px 10px',
+                fontSize: 'var(--font-size-xs)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border-default)',
+                backgroundColor: 'transparent',
+                color: 'var(--color-text-secondary)',
+                cursor: exporting ? 'not-allowed' : 'pointer',
+                opacity: exporting ? 0.5 : 1,
+                height: 26,
+                fontFamily: 'var(--font-sans)',
+                display: 'inline-flex',
+                alignItems: 'center',
+              }}
+            >
+              {exporting === 'pdf' ? 'Exporting...' : 'PDF'}
+            </button>
+            <button
+              onClick={handleExportDocx}
+              disabled={exporting !== null}
+              style={{
+                padding: '3px 10px',
+                fontSize: 'var(--font-size-xs)',
+                borderRadius: 'var(--radius-sm)',
+                border: 'none',
+                backgroundColor: 'var(--color-success)',
+                color: 'var(--color-text-on-accent, #fff)',
+                cursor: exporting ? 'not-allowed' : 'pointer',
+                opacity: exporting ? 0.5 : 1,
+                height: 26,
+                fontFamily: 'var(--font-sans)',
+                fontWeight: 500,
+                display: 'inline-flex',
+                alignItems: 'center',
+              }}
+            >
+              {exporting === 'docx' ? 'Exporting...' : 'DOCX'}
+            </button>
           </div>
 
           {/* Preview pane body */}

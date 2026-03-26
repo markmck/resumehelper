@@ -12,8 +12,6 @@ export default function MinimalTemplate({
   ...props
 }: ResumeTemplateProps): React.JSX.Element {
   const defaults = TEMPLATE_DEFAULTS['minimal']
-  const pt = (marginTop ?? defaults.top) * 96
-  const pb = (marginBottom ?? defaults.bottom) * 96
   const ps = (marginSides ?? defaults.sides) * 96
   const {
     includedJobs,
@@ -73,7 +71,7 @@ export default function MinimalTemplate({
         lineHeight: 1.35,
         maxWidth: '8.5in',
         margin: '0 auto',
-        padding: `${pt}px ${ps}px ${pb}px ${ps}px`,
+        padding: `0 ${ps}px`,
       }}
     >
       {/* Header */}

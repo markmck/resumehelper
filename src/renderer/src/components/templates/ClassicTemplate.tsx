@@ -12,8 +12,6 @@ export default function ClassicTemplate({
   ...props
 }: ResumeTemplateProps): React.JSX.Element {
   const defaults = TEMPLATE_DEFAULTS['classic']
-  const pt = (marginTop ?? defaults.top) * 96
-  const pb = (marginBottom ?? defaults.bottom) * 96
   const ps = (marginSides ?? defaults.sides) * 96
   const {
     includedJobs,
@@ -71,14 +69,14 @@ export default function ClassicTemplate({
         fontFamily: "'Georgia', 'Times New Roman', serif",
         maxWidth: '8.5in',
         margin: '0 auto',
-        padding: `${pt}px ${ps}px ${pb}px ${ps}px`,
+        padding: `0 ${ps}px`,
       }}
     >
       {/* Header */}
       <div
         style={{
           textAlign: 'center',
-          borderBottom: '1px solid #cccccc',
+          borderBottom: showSummary && profile?.summary ? '1px solid #cccccc' : 'none',
           paddingBottom: '12px',
           marginBottom: '4px',
         }}

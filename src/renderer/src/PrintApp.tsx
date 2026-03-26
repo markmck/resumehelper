@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import { resolveTemplate } from './components/templates/resolveTemplate'
+import { TEMPLATE_DEFAULTS } from './components/templates/types'
 
 const PAGE_HEIGHT = 1056 // 11in * 96dpi
 
@@ -10,20 +11,31 @@ const PAGE_HEIGHT = 1056 // 11in * 96dpi
  * In BrowserWindow (PDF export) mode: renders flat (Chromium's printToPDF
  * handles pagination).
  */
-function PagedContent({ children, isIframe }: { children: React.ReactNode; isIframe: boolean }): React.JSX.Element {
+interface PagedContentProps {
+  children: React.ReactNode
+  isIframe: boolean
+  marginTopIn?: number   // top margin in inches (per page)
+  marginBottomIn?: number // bottom margin in inches (per page)
+}
+
+function PagedContent({ children, isIframe, marginTopIn = 1.0, marginBottomIn = 1.0 }: PagedContentProps): React.JSX.Element {
   const measureRef = useRef<HTMLDivElement>(null)
   const [pageCount, setPageCount] = useState(1)
+
+  const topPx = Math.round(marginTopIn * 96)
+  const bottomPx = Math.round(marginBottomIn * 96)
+  const usableHeight = PAGE_HEIGHT - topPx - bottomPx
 
   useLayoutEffect(() => {
     if (!isIframe) return
     const el = measureRef.current
     if (!el) return
     const height = el.scrollHeight
-    setPageCount(Math.max(1, Math.ceil(height / PAGE_HEIGHT)))
+    setPageCount(Math.max(1, Math.ceil(height / usableHeight)))
   })
 
   if (!isIframe) {
-    // PDF export: render flat, Chromium handles page breaks
+    // PDF export: render flat, Chromium's printToPDF handles per-page margins
     return <>{children}</>
   }
 
@@ -41,7 +53,7 @@ function PagedContent({ children, isIframe }: { children: React.ReactNode; isIfr
       >
         {children}
       </div>
-      {/* Visible paged view — clips content into page-sized boxes */}
+      {/* Visible paged view — clips content into page-sized boxes with per-page margins */}
       {Array.from({ length: pageCount }, (_, i) => (
         <div
           key={i}
@@ -57,15 +69,27 @@ function PagedContent({ children, isIframe }: { children: React.ReactNode; isIfr
             position: 'relative',
           }}
         >
+          {/* Content area clipped to usable height, offset by top margin */}
           <div
             style={{
               position: 'absolute',
-              top: `-${i * PAGE_HEIGHT}px`,
+              top: `${topPx}px`,
               left: 0,
               width: '816px',
+              height: `${usableHeight}px`,
+              overflow: 'hidden',
             }}
           >
-            {children}
+            <div
+              style={{
+                position: 'absolute',
+                top: `-${i * usableHeight}px`,
+                left: 0,
+                width: '816px',
+              }}
+            >
+              {children}
+            </div>
           </div>
         </div>
       ))}
@@ -233,7 +257,7 @@ function PrintApp(): React.JSX.Element {
           }
         `}</style>
       )}
-      <PagedContent isIframe={isIframe}>
+      <PagedContent isIframe={isIframe} marginTopIn={marginTop ?? TEMPLATE_DEFAULTS[templateKey]?.top ?? 1.0} marginBottomIn={marginBottom ?? TEMPLATE_DEFAULTS[templateKey]?.bottom ?? 1.0}>
         <TemplateComponent
           profile={data.profile}
           jobs={data.jobs}

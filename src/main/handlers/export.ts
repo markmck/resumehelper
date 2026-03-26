@@ -238,6 +238,21 @@ export function registerExportHandlers(): void {
     const V2_TEMPLATES = new Set(['classic', 'modern', 'jake', 'minimal', 'executive'])
     const isProfessional = V2_TEMPLATES.has(layoutTemplate) || !layoutTemplate || layoutTemplate === 'professional'
 
+    // Parse templateOptions for margin values
+    let pdfMarginTop = 0
+    let pdfMarginBottom = 0
+    if (isProfessional) {
+      const marginDefaults = DOCX_MARGIN_DEFAULTS[layoutTemplate] ?? { top: 1.0, bottom: 1.0, sides: 1.0 }
+      try {
+        const opts = variant?.templateOptions ? JSON.parse(variant.templateOptions as string) : {}
+        pdfMarginTop = opts.marginTop ?? marginDefaults.top
+        pdfMarginBottom = opts.marginBottom ?? marginDefaults.bottom
+      } catch {
+        pdfMarginTop = marginDefaults.top
+        pdfMarginBottom = marginDefaults.bottom
+      }
+    }
+
     if (isProfessional) {
       // Professional path: load print.html + wait for print:ready signal
       const win = new BrowserWindow({
@@ -273,7 +288,7 @@ export function registerExportHandlers(): void {
       const pdfBuffer = await win.webContents.printToPDF({
         printBackground: true,
         pageSize: 'Letter',
-        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        margins: { top: pdfMarginTop, bottom: pdfMarginBottom, left: 0, right: 0 },
       })
       win.destroy()
       await fs.writeFile(filePath, pdfBuffer)
