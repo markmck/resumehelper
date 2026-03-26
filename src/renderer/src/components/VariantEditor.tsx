@@ -63,7 +63,8 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
       ? variant.layoutTemplate
       : 'classic'
   )
-  const [showSummary] = useState(true)
+  const [showSummary, setShowSummary] = useState(true)
+  const [marginsDirty, setMarginsDirty] = useState(false)
   const [analysisScore, setAnalysisScore] = useState<number | null>(null)
   const [analysisId, setAnalysisId] = useState<number | null>(null)
 
@@ -97,19 +98,46 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
       setMarginTop(opts.marginTop ?? undefined)
       setMarginBottom(opts.marginBottom ?? undefined)
       setMarginSides(opts.marginSides ?? undefined)
+      // Dirty if any margin is explicitly set
+      setMarginsDirty(
+        opts.marginTop != null || opts.marginBottom != null || opts.marginSides != null
+      )
     } else {
       setAccentColor(undefined)
       setSkillsDisplay(undefined)
       setMarginTop(undefined)
       setMarginBottom(undefined)
       setMarginSides(undefined)
+      setMarginsDirty(false)
     }
+
+    // Initialize showSummary from builderData.summaryExcluded
+    window.api.templates.getBuilderData(variant.id).then((bd) => {
+      setShowSummary(!(bd.summaryExcluded ?? false))
+    })
   }, [variant.id])
 
   // Sync hex input when accentColor changes
   useEffect(() => {
     setHexInput(accentColor ?? '')
   }, [accentColor])
+
+  // On template switch: snap non-dirty margins to new template defaults
+  const prevLayoutTemplateRef = useRef<string>(layoutTemplate)
+  useEffect(() => {
+    if (prevLayoutTemplateRef.current === layoutTemplate) {
+      prevLayoutTemplateRef.current = layoutTemplate
+      return
+    }
+    prevLayoutTemplateRef.current = layoutTemplate
+    if (!marginsDirty) {
+      // Snap to new template defaults (undefined = use default)
+      setMarginTop(undefined)
+      setMarginBottom(undefined)
+      setMarginSides(undefined)
+    }
+    // If marginsDirty, keep custom values — reset link will be visible
+  }, [layoutTemplate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist template options on change (debounced 300ms)
   const saveOptionsRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -179,6 +207,29 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
     await window.api.templates.setLayoutTemplate(variant.id, newTheme)
   }
 
+  const handleShowSummaryChange = (shown: boolean): void => {
+    setShowSummary(shown)
+    // Persist via sentinel exclusion pattern: excluded = !shown
+    window.api.templates.setItemExcluded(variant.id, 'summary', 0, !shown)
+    setPreviewVersion((v) => v + 1)
+  }
+
+  const handleMarginChange = (field: 'top' | 'bottom' | 'sides', value: number): void => {
+    if (field === 'top') setMarginTop(value)
+    else if (field === 'bottom') setMarginBottom(value)
+    else setMarginSides(value)
+    setMarginsDirty(true)
+    // saveOptions is triggered by the dependency change via useEffect
+  }
+
+  const handleMarginsReset = (): void => {
+    setMarginTop(undefined)
+    setMarginBottom(undefined)
+    setMarginSides(undefined)
+    setMarginsDirty(false)
+    // saveOptions triggered by state change
+  }
+
   const handleExportPdf = async (): Promise<void> => {
     if (exporting) return
     setExporting('pdf')
@@ -211,6 +262,9 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
 
   const effectiveAccentColor = accentColor ?? TEMPLATE_DEFAULTS[layoutTemplate]?.accent ?? '#000000'
   const effectiveSkillsDisplay = skillsDisplay ?? TEMPLATE_DEFAULTS[layoutTemplate]?.skillsDisplay ?? 'grouped'
+  const effectiveMarginTop = marginTop ?? TEMPLATE_DEFAULTS[layoutTemplate]?.top ?? 1.0
+  const effectiveMarginBottom = marginBottom ?? TEMPLATE_DEFAULTS[layoutTemplate]?.bottom ?? 1.0
+  const effectiveMarginSides = marginSides ?? TEMPLATE_DEFAULTS[layoutTemplate]?.sides ?? 1.0
 
   const badgeColors = analysisScore != null ? scoreBadgeColor(analysisScore) : null
 
@@ -330,6 +384,14 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
             <VariantBuilder
               variantId={variant.id}
               onToggle={() => setPreviewVersion((v) => v + 1)}
+              showSummary={showSummary}
+              onShowSummaryChange={handleShowSummaryChange}
+              marginTop={effectiveMarginTop}
+              marginBottom={effectiveMarginBottom}
+              marginSides={effectiveMarginSides}
+              onMarginChange={handleMarginChange}
+              layoutTemplate={layoutTemplate}
+              onMarginsReset={handleMarginsReset}
             />
           </div>
         </div>

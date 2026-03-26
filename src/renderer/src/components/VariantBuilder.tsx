@@ -10,10 +10,21 @@ import {
   BuilderInterest,
   BuilderReference,
 } from '../../../preload/index.d'
+import { TEMPLATE_DEFAULTS } from './templates/types'
 
 interface VariantBuilderProps {
   variantId: number
   onToggle?: () => void
+  // showSummary controls
+  showSummary: boolean
+  onShowSummaryChange: (shown: boolean) => void
+  // margin controls (resolved inches — always a number, not undefined)
+  marginTop: number
+  marginBottom: number
+  marginSides: number
+  onMarginChange: (field: 'top' | 'bottom' | 'sides', value: number) => void
+  layoutTemplate: string
+  onMarginsReset: () => void
 }
 
 const sectionTitleStyle: React.CSSProperties = {
@@ -59,10 +70,21 @@ const companyStyle: React.CSSProperties = {
   color: 'var(--color-text-tertiary)',
 }
 
-function VariantBuilder({ variantId, onToggle }: VariantBuilderProps): React.JSX.Element {
+function VariantBuilder({
+  variantId,
+  onToggle,
+  showSummary,
+  onShowSummaryChange,
+  marginTop,
+  marginBottom,
+  marginSides,
+  onMarginChange,
+  layoutTemplate,
+  onMarginsReset,
+}: VariantBuilderProps): React.JSX.Element {
   const [builderData, setBuilderData] = useState<BuilderData | null>(null)
-  const [summaryIncluded, setSummaryIncluded] = useState(true)
   const [profileSummary, setProfileSummary] = useState('')
+  const [layoutOpen, setLayoutOpen] = useState(false)
 
   useEffect(() => {
     setBuilderData(null)
@@ -205,17 +227,31 @@ function VariantBuilder({ variantId, onToggle }: VariantBuilderProps): React.JSX
     </label>
   )
 
+  // Determine if any margin differs from template defaults
+  const templateDefaults = TEMPLATE_DEFAULTS[layoutTemplate]
+  const defaultTop = templateDefaults?.top ?? 1.0
+  const defaultBottom = templateDefaults?.bottom ?? 1.0
+  const defaultSides = templateDefaults?.sides ?? 1.0
+  const marginsAreDirty =
+    Math.abs(marginTop - defaultTop) > 0.001 ||
+    Math.abs(marginBottom - defaultBottom) > 0.001 ||
+    Math.abs(marginSides - defaultSides) > 0.001
+
   return (
     <div style={{ overflow: 'auto', height: '100%', padding: 'var(--space-5)' }}>
-      {/* Summary toggle */}
+      {/* Summary toggle — first in content area */}
       {profileSummary && (
-        <div style={{ marginBottom: 'var(--space-6)' }}>
-          <div style={sectionTitleStyle}>Summary</div>
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={summaryIncluded} onChange={() => setSummaryIncluded(!summaryIncluded)} style={{ ...cbStyle, marginTop: 3 }} />
-            <span style={toggleTextStyle(!summaryIncluded)}>{profileSummary}</span>
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={showSummary}
+              onChange={(e) => onShowSummaryChange(e.target.checked)}
+              style={cbStyle}
+            />
+            <span style={{ fontSize: 13 }}>Summary</span>
           </label>
-          <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', marginTop: 'var(--space-5)' }} />
+          <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', marginTop: 'var(--space-4)' }} />
         </div>
       )}
 
@@ -375,6 +411,99 @@ function VariantBuilder({ variantId, onToggle }: VariantBuilderProps): React.JSX
           {referencesList.map((ref) => renderEntityToggle(ref.id, ref.name, ref.excluded, () => handleReferenceToggle(ref)))}
         </div>
       )}
+
+      {/* LAYOUT collapsible section */}
+      <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
+        {/* Section header */}
+        <div
+          onClick={() => setLayoutOpen((o) => !o)}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}
+        >
+          <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>
+            {layoutOpen ? '▼' : '▶'}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)' }}>
+            LAYOUT
+          </span>
+          {!layoutOpen && (
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', marginLeft: 4 }}>
+              {marginTop.toFixed(2)}" / {marginBottom.toFixed(2)}" / {marginSides.toFixed(2)}"
+            </span>
+          )}
+        </div>
+
+        {/* Expanded slider area */}
+        {layoutOpen && (
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Top slider */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28 }}>
+              <span style={{ fontSize: 12, minWidth: 48, color: 'var(--color-text-secondary)' }}>Top</span>
+              <input
+                type="range"
+                min={0.4} max={1.2} step={0.05}
+                value={marginTop}
+                onInput={(e) => onMarginChange('top', parseFloat((e.target as HTMLInputElement).value))}
+                style={{ flex: 1, accentColor: '#8b5cf6', cursor: 'pointer' }}
+              />
+              <span style={{
+                fontSize: 12, minWidth: 40, textAlign: 'right',
+                fontFamily: 'var(--font-mono)',
+                color: marginTop < 0.5 ? '#f59e0b' : 'var(--color-text-secondary)',
+              }}>
+                {marginTop.toFixed(2)}"
+              </span>
+            </div>
+
+            {/* Bottom slider */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28 }}>
+              <span style={{ fontSize: 12, minWidth: 48, color: 'var(--color-text-secondary)' }}>Bottom</span>
+              <input
+                type="range"
+                min={0.4} max={1.2} step={0.05}
+                value={marginBottom}
+                onInput={(e) => onMarginChange('bottom', parseFloat((e.target as HTMLInputElement).value))}
+                style={{ flex: 1, accentColor: '#8b5cf6', cursor: 'pointer' }}
+              />
+              <span style={{
+                fontSize: 12, minWidth: 40, textAlign: 'right',
+                fontFamily: 'var(--font-mono)',
+                color: marginBottom < 0.5 ? '#f59e0b' : 'var(--color-text-secondary)',
+              }}>
+                {marginBottom.toFixed(2)}"
+              </span>
+            </div>
+
+            {/* Sides slider */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28 }}>
+              <span style={{ fontSize: 12, minWidth: 48, color: 'var(--color-text-secondary)' }}>Sides</span>
+              <input
+                type="range"
+                min={0.4} max={1.2} step={0.05}
+                value={marginSides}
+                onInput={(e) => onMarginChange('sides', parseFloat((e.target as HTMLInputElement).value))}
+                style={{ flex: 1, accentColor: '#8b5cf6', cursor: 'pointer' }}
+              />
+              <span style={{
+                fontSize: 12, minWidth: 40, textAlign: 'right',
+                fontFamily: 'var(--font-mono)',
+                color: marginSides < 0.5 ? '#f59e0b' : 'var(--color-text-secondary)',
+              }}>
+                {marginSides.toFixed(2)}"
+              </span>
+            </div>
+
+            {/* Reset link */}
+            {marginsAreDirty && (
+              <span
+                onClick={onMarginsReset}
+                style={{ fontSize: 11, color: 'var(--color-text-muted)', cursor: 'pointer', textDecoration: 'underline', marginTop: 4 }}
+              >
+                Reset to template defaults
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
