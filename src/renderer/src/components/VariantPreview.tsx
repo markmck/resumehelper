@@ -3,6 +3,7 @@ import { BuilderData, Profile } from '../../../preload/index.d'
 
 interface VariantPreviewProps {
   variantId: number
+  analysisId?: number     // when provided, getBuilderData returns merged override data
   layoutTemplate?: string
   refreshKey?: number
   showSummary?: boolean
@@ -15,6 +16,7 @@ interface VariantPreviewProps {
 
 function VariantPreview({
   variantId,
+  analysisId,
   layoutTemplate,
   refreshKey,
   showSummary = true,
@@ -46,16 +48,16 @@ function VariantPreview({
     return () => observer.disconnect()
   }, [])
 
-  // Fetch data when variantId or refreshKey changes
+  // Fetch data when variantId, analysisId, or refreshKey changes
   useEffect(() => {
     Promise.all([
-      window.api.templates.getBuilderData(variantId),
+      window.api.templates.getBuilderData(variantId, analysisId),
       window.api.profile.get(),
     ]).then(([builder, profile]) => {
       setBuilderData(builder)
       setProfileData(profile)
     })
-  }, [variantId, refreshKey])
+  }, [variantId, refreshKey, analysisId])
 
   // Send data to iframe via postMessage when data or iframe changes
   const sendDataToIframe = useCallback(() => {
