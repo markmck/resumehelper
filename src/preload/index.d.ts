@@ -152,6 +152,7 @@ export interface BuilderData {
 
 export interface SubmissionSnapshot {
   layoutTemplate: string
+  templateOptions?: { accentColor?: string; skillsDisplay?: string; marginTop?: number; marginBottom?: number; marginSides?: number; showSummary?: boolean }
   jobs: BuilderJob[]
   skills: BuilderSkill[]
   projects: BuilderProject[]

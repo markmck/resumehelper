@@ -6,6 +6,7 @@ import type { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, Builde
 
 interface SubmissionSnapshot {
   layoutTemplate: string
+  templateOptions?: { accentColor?: string; skillsDisplay?: string; marginTop?: number; marginBottom?: number; marginSides?: number; showSummary?: boolean }
   jobs: BuilderJob[]
   skills: BuilderSkill[]
   projects: BuilderProject[]
@@ -20,11 +21,17 @@ interface SubmissionSnapshot {
 
 async function buildSnapshotForVariant(variantId: number): Promise<SubmissionSnapshot> {
   const [variant] = await db
-    .select({ layoutTemplate: templateVariants.layoutTemplate })
+    .select({ layoutTemplate: templateVariants.layoutTemplate, templateOptions: templateVariants.templateOptions })
     .from(templateVariants)
     .where(eq(templateVariants.id, variantId))
 
   const layoutTemplate = variant?.layoutTemplate ?? 'traditional'
+  let templateOptions: SubmissionSnapshot['templateOptions'] = undefined
+  try {
+    if (variant?.templateOptions) {
+      templateOptions = JSON.parse(variant.templateOptions as string)
+    }
+  } catch { /* keep undefined */ }
 
   const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
   const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
@@ -183,6 +190,7 @@ async function buildSnapshotForVariant(variantId: number): Promise<SubmissionSna
 
   return {
     layoutTemplate,
+    templateOptions,
     jobs: jobsWithBullets,
     skills: skillsWithExcluded,
     projects: projectsWithBullets,

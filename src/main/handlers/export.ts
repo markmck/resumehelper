@@ -791,6 +791,7 @@ export function registerExportHandlers(): void {
 
   ipcMain.handle('export:snapshotPdf', async (_, snapshotData: {
     layoutTemplate?: string
+    templateOptions?: { accentColor?: string; skillsDisplay?: string; marginTop?: number; marginBottom?: number; marginSides?: number; showSummary?: boolean }
     jobs?: unknown[]
     skills?: unknown[]
     projects?: unknown[]
@@ -862,11 +863,20 @@ export function registerExportHandlers(): void {
     })
 
     // 9. Push snapshot data to PrintApp via postMessage using executeJavaScript
+    const marginDefaults = DOCX_MARGIN_DEFAULTS[resolvedTemplate] ?? { top: 1.0, bottom: 1.0, sides: 1.0 }
+    const snapOpts = snapshotData?.templateOptions
+    const pdfMarginTop = snapOpts?.marginTop ?? marginDefaults.top
+    const pdfMarginBottom = snapOpts?.marginBottom ?? marginDefaults.bottom
     await win.webContents.executeJavaScript(
       `window.postMessage(${JSON.stringify({
         type: 'print-data',
         template: resolvedTemplate,
-        showSummary: true,
+        showSummary: snapOpts?.showSummary ?? true,
+        accentColor: snapOpts?.accentColor,
+        skillsDisplay: snapOpts?.skillsDisplay,
+        marginTop: pdfMarginTop,
+        marginBottom: pdfMarginBottom,
+        marginSides: snapOpts?.marginSides ?? marginDefaults.sides,
         payload,
       })}, '*')`
     )
@@ -874,11 +884,11 @@ export function registerExportHandlers(): void {
     // 10. Settle delay to let React render
     await new Promise((r) => setTimeout(r, 500))
 
-    // 11. Print to PDF
+    // 11. Print to PDF — margins match what was sent to PrintApp
     const pdfBuffer = await win.webContents.printToPDF({
       printBackground: true,
       pageSize: 'Letter',
-      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      margins: { top: pdfMarginTop, bottom: pdfMarginBottom, left: 0, right: 0 },
     })
     win.destroy()
     await fs.writeFile(filePath, pdfBuffer)

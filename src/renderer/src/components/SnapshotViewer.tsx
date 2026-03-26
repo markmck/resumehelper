@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Profile, SubmissionSnapshot } from '../../../preload/index.d'
+import { TEMPLATE_DEFAULTS } from './templates/types'
 
 interface SnapshotViewerProps {
   snapshot: SubmissionSnapshot
@@ -34,6 +35,8 @@ function SnapshotViewer({ snapshot, onClose, onReExport }: SnapshotViewerProps):
 
   // Resolve template key — old/unknown values fall back to classic
   const resolvedTemplate = V2_TEMPLATES.has(snapshot.layoutTemplate) ? snapshot.layoutTemplate : 'classic'
+  const defaults = TEMPLATE_DEFAULTS[resolvedTemplate] ?? TEMPLATE_DEFAULTS['classic']
+  const opts = snapshot.templateOptions
 
   // Build print URL using __printBase (same pattern as VariantPreview)
   const base = (window as Window & { __printBase?: string }).__printBase ?? window.location.origin
@@ -49,7 +52,12 @@ function SnapshotViewer({ snapshot, onClose, onReExport }: SnapshotViewerProps):
       iframe.contentWindow.postMessage({
         type: 'print-data',
         template: resolvedTemplate,
-        showSummary: true,
+        showSummary: opts?.showSummary ?? true,
+        marginTop: opts?.marginTop ?? defaults.top,
+        marginBottom: opts?.marginBottom ?? defaults.bottom,
+        marginSides: opts?.marginSides ?? defaults.sides,
+        accentColor: opts?.accentColor ?? defaults.accent,
+        skillsDisplay: opts?.skillsDisplay ?? defaults.skillsDisplay,
         payload: {
           profile: profileData,
           jobs: snapshot.jobs,
