@@ -282,6 +282,22 @@ export interface SubmissionMetrics {
   respondedAvgScore: number | null
 }
 
+export interface BulletOverride {
+  bulletId: number
+  overrideText: string
+  source: 'ai_suggestion' | 'manual_edit'
+  suggestionId: string | null
+}
+
+export interface SkillAddition {
+  id: number
+  analysisId: number
+  skillName: string
+  reason: string
+  category: string
+  status: 'pending' | 'accepted' | 'dismissed'
+}
+
 export interface Api {
   jobs: {
     list: () => Promise<JobWithBullets[]>
@@ -521,8 +537,9 @@ export interface Api {
     analyze: (jobPostingId: number, variantId: number) => Promise<{ analysisId: number; parsedJob: unknown } | { error: string; code: string }>
     onProgress: (cb: (phase: string, pct: number, data?: unknown) => void) => void
     offProgress: () => void
-    acceptSuggestion: (analysisId: number, bulletId: number, text: string) => Promise<void>
-    dismissSuggestion: (analysisId: number, bulletId: number) => Promise<void>
+    acceptSuggestion: (analysisId: number, bulletId: number, text: string) => Promise<{ success: boolean } | { error: string }>
+    dismissSuggestion: (analysisId: number, bulletId: number) => Promise<{ success: boolean } | { error: string }>
+    getOverrides: (analysisId: number) => Promise<BulletOverride[]>
   }
   jobPostings: {
     list: () => Promise<unknown[]>
