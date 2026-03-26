@@ -102,5 +102,5 @@ Plans:
 | 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
 | 13. Pipeline Foundation | 3/3 | Complete    | 2026-03-25 | - |
 | 14. Templates Complete | 3/3 | Complete    | 2026-03-25 | - |
-| 15. Controls + Page Break Overlay | 1/3 | In Progress|  | - |
+| 15. Controls + Page Break Overlay | 2/3 | In Progress|  | - |
 | 16. Cleanup | v2.1 | 0/? | Not started | - |
