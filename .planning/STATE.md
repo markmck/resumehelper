@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Resume Templates
 status: planning
-stopped_at: Completed 16-cleanup 16-02-PLAN.md
-last_updated: "2026-03-26T12:56:38.220Z"
+stopped_at: Completed 16-cleanup 16-03-PLAN.md
+last_updated: "2026-03-26T14:19:54.096Z"
 last_activity: 2026-03-25 — v2.1 roadmap created, 21 requirements mapped across 4 phases
 progress:
   total_phases: 4
   completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 12
+  completed_plans: 12
   percent: 0
 ---
 
@@ -62,6 +62,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 15-controls-page-break-overlay P03 | 4 | 2 tasks | 3 files |
 | Phase 16-cleanup P01 | 12 | 2 tasks | 9 files |
 | Phase 16-cleanup P02 | 3 | 2 tasks | 4 files |
+| Phase 16-cleanup P03 | 8 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,8 @@ Recent decisions affecting current work:
 - [Phase 16-cleanup]: variantId=0 sentinel in print.html URL triggers postMessage path in both iframe and BrowserWindow snapshot contexts
 - [Phase 16-cleanup]: SnapshotViewer fetches profile separately (snapshot data lacks profile fields), merges before postMessage to iframe
 - [Phase 16-cleanup]: Unified rendering pipeline complete: preview, PDF export, snapshot view, snapshot export all use print.html
+- [Phase 16-cleanup]: Template dropdown onChange is inline (two calls) — no separate handler; existing layoutTemplate useEffect handles preview re-render
+- [Phase 16-cleanup]: Snapshot PDF zero margins: template CSS padding is sole spacing source, matching iframe viewer behavior
 
 ### Pending Todos
 
@@ -120,6 +123,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-26T12:51:41.973Z
-Stopped at: Completed 16-cleanup 16-02-PLAN.md
+Last session: 2026-03-26T14:19:54.094Z
+Stopped at: Completed 16-cleanup 16-03-PLAN.md
 Resume file: None
