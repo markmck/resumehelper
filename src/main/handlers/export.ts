@@ -832,9 +832,6 @@ export function registerExportHandlers(): void {
       references: snapshotData?.references ?? [],
     }
 
-    // 5. Determine margins from template defaults (snapshots don't store templateOptions)
-    const marginDefaults = DOCX_MARGIN_DEFAULTS[resolvedTemplate] ?? { top: 1.0, bottom: 1.0, sides: 1.0 }
-
     // 6. Create a hidden BrowserWindow with preload for IPC support
     const win = new BrowserWindow({
       show: false,
@@ -881,7 +878,7 @@ export function registerExportHandlers(): void {
     const pdfBuffer = await win.webContents.printToPDF({
       printBackground: true,
       pageSize: 'Letter',
-      margins: { top: marginDefaults.top, bottom: marginDefaults.bottom, left: 0, right: 0 },
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
     })
     win.destroy()
     await fs.writeFile(filePath, pdfBuffer)
