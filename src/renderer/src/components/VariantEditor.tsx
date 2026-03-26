@@ -11,6 +11,7 @@ interface VariantEditorProps {
   onRename: (id: number, name: string) => void
   onDelete: (id: number) => void
   onOptimizeVariant?: (analysisId: number) => void
+  onVariantChanged?: () => void
 }
 
 interface JobPostingRow {
@@ -53,7 +54,7 @@ function normalizeHex(value: string): string {
   return cleaned.toLowerCase()
 }
 
-function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: VariantEditorProps): React.JSX.Element {
+function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant, onVariantChanged }: VariantEditorProps): React.JSX.Element {
   const [previewVersion, setPreviewVersion] = useState(0)
   const [exporting, setExporting] = useState<'pdf' | 'docx' | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -146,7 +147,7 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
         marginTop,
         marginBottom,
         marginSides,
-      })
+      }).then(() => onVariantChanged?.())
     }, 300)
   }, [variant.id, accentColor, skillsDisplay, marginTop, marginBottom, marginSides])
 
@@ -416,6 +417,7 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
               onChange={(e) => {
                 setLayoutTemplate(e.target.value)
                 window.api.templates.setLayoutTemplate(variant.id, e.target.value)
+                onVariantChanged?.()
               }}
               style={{
                 fontSize: 13,

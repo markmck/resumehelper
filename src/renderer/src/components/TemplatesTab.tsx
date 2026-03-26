@@ -53,6 +53,11 @@ function TemplatesTab({ selectedVariantId, onVariantsLoaded, onSelectedChange, o
     })
   }
 
+  const refreshVariants = async (): Promise<void> => {
+    const list = await window.api.templates.list()
+    setVariants(list)
+  }
+
   const selectedVariant = variants.find((v) => v.id === selectedVariantId) ?? null
 
   return (
@@ -64,6 +69,7 @@ function TemplatesTab({ selectedVariantId, onVariantsLoaded, onSelectedChange, o
             onRename={handleRename}
             onDelete={handleDelete}
             onOptimizeVariant={onOptimizeVariant}
+            onVariantChanged={refreshVariants}
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-tertiary)' }}>
