@@ -3,21 +3,6 @@ import type {
   Profile,
 } from '../../preload/index.d'
 
-export interface ThemeEntry {
-  key: string
-  displayName: string
-}
-
-export const THEMES: ThemeEntry[] = [
-  { key: 'classic', displayName: 'Classic' },
-  { key: 'modern', displayName: 'Modern' },
-  { key: 'jake', displayName: 'Jake' },
-  { key: 'minimal', displayName: 'Minimal' },
-  { key: 'executive', displayName: 'Executive' },
-]
-
-export const THEME_KEYS = THEMES.map((t) => t.key)
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function buildResumeJson(profileRow: Profile | undefined, builderData: BuilderData): Record<string, any> {
   const includedJobs = builderData.jobs.filter((j) => !j.excluded)
@@ -97,50 +82,5 @@ export function buildResumeJson(profileRow: Profile | undefined, builderData: Bu
     languages: includedLanguages.map((l) => ({ language: l.language, fluency: l.fluency })),
     interests: includedInterests.map((i) => ({ name: i.name, keywords: i.keywords })),
     references: includedReferences.map((r) => ({ name: r.name, reference: r.reference })),
-  }
-}
-
-// Sanitize date fields — remove any value that would cause new Date() to throw "Invalid time value"
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function sanitizeDates(resumeJson: Record<string, any>): Record<string, any> {
-  const dateFields = ['startDate', 'endDate', 'date', 'releaseDate']
-  const sections = ['work', 'education', 'volunteer', 'awards', 'publications', 'projects']
-  for (const section of sections) {
-    if (!Array.isArray(resumeJson[section])) continue
-    for (const item of resumeJson[section]) {
-      for (const field of dateFields) {
-        if (field in item && item[field]) {
-          const d = new Date(item[field])
-          if (isNaN(d.getTime())) {
-            item[field] = undefined
-          }
-        }
-      }
-    }
-  }
-  return resumeJson
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function renderThemeHtml(themeKey: string, resumeJson: Record<string, any>): Promise<string> {
-  sanitizeDates(resumeJson)
-  switch (themeKey) {
-    case 'even': {
-      const theme = await import('jsonresume-theme-even')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return theme.render(resumeJson as any)
-    }
-    case 'class': {
-      const theme = await import('@jsonresume/jsonresume-theme-class')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return theme.render(resumeJson as any)
-    }
-    case 'elegant': {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const theme = require('jsonresume-theme-elegant') as { render: (r: Record<string, unknown>) => string }
-      return Promise.resolve(theme.render(resumeJson))
-    }
-    default:
-      throw new Error(`Unknown theme: ${themeKey}`)
   }
 }
