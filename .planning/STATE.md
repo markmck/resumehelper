@@ -2,30 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Three Layer Data
-status: ready_to_plan
-stopped_at: Completed 17-02-PLAN.md
-last_updated: "2026-03-26T21:44:35.391Z"
+status: planning
+stopped_at: Phase 18 context gathered
+last_updated: "2026-03-26T22:15:46.935Z"
 last_activity: 2026-03-26 — Roadmap created, 20 requirements mapped across 5 phases
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 2
   completed_plans: 2
----
-
----
-gsd_state_version: 1.0
-milestone: v2.2
-milestone_name: Three Layer Data
-status: ready_to_plan
-stopped_at: null
-last_updated: "2026-03-26T22:00:00.000Z"
-last_activity: 2026-03-26 — Roadmap created for v2.2, 5 phases (17-21)
-progress:
-  total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
   percent: 0
 ---
 
@@ -50,6 +35,7 @@ Progress: ░░░░░░░░░░ 0%
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 26 (v2.0: 14, v2.1: 12)
 - v2.1 average duration: ~8 min/plan
 - v2.1 total execution time: ~1.5 hours
@@ -72,6 +58,7 @@ Progress: ░░░░░░░░░░ 0%
 Decisions are logged in PROJECT.MD Key Decisions table.
 
 Key v2.2 decisions from research:
+
 - Use separate `analysis_bullet_overrides` table (not JSON column on analysisResults) — FK cascades, indexed lookups
 - Use `@dnd-kit` for chip grid drag (not HTML5 DnD) — Electron/Windows pointer-event compatibility
 - Phase 17 (schema) must precede Phase 18 (accept path rewire) atomically — Pitfall 35/36
@@ -94,6 +81,6 @@ None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-03-26T21:44:35.389Z
-Stopped at: Completed 17-02-PLAN.md
-Resume file: None
+Last session: 2026-03-26T22:15:46.932Z
+Stopped at: Phase 18 context gathered
+Resume file: .planning/phases/18-three-layer-model-wiring/18-CONTEXT.md
