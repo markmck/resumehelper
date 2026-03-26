@@ -1,4 +1,4 @@
-import { ResumeTemplateProps } from './types'
+import { ResumeTemplateProps, TEMPLATE_DEFAULTS } from './types'
 import { filterResumeData } from './filterResumeData'
 
 export default function JakeTemplate({
@@ -6,8 +6,15 @@ export default function JakeTemplate({
   accentColor = '#333333',
   skillsDisplay = 'grouped',
   showSummary = false,
+  marginTop,
+  marginBottom,
+  marginSides,
   ...props
 }: ResumeTemplateProps): React.JSX.Element {
+  const defaults = TEMPLATE_DEFAULTS['jake']
+  const pt = (marginTop ?? defaults.top) * 96
+  const pb = (marginBottom ?? defaults.bottom) * 96
+  const ps = (marginSides ?? defaults.sides) * 96
   const {
     includedJobs,
     includedSkills,
@@ -65,7 +72,7 @@ export default function JakeTemplate({
         lineHeight: '1.15',
         maxWidth: '8.5in',
         margin: '0 auto',
-        padding: '0.6in 0.5in',
+        padding: `${pt}px ${ps}px ${pb}px ${ps}px`,
       }}
     >
       {/* Header */}

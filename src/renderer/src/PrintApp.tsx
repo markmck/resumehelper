@@ -104,6 +104,11 @@ function PrintApp(): React.JSX.Element {
   const [data, setData] = useState<PrintData | null>(null)
   const [templateKey, setTemplateKey] = useState<string>('classic')
   const [showSummary, setShowSummary] = useState<boolean>(true)
+  const [accentColor, setAccentColor] = useState<string | undefined>(undefined)
+  const [skillsDisplay, setSkillsDisplay] = useState<'grouped' | 'inline' | undefined>(undefined)
+  const [marginTop, setMarginTop] = useState<number | undefined>(undefined)
+  const [marginBottom, setMarginBottom] = useState<number | undefined>(undefined)
+  const [marginSides, setMarginSides] = useState<number | undefined>(undefined)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -114,23 +119,33 @@ function PrintApp(): React.JSX.Element {
     // In a BrowserWindow (PDF export), window.api is available via preload.
     // In an iframe (preview), preload doesn't inject — receive data via postMessage instead.
     if (typeof window.api !== 'undefined' && window.api?.profile) {
-      Promise.all([window.api.profile.get(), window.api.templates.getBuilderData(variantId)]).then(
-        ([profileData, builderData]) => {
-          setData({
-            profile: profileData,
-            jobs: builderData.jobs,
-            skills: builderData.skills,
-            projects: builderData.projects,
-            education: builderData.education,
-            volunteer: builderData.volunteer,
-            awards: builderData.awards,
-            publications: builderData.publications,
-            languages: builderData.languages,
-            interests: builderData.interests,
-            references: builderData.references,
-          })
+      Promise.all([
+        window.api.profile.get(),
+        window.api.templates.getBuilderData(variantId),
+        window.api.templates.getOptions(variantId),
+      ]).then(([profileData, builderData, opts]) => {
+        setData({
+          profile: profileData,
+          jobs: builderData.jobs,
+          skills: builderData.skills,
+          projects: builderData.projects,
+          education: builderData.education,
+          volunteer: builderData.volunteer,
+          awards: builderData.awards,
+          publications: builderData.publications,
+          languages: builderData.languages,
+          interests: builderData.interests,
+          references: builderData.references,
+        })
+        // Apply templateOptions from DB for PDF export path
+        if (opts) {
+          if (opts.accentColor !== undefined) setAccentColor(opts.accentColor)
+          if (opts.skillsDisplay) setSkillsDisplay(opts.skillsDisplay)
+          if (typeof opts.marginTop === 'number') setMarginTop(opts.marginTop)
+          if (typeof opts.marginBottom === 'number') setMarginBottom(opts.marginBottom)
+          if (typeof opts.marginSides === 'number') setMarginSides(opts.marginSides)
         }
-      )
+      })
       return
     } else {
       // iframe mode: listen for data from parent VariantPreview
@@ -143,6 +158,11 @@ function PrintApp(): React.JSX.Element {
           if (typeof event.data.showSummary === 'boolean') {
             setShowSummary(event.data.showSummary)
           }
+          if (event.data.accentColor !== undefined) setAccentColor(event.data.accentColor)
+          if (event.data.skillsDisplay) setSkillsDisplay(event.data.skillsDisplay)
+          if (typeof event.data.marginTop === 'number') setMarginTop(event.data.marginTop)
+          if (typeof event.data.marginBottom === 'number') setMarginBottom(event.data.marginBottom)
+          if (typeof event.data.marginSides === 'number') setMarginSides(event.data.marginSides)
         }
       }
       window.addEventListener('message', handler)
@@ -227,6 +247,11 @@ function PrintApp(): React.JSX.Element {
           interests={data.interests}
           references={data.references}
           showSummary={showSummary}
+          accentColor={accentColor}
+          skillsDisplay={skillsDisplay}
+          marginTop={marginTop}
+          marginBottom={marginBottom}
+          marginSides={marginSides}
         />
       </PagedContent>
     </div>

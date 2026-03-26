@@ -1,4 +1,4 @@
-import { ResumeTemplateProps } from './types'
+import { ResumeTemplateProps, TEMPLATE_DEFAULTS } from './types'
 import { filterResumeData } from './filterResumeData'
 
 export default function MinimalTemplate({
@@ -6,8 +6,15 @@ export default function MinimalTemplate({
   accentColor = '#333333',
   skillsDisplay = 'inline',
   showSummary = false,
+  marginTop,
+  marginBottom,
+  marginSides,
   ...props
 }: ResumeTemplateProps): React.JSX.Element {
+  const defaults = TEMPLATE_DEFAULTS['minimal']
+  const pt = (marginTop ?? defaults.top) * 96
+  const pb = (marginBottom ?? defaults.bottom) * 96
+  const ps = (marginSides ?? defaults.sides) * 96
   const {
     includedJobs,
     includedSkills,
@@ -66,7 +73,7 @@ export default function MinimalTemplate({
         lineHeight: 1.35,
         maxWidth: '8.5in',
         margin: '0 auto',
-        padding: '1in',
+        padding: `${pt}px ${ps}px ${pb}px ${ps}px`,
       }}
     >
       {/* Header */}
