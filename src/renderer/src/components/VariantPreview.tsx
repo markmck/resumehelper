@@ -6,9 +6,24 @@ interface VariantPreviewProps {
   layoutTemplate?: string
   refreshKey?: number
   showSummary?: boolean
+  accentColor?: string
+  skillsDisplay?: 'grouped' | 'inline'
+  marginTop?: number
+  marginBottom?: number
+  marginSides?: number
 }
 
-function VariantPreview({ variantId, layoutTemplate, refreshKey, showSummary = true }: VariantPreviewProps): React.JSX.Element {
+function VariantPreview({
+  variantId,
+  layoutTemplate,
+  refreshKey,
+  showSummary = true,
+  accentColor,
+  skillsDisplay,
+  marginTop,
+  marginBottom,
+  marginSides,
+}: VariantPreviewProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [scale, setScale] = useState<number>(0)
@@ -51,6 +66,11 @@ function VariantPreview({ variantId, layoutTemplate, refreshKey, showSummary = t
       type: 'print-data',
       template: layoutTemplate ?? 'classic',
       showSummary,
+      accentColor,
+      skillsDisplay,
+      marginTop,
+      marginBottom,
+      marginSides,
       payload: {
         profile: profileData,
         jobs: builderData.jobs,
@@ -65,7 +85,7 @@ function VariantPreview({ variantId, layoutTemplate, refreshKey, showSummary = t
         references: builderData.references,
       },
     }, '*')
-  }, [builderData, profileData, layoutTemplate, showSummary])
+  }, [builderData, profileData, layoutTemplate, showSummary, accentColor, skillsDisplay, marginTop, marginBottom, marginSides])
 
   // Listen for iframe messages (ready signal + content height)
   useEffect(() => {

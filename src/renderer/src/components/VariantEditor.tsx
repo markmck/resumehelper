@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { TemplateVariant } from '../../../preload/index.d'
 import InlineEdit from './InlineEdit'
 import VariantBuilder from './VariantBuilder'
 import VariantPreview from './VariantPreview'
 import { useToast } from './Toast'
+import { TEMPLATE_DEFAULTS } from './templates/types'
 
 interface VariantEditorProps {
   variant: TemplateVariant
@@ -33,6 +34,25 @@ const paneLabelStyle: React.CSSProperties = {
   letterSpacing: '0.05em',
 }
 
+const PRESET_SWATCHES = [
+  '#000000',
+  '#1e3a5f',
+  '#2563EB',
+  '#0d9488',
+  '#166534',
+  '#7f1d1d',
+]
+
+function isValidHex(value: string): boolean {
+  const cleaned = value.startsWith('#') ? value.slice(1) : value
+  return /^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(cleaned)
+}
+
+function normalizeHex(value: string): string {
+  const cleaned = value.startsWith('#') ? value : `#${value}`
+  return cleaned.toLowerCase()
+}
+
 function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: VariantEditorProps): React.JSX.Element {
   const [previewVersion, setPreviewVersion] = useState(0)
   const [exporting, setExporting] = useState<'pdf' | 'docx' | null>(null)
@@ -43,9 +63,21 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
       ? variant.layoutTemplate
       : 'classic'
   )
-  const [showSummary, setShowSummary] = useState(true)
+  const [showSummary] = useState(true)
   const [analysisScore, setAnalysisScore] = useState<number | null>(null)
   const [analysisId, setAnalysisId] = useState<number | null>(null)
+
+  // New template option states
+  const [accentColor, setAccentColor] = useState<string | undefined>(undefined)
+  const [skillsDisplay, setSkillsDisplay] = useState<'grouped' | 'inline' | undefined>(undefined)
+  const [marginTop, setMarginTop] = useState<number | undefined>(undefined)
+  const [marginBottom, setMarginBottom] = useState<number | undefined>(undefined)
+  const [marginSides, setMarginSides] = useState<number | undefined>(undefined)
+  const [colorPickerOpen, setColorPickerOpen] = useState(false)
+  const [hexInput, setHexInput] = useState('')
+
+  const colorPickerRef = useRef<HTMLDivElement>(null)
+  const colorDotRef = useRef<HTMLDivElement>(null)
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -54,8 +86,70 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
 
   useEffect(() => {
     const tpl = variant.layoutTemplate
-    setLayoutTemplate(tpl && tpl !== 'traditional' && tpl !== 'professional' ? tpl : 'classic')
+    const resolvedTpl = tpl && tpl !== 'traditional' && tpl !== 'professional' ? tpl : 'classic'
+    setLayoutTemplate(resolvedTpl)
+
+    // Load templateOptions from variant
+    const opts = variant.templateOptions
+    if (opts) {
+      setAccentColor(opts.accentColor ?? undefined)
+      setSkillsDisplay(opts.skillsDisplay ?? undefined)
+      setMarginTop(opts.marginTop ?? undefined)
+      setMarginBottom(opts.marginBottom ?? undefined)
+      setMarginSides(opts.marginSides ?? undefined)
+    } else {
+      setAccentColor(undefined)
+      setSkillsDisplay(undefined)
+      setMarginTop(undefined)
+      setMarginBottom(undefined)
+      setMarginSides(undefined)
+    }
   }, [variant.id])
+
+  // Sync hex input when accentColor changes
+  useEffect(() => {
+    setHexInput(accentColor ?? '')
+  }, [accentColor])
+
+  // Persist template options on change (debounced 300ms)
+  const saveOptionsRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const saveOptions = useCallback(() => {
+    if (saveOptionsRef.current) clearTimeout(saveOptionsRef.current)
+    saveOptionsRef.current = setTimeout(() => {
+      window.api.templates.setOptions(variant.id, {
+        accentColor,
+        skillsDisplay,
+        marginTop,
+        marginBottom,
+        marginSides,
+      })
+    }, 300)
+  }, [variant.id, accentColor, skillsDisplay, marginTop, marginBottom, marginSides])
+
+  useEffect(() => {
+    saveOptions()
+    return () => {
+      if (saveOptionsRef.current) clearTimeout(saveOptionsRef.current)
+    }
+  }, [saveOptions])
+
+  // Close color picker on click outside
+  useEffect(() => {
+    if (!colorPickerOpen) return
+    const handler = (e: MouseEvent): void => {
+      if (
+        colorPickerRef.current &&
+        !colorPickerRef.current.contains(e.target as Node) &&
+        colorDotRef.current &&
+        !colorDotRef.current.contains(e.target as Node)
+      ) {
+        setColorPickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [colorPickerOpen])
 
   // Look up analysis score for this variant
   useEffect(() => {
@@ -63,12 +157,10 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
     setAnalysisId(null)
     window.api.jobPostings.list().then((rows) => {
       const typed = rows as JobPostingRow[]
-      // Filter rows that match this variant and have a score
       const matches = typed.filter(
         (r) => r.variantId === variant.id && r.matchScore != null && r.analysisId != null
       )
       if (matches.length === 0) return
-      // Pick the most recent by analysisCreatedAt
       const latest = matches.reduce((best, cur) => {
         if (!best.analysisCreatedAt) return cur
         if (!cur.analysisCreatedAt) return best
@@ -116,6 +208,9 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
       setExporting(null)
     }
   }
+
+  const effectiveAccentColor = accentColor ?? TEMPLATE_DEFAULTS[layoutTemplate]?.accent ?? '#000000'
+  const effectiveSkillsDisplay = skillsDisplay ?? TEMPLATE_DEFAULTS[layoutTemplate]?.skillsDisplay ?? 'grouped'
 
   const badgeColors = analysisScore != null ? scoreBadgeColor(analysisScore) : null
 
@@ -248,111 +343,212 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
             minWidth: 0,
           }}
         >
-          {/* Preview pane header */}
+          {/* Preview pane header — two rows */}
           <div
             style={{
               flexShrink: 0,
               borderBottom: '1px solid var(--color-border-subtle)',
               padding: '8px 16px',
               backgroundColor: 'var(--color-bg-surface)',
+              flexDirection: 'column',
               display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-3)',
             }}
           >
-            <span style={paneLabelStyle}>Preview</span>
-
-            <div style={{ flex: 1 }} />
-
-            <label
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: 'var(--font-size-xs)',
-                color: 'var(--color-text-secondary)',
-                cursor: 'pointer',
-                userSelect: 'none',
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={showSummary}
-                onChange={(e) => {
-                  setShowSummary(e.target.checked)
-                  setPreviewVersion((v) => v + 1)
-                }}
-                style={{ margin: 0 }}
-              />
-              Summary
-            </label>
-
-            {themes.length > 0 && (
-              <select
-                value={layoutTemplate}
-                onChange={(e) => handleThemeChange(e.target.value)}
+            {/* Row 1: Preview label + export buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={paneLabelStyle}>Preview</span>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={handleExportPdf}
+                disabled={exporting !== null}
                 style={{
-                  backgroundColor: 'var(--color-bg-input)',
-                  border: '1px solid var(--color-border-default)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '3px 8px',
+                  padding: '3px 10px',
                   fontSize: 'var(--font-size-xs)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--color-border-default)',
+                  backgroundColor: 'transparent',
                   color: 'var(--color-text-secondary)',
+                  cursor: exporting ? 'not-allowed' : 'pointer',
+                  opacity: exporting ? 0.5 : 1,
                   height: 26,
-                  outline: 'none',
                   fontFamily: 'var(--font-sans)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
                 }}
               >
-                {themes.map((t) => (
-                  <option key={t.key} value={t.key}>
-                    {t.displayName}
-                  </option>
-                ))}
+                {exporting === 'pdf' ? 'Exporting...' : 'PDF'}
+              </button>
+              <button
+                onClick={handleExportDocx}
+                disabled={exporting !== null}
+                style={{
+                  padding: '3px 10px',
+                  fontSize: 'var(--font-size-xs)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: 'none',
+                  backgroundColor: 'var(--color-success)',
+                  color: 'var(--color-text-on-accent, #fff)',
+                  cursor: exporting ? 'not-allowed' : 'pointer',
+                  opacity: exporting ? 0.5 : 1,
+                  height: 26,
+                  fontFamily: 'var(--font-sans)',
+                  fontWeight: 500,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                {exporting === 'docx' ? 'Exporting...' : 'DOCX'}
+              </button>
+            </div>
+
+            {/* Row 2: Template dropdown + color dot + skills dropdown */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, position: 'relative' }}>
+              {/* Template dropdown */}
+              {themes.length > 0 && (
+                <select
+                  value={layoutTemplate}
+                  onChange={(e) => handleThemeChange(e.target.value)}
+                  style={{
+                    backgroundColor: 'var(--color-bg-input)',
+                    border: '1px solid var(--color-border-default)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '3px 8px',
+                    fontSize: 'var(--font-size-xs)',
+                    color: 'var(--color-text-secondary)',
+                    height: 26,
+                    outline: 'none',
+                    fontFamily: 'var(--font-sans)',
+                  }}
+                >
+                  {themes.map((t) => (
+                    <option key={t.key} value={t.key}>
+                      {t.displayName}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {/* Color dot trigger */}
+              <div
+                ref={colorDotRef}
+                onClick={() => setColorPickerOpen(!colorPickerOpen)}
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  backgroundColor: effectiveAccentColor,
+                  border: '2px solid var(--color-border)',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  flexShrink: 0,
+                }}
+                title="Accent color"
+              />
+
+              {/* Color picker popover */}
+              {colorPickerOpen && (
+                <div
+                  ref={colorPickerRef}
+                  style={{
+                    position: 'absolute',
+                    top: 28,
+                    left: 0,
+                    zIndex: 50,
+                    background: 'var(--color-bg-raised)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 8,
+                    padding: 12,
+                    minWidth: 160,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+                  }}
+                >
+                  {/* Swatch grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gap: 6, marginBottom: 10 }}>
+                    {PRESET_SWATCHES.map((swatch) => (
+                      <div
+                        key={swatch}
+                        onClick={() => setAccentColor(swatch)}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 4,
+                          backgroundColor: swatch,
+                          cursor: 'pointer',
+                          border: effectiveAccentColor.toLowerCase() === swatch.toLowerCase()
+                            ? '3px solid var(--color-accent)'
+                            : '2px solid transparent',
+                          boxSizing: 'border-box',
+                        }}
+                        title={swatch}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Hex input */}
+                  <input
+                    type="text"
+                    value={hexInput}
+                    onChange={(e) => setHexInput(e.target.value)}
+                    onBlur={(e) => {
+                      const val = e.target.value.trim()
+                      if (isValidHex(val)) {
+                        setAccentColor(normalizeHex(val))
+                      } else {
+                        setHexInput(accentColor ?? '')
+                      }
+                    }}
+                    placeholder="#hex"
+                    style={{
+                      width: 120,
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                      padding: '3px 6px',
+                      borderRadius: 4,
+                      border: '1px solid var(--color-border)',
+                      background: 'var(--color-bg-input)',
+                      color: 'var(--color-text-primary)',
+                      display: 'block',
+                      marginBottom: accentColor !== undefined ? 6 : 0,
+                    }}
+                  />
+
+                  {/* Reset to template default */}
+                  {accentColor !== undefined && (
+                    <span
+                      onClick={() => setAccentColor(undefined)}
+                      style={{
+                        fontSize: 11,
+                        color: 'var(--color-text-muted)',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        display: 'block',
+                      }}
+                    >
+                      Reset to template default
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Skills display dropdown */}
+              <select
+                value={effectiveSkillsDisplay}
+                onChange={(e) => setSkillsDisplay(e.target.value as 'grouped' | 'inline')}
+                style={{
+                  fontSize: 12,
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-bg-raised)',
+                  color: 'var(--color-text-primary)',
+                  fontFamily: 'var(--font-sans)',
+                  height: 26,
+                }}
+              >
+                <option value="grouped">Skills: Grouped</option>
+                <option value="inline">Skills: Inline</option>
               </select>
-            )}
-
-            <button
-              onClick={handleExportPdf}
-              disabled={exporting !== null}
-              style={{
-                padding: '3px 10px',
-                fontSize: 'var(--font-size-xs)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--color-border-default)',
-                backgroundColor: 'transparent',
-                color: 'var(--color-text-secondary)',
-                cursor: exporting ? 'not-allowed' : 'pointer',
-                opacity: exporting ? 0.5 : 1,
-                height: 26,
-                fontFamily: 'var(--font-sans)',
-                display: 'inline-flex',
-                alignItems: 'center',
-              }}
-            >
-              {exporting === 'pdf' ? 'Exporting...' : 'PDF'}
-            </button>
-
-            <button
-              onClick={handleExportDocx}
-              disabled={exporting !== null}
-              style={{
-                padding: '3px 10px',
-                fontSize: 'var(--font-size-xs)',
-                borderRadius: 'var(--radius-sm)',
-                border: 'none',
-                backgroundColor: 'var(--color-success)',
-                color: 'var(--color-text-on-accent, #fff)',
-                cursor: exporting ? 'not-allowed' : 'pointer',
-                opacity: exporting ? 0.5 : 1,
-                height: 26,
-                fontFamily: 'var(--font-sans)',
-                fontWeight: 500,
-                display: 'inline-flex',
-                alignItems: 'center',
-              }}
-            >
-              {exporting === 'docx' ? 'Exporting...' : 'DOCX'}
-            </button>
+            </div>
           </div>
 
           {/* Preview pane body */}
@@ -368,6 +564,11 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
               layoutTemplate={layoutTemplate}
               refreshKey={previewVersion}
               showSummary={showSummary}
+              accentColor={accentColor}
+              skillsDisplay={skillsDisplay}
+              marginTop={marginTop}
+              marginBottom={marginBottom}
+              marginSides={marginSides}
             />
           </div>
         </div>
