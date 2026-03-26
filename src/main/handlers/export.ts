@@ -32,8 +32,9 @@ const DOCX_MARGIN_DEFAULTS: Record<string, { top: number; bottom: number; sides:
   executive: { top: 0.80, bottom: 0.80, sides: 0.80 },
 }
 import { db } from '../db'
-import { profile, jobs, jobBullets, skills, projects, projectBullets, templateVariantItems, templateVariants, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
+import { profile, jobs, jobBullets, skills, projects, projectBullets, templateVariantItems, templateVariants, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisBulletOverrides } from '../db/schema'
 import { eq, asc, desc } from 'drizzle-orm'
+import { applyOverrides } from '../../shared/overrides'
 import { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
 
 interface BuilderData {
@@ -49,7 +50,7 @@ interface BuilderData {
   references: BuilderReference[]
 }
 
-export async function getBuilderDataForVariant(variantId: number): Promise<BuilderData> {
+export async function getBuilderDataForVariant(variantId: number, analysisId?: number): Promise<BuilderData> {
   const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
   const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
   const allSkills = await db.select().from(skills)
@@ -205,6 +206,22 @@ export async function getBuilderDataForVariant(variantId: number): Promise<Build
     excluded: excludedReferenceIds.has(r.id),
   }))
 
+  if (analysisId != null) {
+    const overrideRows = db.select({
+      bulletId: analysisBulletOverrides.bulletId,
+      overrideText: analysisBulletOverrides.overrideText,
+      source: analysisBulletOverrides.source,
+      suggestionId: analysisBulletOverrides.suggestionId,
+    })
+    .from(analysisBulletOverrides)
+    .where(eq(analysisBulletOverrides.analysisId, analysisId))
+    .all() as Array<{ bulletId: number; overrideText: string; source: 'ai_suggestion' | 'manual_edit'; suggestionId: string | null }>
+
+    for (const job of jobsWithBullets) {
+      job.bullets = applyOverrides(job.bullets, overrideRows) as typeof job.bullets
+    }
+  }
+
   return {
     jobs: jobsWithBullets,
     skills: skillsWithExcluded,
@@ -220,7 +237,7 @@ export async function getBuilderDataForVariant(variantId: number): Promise<Build
 }
 
 export function registerExportHandlers(): void {
-  ipcMain.handle('export:pdf', async (_, variantId: number, defaultFilename: string) => {
+  ipcMain.handle('export:pdf', async (_, variantId: number, defaultFilename: string, analysisId?: number) => {
     // 1. Show Save As dialog
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: 'Export Resume as PDF',
@@ -257,13 +274,13 @@ export function registerExportHandlers(): void {
     })
 
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      await win.loadURL(
-        `${process.env['ELECTRON_RENDERER_URL']}/print.html?variantId=${variantId}&template=${layoutTemplate ?? 'classic'}`
-      )
+      let printUrl = `${process.env['ELECTRON_RENDERER_URL']}/print.html?variantId=${variantId}&template=${layoutTemplate ?? 'classic'}`
+      if (analysisId != null) printUrl += `&analysisId=${analysisId}`
+      await win.loadURL(printUrl)
     } else {
-      await win.loadFile(join(__dirname, '../renderer/print.html'), {
-        query: { variantId: String(variantId), template: layoutTemplate ?? 'classic' },
-      })
+      const query: Record<string, string> = { variantId: String(variantId), template: layoutTemplate ?? 'classic' }
+      if (analysisId != null) query.analysisId = String(analysisId)
+      await win.loadFile(join(__dirname, '../renderer/print.html'), { query })
     }
 
     // Wait for React to signal readiness
@@ -286,7 +303,7 @@ export function registerExportHandlers(): void {
     return { canceled: false, filePath }
   })
 
-  ipcMain.handle('export:docx', async (_, variantId: number, defaultFilename: string) => {
+  ipcMain.handle('export:docx', async (_, variantId: number, defaultFilename: string, analysisId?: number) => {
     // 1. Show Save As dialog
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: 'Export Resume as DOCX',
@@ -323,7 +340,7 @@ export function registerExportHandlers(): void {
 
     // 3. Fetch data directly from DB
     const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
-    const builderData = await getBuilderDataForVariant(variantId)
+    const builderData = await getBuilderDataForVariant(variantId, analysisId)
 
     const includedJobs = builderData.jobs.filter((j) => !j.excluded)
     const includedSkills = builderData.skills.filter((s) => !s.excluded)

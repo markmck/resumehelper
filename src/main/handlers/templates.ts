@@ -1,7 +1,8 @@
 import { ipcMain } from 'electron'
 import { db } from '../db'
-import { templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
+import { templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisBulletOverrides } from '../db/schema'
 import { eq, and, asc, desc, inArray } from 'drizzle-orm'
+import { applyOverrides } from '../../shared/overrides'
 
 export function registerTemplateHandlers(): void {
   ipcMain.handle('templates:list', async () => {
@@ -119,7 +120,7 @@ export function registerTemplateHandlers(): void {
     return rows[0]
   })
 
-  ipcMain.handle('templates:getBuilderData', async (_, variantId: number) => {
+  ipcMain.handle('templates:getBuilderData', async (_, variantId: number, analysisId?: number) => {
     const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
 
     const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
@@ -280,6 +281,22 @@ export function registerTemplateHandlers(): void {
       reference: r.reference,
       excluded: excludedReferenceIds.has(r.id),
     }))
+
+    if (analysisId != null) {
+      const overrideRows = db.select({
+        bulletId: analysisBulletOverrides.bulletId,
+        overrideText: analysisBulletOverrides.overrideText,
+        source: analysisBulletOverrides.source,
+        suggestionId: analysisBulletOverrides.suggestionId,
+      })
+      .from(analysisBulletOverrides)
+      .where(eq(analysisBulletOverrides.analysisId, analysisId))
+      .all() as Array<{ bulletId: number; overrideText: string; source: 'ai_suggestion' | 'manual_edit'; suggestionId: string | null }>
+
+      for (const job of jobsWithBullets) {
+        job.bullets = applyOverrides(job.bullets, overrideRows) as typeof job.bullets
+      }
+    }
 
     const summaryExclusionRow = exclusionItems.find(
       (item) => item.itemType === 'summary' && item.excluded,

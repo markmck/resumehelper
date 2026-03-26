@@ -1,7 +1,7 @@
 import { ipcMain, safeStorage } from 'electron'
 import { eq, and } from 'drizzle-orm'
 import { db } from '../db'
-import { aiSettings, jobPostings, analysisResults, profile, analysisBulletOverrides } from '../db/schema'
+import { aiSettings, jobPostings, analysisResults, profile, analysisBulletOverrides, analysisSkillAdditions } from '../db/schema'
 import { callJobParser, callResumeScorer, deriveOverallScore } from '../lib/aiProvider'
 import { buildResumeTextForLlm } from '../lib/analysisPrompts'
 import { getBuilderDataForVariant } from './export'
@@ -180,6 +180,67 @@ export function registerAiHandlers(): void {
     } catch (err) {
       console.error('ai:getOverrides error', err)
       return []
+    }
+  })
+
+  ipcMain.handle('ai:acceptSkillAddition', async (_event, analysisId: number, skillName: string) => {
+    try {
+      db.update(analysisSkillAdditions)
+        .set({ status: 'accepted' })
+        .where(and(
+          eq(analysisSkillAdditions.analysisId, analysisId),
+          eq(analysisSkillAdditions.skillName, skillName),
+        ))
+        .run()
+      return { success: true }
+    } catch (err) {
+      console.error('ai:acceptSkillAddition error', err)
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('ai:dismissSkillAddition', async (_event, analysisId: number, skillName: string) => {
+    try {
+      db.update(analysisSkillAdditions)
+        .set({ status: 'dismissed' })
+        .where(and(
+          eq(analysisSkillAdditions.analysisId, analysisId),
+          eq(analysisSkillAdditions.skillName, skillName),
+        ))
+        .run()
+      return { success: true }
+    } catch (err) {
+      console.error('ai:dismissSkillAddition error', err)
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('ai:ensureSkillAdditions', async (_event, analysisId: number, skills: Array<{ skill: string; severity: string; reason?: string; category?: string }>) => {
+    try {
+      for (const sk of skills) {
+        const existing = db.select({ id: analysisSkillAdditions.id })
+          .from(analysisSkillAdditions)
+          .where(and(
+            eq(analysisSkillAdditions.analysisId, analysisId),
+            eq(analysisSkillAdditions.skillName, sk.skill),
+          ))
+          .get()
+        if (!existing) {
+          db.insert(analysisSkillAdditions)
+            .values({
+              analysisId,
+              skillName: sk.skill,
+              reason: sk.reason ?? '',
+              category: sk.category ?? '',
+              status: 'pending',
+            })
+            .run()
+        }
+      }
+      return { success: true }
+    } catch (err) {
+      console.error('ai:ensureSkillAdditions error', err)
+      return { error: err instanceof Error ? err.message : String(err) }
     }
   })
 }
