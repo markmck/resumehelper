@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Resume Templates
 status: planning
-stopped_at: Completed 16-cleanup 16-01-PLAN.md
-last_updated: "2026-03-26T12:47:08.376Z"
+stopped_at: Completed 16-cleanup 16-02-PLAN.md
+last_updated: "2026-03-26T12:51:41.975Z"
 last_activity: 2026-03-25 — v2.1 roadmap created, 21 requirements mapped across 4 phases
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 15-controls-page-break-overlay P02 | 10 | 2 tasks | 8 files |
 | Phase 15-controls-page-break-overlay P03 | 4 | 2 tasks | 3 files |
 | Phase 16-cleanup P01 | 12 | 2 tasks | 9 files |
+| Phase 16-cleanup P02 | 3 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,9 @@ Recent decisions affecting current work:
 - [Phase 15-controls-page-break-overlay]: marginsDirty flag: undefined margin = use template default; template switch snaps non-dirty margins to new defaults
 - [Phase 16-cleanup]: SnapshotViewer stubbed to ProfessionalLayout only — full v2.1 template-aware rewrite deferred to Plan 02
 - [Phase 16-cleanup]: export:pdf simplified to single print.html path — legacy theme else branch removed (V2_TEMPLATES covers all valid keys)
+- [Phase 16-cleanup]: variantId=0 sentinel in print.html URL triggers postMessage path in both iframe and BrowserWindow snapshot contexts
+- [Phase 16-cleanup]: SnapshotViewer fetches profile separately (snapshot data lacks profile fields), merges before postMessage to iframe
+- [Phase 16-cleanup]: Unified rendering pipeline complete: preview, PDF export, snapshot view, snapshot export all use print.html
 
 ### Pending Todos
 
@@ -116,6 +120,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-26T12:47:08.374Z
-Stopped at: Completed 16-cleanup 16-01-PLAN.md
+Last session: 2026-03-26T12:51:41.973Z
+Stopped at: Completed 16-cleanup 16-02-PLAN.md
 Resume file: None

@@ -40,8 +40,8 @@ Requirements for Resume Templates milestone. Each maps to roadmap phases.
 ### Cleanup
 
 - [x] **CLEAN-01**: Old resume.json themes (Even, Class, Elegant) are removed — npm packages uninstalled, theme registry deleted
-- [ ] **CLEAN-02**: Old ProfessionalLayout component is replaced by the Classic template
-- [ ] **CLEAN-03**: Submission snapshot PDF export works with the new template system (falls back gracefully for old snapshots)
+- [x] **CLEAN-02**: Old ProfessionalLayout component is replaced by the Classic template
+- [x] **CLEAN-03**: Submission snapshot PDF export works with the new template system (falls back gracefully for old snapshots)
 
 ## v2.2 Requirements
 
@@ -99,8 +99,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXPRT-03 | Phase 14 | Complete |
 | EXPRT-04 | Phase 13 | Complete |
 | CLEAN-01 | Phase 16 | Complete |
-| CLEAN-02 | Phase 16 | Pending |
-| CLEAN-03 | Phase 16 | Pending |
+| CLEAN-02 | Phase 16 | Complete |
+| CLEAN-03 | Phase 16 | Complete |
 
 **Coverage:**
 - v2.1 requirements: 21 total
