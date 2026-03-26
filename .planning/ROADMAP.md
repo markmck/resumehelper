@@ -5,7 +5,8 @@
 - ✅ **v1.0 MVP** - Phases 1-6 (shipped 2026-03-13)
 - ✅ **v1.1 Enhancements** - Phase 7 (shipped 2026-03-23)
 - ✅ **v2.0 AI Analysis Integration** - Phases 8-12 (shipped 2026-03-24)
-- 🚧 **v2.1 Resume Templates** - Phases 13-16 (in progress)
+- ✅ **v2.1 Resume Templates** - Phases 13-16 (shipped 2026-03-26)
+- 🚧 **v2.2 Three Layer Data** - Phases 17-21 (in progress)
 
 ## Phases
 
@@ -25,78 +26,81 @@ Phases 8-12 covered: Design system + sidebar navigation, AI provider settings, j
 
 </details>
 
-### 🚧 v2.1 Resume Templates (In Progress)
+<details>
+<summary>✅ v2.1 Resume Templates (Phases 13-16) - SHIPPED 2026-03-26</summary>
 
-**Milestone Goal:** Replace bundled resume.json themes with 5 purpose-built HTML/CSS templates (Classic, Modern, Jake, Minimal, Executive) with proper page break handling, margin controls, accent color customization, and matching PDF/DOCX export — preview matches export exactly.
+Phases 13-16 covered: Unified print.html rendering pipeline, 5 purpose-built templates (Classic, Modern, Jake, Minimal, Executive), template controls (accent color, margin sliders, skills display mode), page break visualization, snapshot PDF migration, old theme cleanup.
 
-- [x] **Phase 13: Pipeline Foundation** - Unified print.html rendering path with Classic template end-to-end (completed 2026-03-25)
-- [x] **Phase 14: Templates Complete** - All 5 templates with per-template fonts and DOCX support (completed 2026-03-25)
-- [x] **Phase 15: Controls + Page Break Overlay** - Accent color, margin toggle, skills mode, page boundary visualization (completed 2026-03-26)
-- [x] **Phase 16: Cleanup** - Remove old resume.json themes, migrate snapshot PDF path (completed 2026-03-26)
+4 phases, 12 plans, 21 requirements. Full details in `.planning/milestones/v2.1-ROADMAP.md`.
+
+</details>
+
+### 🚧 v2.2 Three Layer Data (In Progress)
+
+**Milestone Goal:** Restructure data model so AI rewrites live on analyses (not variants), redesign skills management, and fix analysis/variant UX gaps.
 
 ## Phase Details
 
-### Phase 13: Pipeline Foundation
-**Goal**: A single unified rendering path (PrintApp + VariantPreview + export.ts) proven end-to-end with the Classic template — no bifurcated preview/PDF branches
-**Depends on**: Nothing (first phase of v2.1)
-**Requirements**: TMPL-02, TMPL-03, PREV-03, EXPRT-04
+### Phase 17: Schema + Override IPC Foundation
+**Goal**: The analysis_bullet_overrides table and IPC layer exist and are ready to receive writes
+**Depends on**: Phase 16
+**Requirements**: DATA-01, DATA-08
 **Success Criteria** (what must be TRUE):
-  1. Classic template renders inside the variant builder preview pane as a full HTML/CSS page at paper scale
-  2. Exporting to PDF produces output that matches the preview — same layout, same fonts, same spacing
-  3. Preview iframe and PDF export use the exact same rendering surface (print.html BrowserWindow) — no separate code path
-  4. Font files (Inter, Lato, EB Garamond) are bundled as woff2 and load correctly in both preview and PDF export
-**Plans**: 3 plans
+  1. The analysis_bullet_overrides table exists in the database on both fresh install and upgrade from v2.1
+  2. IPC handlers ai:acceptSuggestion, ai:dismissSuggestion, and ai:getOverrides are callable from the renderer with correct types
+  3. The applyOverrides() utility accepts a bullet list and override rows and returns merged text without mutating the input
+  4. AI skill suggestions returned from analysis are not written to the skills table or variant
+**Plans**: 2 plans
 Plans:
-- [ ] 13-01-PLAN.md — Template types, filterResumeData, ClassicTemplate, resolveTemplate registry
-- [ ] 13-02-PLAN.md — Font bundling (woff2), print.html @font-face + CSP, __printBase preload global
-- [ ] 13-03-PLAN.md — Wire PrintApp + VariantPreview + export.ts unified pipeline
+- [ ] 17-01-PLAN.md — Schema tables, Drizzle definitions, shared applyOverrides utility, module boundary config
+- [ ] 17-02-PLAN.md — IPC handler implementations (accept, dismiss, getOverrides) and preload bridge
 
-### Phase 14: Templates Complete
-**Goal**: All 5 resume templates (Classic, Modern, Jake, Minimal, Executive) are available, each with distinct visual style, and DOCX export uses the correct font per template
-**Depends on**: Phase 13
-**Requirements**: TMPL-01, TMPL-04, TMPL-05, EXPRT-01, EXPRT-02, EXPRT-03
+### Phase 18: Three-Layer Model Wiring
+**Goal**: Accepting an AI suggestion writes to the override table (not base bullets), preview/export merges all three layers, and submissions capture the correct merged result
+**Depends on**: Phase 17
+**Requirements**: DATA-02, DATA-03, DATA-04, DATA-05, DATA-06, DATA-07
 **Success Criteria** (what must be TRUE):
-  1. User can select any of 5 templates (Classic, Modern, Jake, Minimal, Executive) — each has visually distinct typography, spacing, and style
-  2. All 5 templates produce PDF output matching their preview — no layout drift for any template
-  3. DOCX export for each template uses the appropriate font family (serif for Classic/Executive, sans-serif for Modern/Jake/Minimal) with proper Word heading styles
-  4. Professional summary section renders in templates when present and is skipped cleanly when not included
-  5. Skills section renders in both inline comma-separated and grouped-by-category modes
-**Plans**: 3 plans
-Plans:
-- [ ] 14-01-PLAN.md — Types update, Classic font/accent fix, Modern + Jake templates
-- [ ] 14-02-PLAN.md — Minimal + Executive templates
-- [ ] 14-03-PLAN.md — Registry wiring (resolveTemplate + themeRegistry) + DOCX export upgrade
+  1. Accepting a bullet suggestion in OptimizeVariant no longer changes the bullet text visible in the base Experience tab
+  2. The preview in OptimizeVariant shows the overridden text for the current analysis and the base text when viewed outside analysis context
+  3. Two analyses on the same variant show independent rewrite text — accepting in one does not affect the other
+  4. Dismissing a suggestion leaves the bullet unchanged; undoing an accepted suggestion reverts the bullet to base text
+  5. A submission created from analysis context freezes the merged (overridden) bullet text in the snapshot, not the base text
+**Plans**: TBD
 
-### Phase 15: Controls + Page Break Overlay
-**Goal**: Users can customize accent color, margins, and skills display mode per variant, and the preview pane shows visible page boundaries
-**Depends on**: Phase 14
-**Requirements**: CTRL-01, CTRL-02, CTRL-03, CTRL-04, CTRL-05, CTRL-06, PREV-01, PREV-02
+### Phase 19: Analysis Submission Flow
+**Goal**: Users can log a submission directly from the analysis screen with company and role pre-filled, and stale or orphaned analysis states are surfaced clearly
+**Depends on**: Phase 18
+**Requirements**: ANLYS-01, ANLYS-02, ANLYS-03, ANLYS-04, ANLYS-05
 **Success Criteria** (what must be TRUE):
-  1. User can switch templates from a dropdown in the variant builder — preview re-renders immediately
-  2. User can pick an accent color from preset swatches — color applies to the template and persists per variant
-  3. User can toggle compact margins — layout tightens and persists per variant
-  4. User can switch skills display mode between inline and grouped — change reflects in preview and persists per variant
-  5. Preview pane shows page boundaries (page 1, gap, page 2) — jobs are never split across pages
-  6. Preview updates in real-time when any checkbox or template control changes
-**Plans**: 3 plans
-Plans:
-- [ ] 15-01-PLAN.md — DB schema (templateOptions column), IPC handlers, preload bridge, TypeScript types
-- [ ] 15-02-PLAN.md — Preview header controls (color picker, skills dropdown, two-row layout) + postMessage pipeline + template margin props
-- [ ] 15-03-PLAN.md — Builder pane LAYOUT section (margin sliders, showSummary relocation) + PDF/DOCX export margin integration
+  1. A "Log Submission" button on the optimize screen and analysis list pre-populates the submission form with company, role, and the current analysis's merged resume content
+  2. Pasting a job posting into the analysis form auto-fills company and role fields without manual typing
+  3. Company and role on an existing analysis can be edited inline after creation
+  4. An analysis that becomes stale (base bullet or variant changed after analysis ran) shows a visible stale indicator
+  5. If a bullet referenced by an override has been deleted, the analysis view shows a graceful notice rather than crashing or silently rendering stale text
+**Plans**: TBD
 
-### Phase 16: Cleanup
-**Goal**: Old resume.json themes (Even, Class, Elegant) are fully removed and the submission snapshot PDF path works cleanly with the new template system
-**Depends on**: Phase 15
-**Requirements**: CLEAN-01, CLEAN-02, CLEAN-03
+### Phase 20: Skills Chip Grid
+**Goal**: Skills are displayed and managed as a chip grid with drag-and-drop between categories and inline rename
+**Depends on**: Phase 16
+**Requirements**: VARNT-02, VARNT-03, VARNT-04
 **Success Criteria** (what must be TRUE):
-  1. Even, Class, and Elegant theme npm packages are uninstalled and all theme registry wiring is gone — no dead code paths remain
-  2. ProfessionalLayout component is deleted — Classic template is the replacement and works identically for existing variants
-  3. Exporting a PDF from a submission snapshot (old or new) completes without error
-**Plans**: 3 plans
-Plans:
-- [ ] 16-01-PLAN.md — Dead code sweep: uninstall theme packages, delete themes handler, clean themeRegistry, remove preload bridge, strip VariantEditor themes code, remove export:pdf dead branch
-- [ ] 16-02-PLAN.md — Snapshot migration: PrintApp snapshot mode, snapshotPdf handler rewrite, SnapshotViewer iframe rewrite, ProfessionalLayout deletion
-- [ ] 16-03-PLAN.md — Gap closure: restore template dropdown in preview header, fix snapshot PDF double margins
+  1. Skills page displays all skills as chips grouped by category, replacing the flat tag list
+  2. A skill chip can be dragged from one category column and dropped into another, updating its category
+  3. A category name can be renamed inline by clicking it
+  4. A new empty category can be created and skills dragged into it
+  5. All existing skill category assignments from v2.1 tags data are preserved after the migration — no skills lose their grouping
+**Plans**: TBD
+
+### Phase 21: Variant UX + Cleanup
+**Goal**: Users can toggle entire jobs off in the variant builder, variant cards show accurate timestamps, the Modern template renders skills correctly, and all stale UI copy is removed
+**Depends on**: Phase 16
+**Requirements**: VARNT-01, VARNT-05, TMPL-01, CLNP-01
+**Success Criteria** (what must be TRUE):
+  1. A single toggle on a job header in the variant builder includes or excludes all bullets for that job at once
+  2. Variant cards display the correct last-edited timestamp, not a stale or wrong value
+  3. Modern template renders skills inline without layout breakage
+  4. No "coming soon" placeholder text appears anywhere in the app for features that have shipped
+**Plans**: TBD
 
 ## Progress
 
@@ -104,7 +108,9 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1-7 | v1.0 + v1.1 | - | Complete | 2026-03-23 |
 | 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
-| 13. Pipeline Foundation | 3/3 | Complete    | 2026-03-25 | - |
-| 14. Templates Complete | 3/3 | Complete    | 2026-03-25 | - |
-| 15. Controls + Page Break Overlay | 3/3 | Complete    | 2026-03-26 | - |
-| 16. Cleanup | 3/3 | Complete   | 2026-03-26 | - |
+| 13-16 | v2.1 | 12/12 | Complete | 2026-03-26 |
+| 17. Schema + Override IPC Foundation | 1/2 | In Progress|  | - |
+| 18. Three-Layer Model Wiring | v2.2 | 0/? | Not started | - |
+| 19. Analysis Submission Flow | v2.2 | 0/? | Not started | - |
+| 20. Skills Chip Grid | v2.2 | 0/? | Not started | - |
+| 21. Variant UX + Cleanup | v2.2 | 0/? | Not started | - |

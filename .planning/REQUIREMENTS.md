@@ -1,78 +1,77 @@
 # Requirements: ResumeHelper
 
-**Defined:** 2026-03-25
-**Core Value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands in the pipeline.
-
-## v2.1 Requirements
-
-Requirements for Resume Templates milestone. Each maps to roadmap phases.
-
-### Template Rendering
-
-- [x] **TMPL-01**: App includes 5 resume templates: Classic, Modern, Jake, Minimal, Executive — each with distinct typography, spacing, and visual style
-- [x] **TMPL-02**: Templates render as HTML/CSS inside the preview pane at page scale, showing actual page boundaries
-- [x] **TMPL-03**: All templates use single-column ATS-friendly layout with standard section headings (Work Experience, Education, Skills, etc.)
-- [x] **TMPL-04**: Templates support professional summary section (optional, user-toggleable)
-- [x] **TMPL-05**: Skills section supports two display modes per template: inline comma-separated and grouped by category
-
-### Template Controls
-
-- [x] **CTRL-01**: User can select a template from a dropdown in the variant builder preview header — switching re-renders immediately
-- [x] **CTRL-02**: User can override the template accent color via a color picker — saved per variant
-- [x] **CTRL-03**: User can toggle between standard and compact margins per template — saved per variant
-- [x] **CTRL-04**: User can toggle skills display mode (inline vs grouped) per template — saved per variant
-- [x] **CTRL-05**: User can adjust the bottom page break margin to control when content pushes to the next page — jobs are never split across pages
-- [x] **CTRL-06**: Template choice, accent color, margins, and skills mode are persisted per variant in the database
-
-### Preview Quality
-
-- [x] **PREV-01**: Preview pane shows a full print preview with actual page boundaries (page 1, gap, page 2) — like a PDF viewer
-- [x] **PREV-02**: Preview updates in real-time when builder checkboxes are toggled or template controls are changed
-- [x] **PREV-03**: Preview and PDF export render identically — same component, same engine, no layout drift
-
-### Export Quality
-
-- [x] **EXPRT-01**: PDF export matches the preview exactly for all 5 templates — no layout differences
-- [x] **EXPRT-02**: DOCX export produces clean ATS-parseable documents with proper Word heading styles (HeadingLevel.HEADING_1 for section headers)
-- [x] **EXPRT-03**: DOCX export uses the correct font family per template (serif for Classic/Executive, sans-serif for Modern/Jake/Minimal)
-- [x] **EXPRT-04**: Template fonts are bundled as woff2 files for consistent rendering across platforms (Lato, EB Garamond, Inter already bundled)
-
-### Cleanup
-
-- [x] **CLEAN-01**: Old resume.json themes (Even, Class, Elegant) are removed — npm packages uninstalled, theme registry deleted
-- [x] **CLEAN-02**: Old ProfessionalLayout component is replaced by the Classic template
-- [x] **CLEAN-03**: Submission snapshot PDF export works with the new template system (falls back gracefully for old snapshots)
+**Defined:** 2026-03-26
+**Core Value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
 
 ## v2.2 Requirements
 
+Requirements for milestone v2.2 Three Layer Data. Each maps to roadmap phases.
+
+### Three-Layer Data Model
+
+- [x] **DATA-01**: Analysis bullet overrides stored in dedicated table with (analysisId, bulletId) key
+- [ ] **DATA-02**: Accepting an AI suggestion writes override to analysis, not to base bullet or variant
+- [ ] **DATA-03**: Preview/export merges base text → variant selection → analysis overrides with correct precedence
+- [ ] **DATA-04**: Variant preview without analysis context shows base text only (no overrides)
+- [ ] **DATA-05**: Same variant analyzed against two jobs produces independent override sets
+- [ ] **DATA-06**: Dismissing a suggestion creates no override; undoing acceptance removes override and reverts to base
+- [ ] **DATA-07**: Submission snapshot captures fully merged three-layer result, immutable after creation
+- [x] **DATA-08**: AI skill suggestions stored on analysis only, not added to variant or base
+
+### Analysis UX
+
+- [ ] **ANLYS-01**: User can log submission directly from the optimize screen
+- [ ] **ANLYS-02**: Company and role auto-extracted from job posting text when not manually entered
+- [ ] **ANLYS-03**: User can edit company and role after analysis is created
+- [ ] **ANLYS-04**: Stale indicator shown when base bullet or variant changes after analysis
+- [ ] **ANLYS-05**: Orphaned overrides (deleted base bullets) handled gracefully with UI notice
+
+### Variant & Experience UX
+
+- [ ] **VARNT-01**: User can toggle entire job on/off in variant builder (all bullets at once)
+- [ ] **VARNT-02**: Skills displayed as chip grid with drag-and-drop between categories
+- [ ] **VARNT-03**: User can rename skill categories inline
+- [ ] **VARNT-04**: User can add new skill categories and drag skills into them
+- [ ] **VARNT-05**: Variant cards show correct "last edited" timestamp
+
+### Template Fixes
+
+- [ ] **TMPL-01**: Modern template renders skills inline correctly
+
+### Cleanup
+
+- [ ] **CLNP-01**: All stale "coming soon" messages removed for shipped features
+
+## Future Requirements
+
 Deferred to future release. Tracked but not in current roadmap.
 
-### Automated Tailoring
+### Variant Enhancements
 
-- **AUTO-01**: AI auto-generates a variant from job posting analysis (pre-selected bullets + reworded)
-- **AUTO-02**: Automated pipeline: paste job → analyze → generate variant → user reviews → export → log submission
+- **VARNT-F01**: Section reordering in templates
+- **VARNT-F02**: Skills pills/chips display mode in rendered templates (requires DOCX degradation logic)
 
-### Template Enhancements
+### AI Automation
 
-- **TMPL-ENH-01**: User can reorder resume sections (drag sections 2-7 in variant builder)
-- **TMPL-ENH-02**: Skills pills/chips display mode for templates (requires DOCX degradation logic)
+- **AI-F01**: AI-powered auto-variant generation
+- **AI-F02**: Automated tailoring pipeline (paste → analyze → generate → export)
 
-### Analysis Enhancements
+### Analytics
 
-- **ENH-01**: Analysis history per job posting with score progression and delta display
-- **ENH-02**: ATS compatibility check as distinct signal
-- **ENH-03**: Analysis run linked to submission export for full traceability
+- **ANLT-F01**: Submission analytics/pattern insights (needs history data)
 
 ## Out of Scope
 
+Explicitly excluded. Documented to prevent scope creep.
+
 | Feature | Reason |
 |---------|--------|
-| Two-column/sidebar template layouts | ATS parsers can't reliably read multi-column content |
-| Custom font upload | Bundled ATS-safe fonts cover all professional needs |
-| LaTeX template rendering | HTML/CSS pipeline is simpler and matches Electron's printToPDF |
-| Section reordering | Fixed order for v2.1; deferred to v2.2 |
-| Skills pills/chips in templates | Requires DOCX degradation logic; deferred to v2.2 |
-| Cover letter templates | Separate document type, explicitly out of scope |
+| AI-generated resume text from scratch | AI suggests rewording only — never fabricates experience |
+| Mobile app | Desktop-first via Electron |
+| Cover letter generation | Separate concern |
+| Job board integration/scraping | Manual entry |
+| Runtime theme installation | Bundle curated templates only |
+| Configurable DB location | Future milestone |
 
 ## Traceability
 
@@ -80,33 +79,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TMPL-01 | Phase 14 | Complete |
-| TMPL-02 | Phase 13 | Complete |
-| TMPL-03 | Phase 13 | Complete |
-| TMPL-04 | Phase 14 | Complete |
-| TMPL-05 | Phase 14 | Complete |
-| CTRL-01 | Phase 15 | Complete |
-| CTRL-02 | Phase 15 | Complete |
-| CTRL-03 | Phase 15 | Complete |
-| CTRL-04 | Phase 15 | Complete |
-| CTRL-05 | Phase 15 | Complete |
-| CTRL-06 | Phase 15 | Complete |
-| PREV-01 | Phase 15 | Complete |
-| PREV-02 | Phase 15 | Complete |
-| PREV-03 | Phase 13 | Complete |
-| EXPRT-01 | Phase 14 | Complete |
-| EXPRT-02 | Phase 14 | Complete |
-| EXPRT-03 | Phase 14 | Complete |
-| EXPRT-04 | Phase 13 | Complete |
-| CLEAN-01 | Phase 16 | Complete |
-| CLEAN-02 | Phase 16 | Complete |
-| CLEAN-03 | Phase 16 | Complete |
+| DATA-01 | Phase 17 | Complete |
+| DATA-08 | Phase 17 | Complete |
+| DATA-02 | Phase 18 | Pending |
+| DATA-03 | Phase 18 | Pending |
+| DATA-04 | Phase 18 | Pending |
+| DATA-05 | Phase 18 | Pending |
+| DATA-06 | Phase 18 | Pending |
+| DATA-07 | Phase 18 | Pending |
+| ANLYS-01 | Phase 19 | Pending |
+| ANLYS-02 | Phase 19 | Pending |
+| ANLYS-03 | Phase 19 | Pending |
+| ANLYS-04 | Phase 19 | Pending |
+| ANLYS-05 | Phase 19 | Pending |
+| VARNT-02 | Phase 20 | Pending |
+| VARNT-03 | Phase 20 | Pending |
+| VARNT-04 | Phase 20 | Pending |
+| VARNT-01 | Phase 21 | Pending |
+| VARNT-05 | Phase 21 | Pending |
+| TMPL-01 | Phase 21 | Pending |
+| CLNP-01 | Phase 21 | Pending |
 
 **Coverage:**
-- v2.1 requirements: 21 total
-- Mapped to phases: 21
-- Unmapped: 0
+- v2.2 requirements: 20 total
+- Mapped to phases: 20
+- Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 — traceability mapped to phases 13-16*
+*Requirements defined: 2026-03-26*
+*Last updated: 2026-03-26 — traceability filled after roadmap creation*

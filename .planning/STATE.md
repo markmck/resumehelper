@@ -1,16 +1,31 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: Resume Templates
-status: planning
-stopped_at: Completed 16-cleanup 16-03-PLAN.md
-last_updated: "2026-03-26T14:19:54.096Z"
-last_activity: 2026-03-25 — v2.1 roadmap created, 21 requirements mapped across 4 phases
+milestone: v2.2
+milestone_name: Three Layer Data
+status: ready_to_plan
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-03-26T21:42:09.807Z"
+last_activity: 2026-03-26 — Roadmap created, 20 requirements mapped across 5 phases
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 1
+---
+
+---
+gsd_state_version: 1.0
+milestone: v2.2
+milestone_name: Three Layer Data
+status: ready_to_plan
+stopped_at: null
+last_updated: "2026-03-26T22:00:00.000Z"
+last_activity: 2026-03-26 — Roadmap created for v2.2, 5 phases (17-21)
+progress:
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
   percent: 0
 ---
 
@@ -18,111 +33,63 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-25)
+See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Milestone v2.1 — Phase 13: Pipeline Foundation
+**Current focus:** v2.2 Three Layer Data — Phase 17: Schema + Override IPC Foundation
 
 ## Current Position
 
-Phase: 13 of 16 (Pipeline Foundation)
-Plan: —
+Phase: 17 of 21 (Schema + Override IPC Foundation)
+Plan: — (not yet planned)
 Status: Ready to plan
-Last activity: 2026-03-25 — v2.1 roadmap created, 21 requirements mapped across 4 phases
+Last activity: 2026-03-26 — Roadmap created, 20 requirements mapped across 5 phases
 
-Progress: [░░░░░░░░░░] 0%
+Progress: ░░░░░░░░░░ 0%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14 (v2.0)
-- Average duration: ~12 min/plan (v2.0)
-- Total execution time: ~2.8 hours (v2.0)
+- Total plans completed: 26 (v2.0: 14, v2.1: 12)
+- v2.1 average duration: ~8 min/plan
+- v2.1 total execution time: ~1.5 hours
 
-**By Phase (v2.0 reference):**
+**By Phase (v2.1):**
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 08-foundation | 2 | ~7 min | ~3.5 min |
-| 09-analysis-core | 3 | ~32 min | ~11 min |
-| 10-bullet-suggestions | 1 | ~4 min | 4 min |
-| 11-submission-pipeline | 3 | ~69 min | ~23 min |
-| 12-ui-redesign | 3 | ~39 min | ~13 min |
-
-*Updated after each plan completion*
-| Phase 13-pipeline-foundation P01 | 8 | 2 tasks | 4 files |
-| Phase 13-pipeline-foundation P02 | 10 | 2 tasks | 10 files |
-| Phase 13-pipeline-foundation P03 | 12 | 2 tasks | 4 files |
-| Phase 13-pipeline-foundation P03 | 35 | 3 tasks | 6 files |
-| Phase 14-templates-complete P02 | 2 | 2 tasks | 2 files |
-| Phase 14-templates-complete P01 | 3 | 3 tasks | 4 files |
-| Phase 14-templates-complete P03 | 2 | 2 tasks | 3 files |
-| Phase 15-controls-page-break-overlay P01 | 8 | 2 tasks | 6 files |
-| Phase 15-controls-page-break-overlay P02 | 10 | 2 tasks | 8 files |
-| Phase 15-controls-page-break-overlay P03 | 4 | 2 tasks | 3 files |
-| Phase 16-cleanup P01 | 12 | 2 tasks | 9 files |
-| Phase 16-cleanup P02 | 3 | 2 tasks | 4 files |
-| Phase 16-cleanup P03 | 8 | 2 tasks | 2 files |
+| Phase | Plans | Duration | Tasks | Files |
+|-------|-------|----------|-------|-------|
+| 13-pipeline-foundation | 3 | ~65 min | 9 tasks | 24 files |
+| 14-templates-complete | 3 | ~7 min | 7 tasks | 9 files |
+| 15-controls-page-break-overlay | 3 | ~22 min | 6 tasks | 17 files |
+| 16-cleanup | 3 | ~23 min | 6 tasks | 15 files |
+| Phase 17-schema-override-ipc-foundation P01 | 10 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
+Decisions are logged in PROJECT.MD Key Decisions table.
 
-- [v2.1 research]: Unified print.html path — VariantPreview iframe + PDF export use same URL, layout drift structurally impossible
-- [v2.1 research]: Per-template independent React components — no shared base component; shared ResumeTemplateProps type + resolveTemplate registry
-- [v2.1 research]: react-colorful@5.6.1 — only new npm dep; fallback is native `<input type="color">` if React 19 compat issue
-- [v2.1 research]: templateOptions column via ALTER TABLE ADD COLUMN in try/catch at startup — not Drizzle file migration
-- [v2.1 research]: CSS @page rules banned in templates — conflicts with printToPDF margins (Electron issue #8138)
-- [v2.1 research]: All template styles use React inline styles — external CSS breaks in prod file:// context
-- [Phase 11]: snapshotPdf uses themeRegistry renderThemeHtml — will break when old themes removed; Classic fallback fix in Phase 16
-- [v1.0]: CREATE TABLE IF NOT EXISTS — new columns need ALTER TABLE ADD COLUMN in try/catch
-- [Phase 13-01]: ClassicTemplate uses Times New Roman instead of Calibri/Segoe UI — ATS-friendly serif font for print/PDF
-- [Phase 13-01]: Summary renders as plain paragraph below contact line with no h2 heading — removes visual noise for ATS
-- [Phase 13-01]: filterResumeData pre-filters excluded bullets within jobs/projects — templates never receive excluded bullets
-- [Phase 13-pipeline-foundation]: Used @fontsource npm packages for font woff2 files (separate per-weight latin subset), not Google Fonts CDN
-- [Phase 13-pipeline-foundation]: window.__printBase preload global resolves via ELECTRON_RENDERER_URL in dev, file:// renderer dir in prod
-- [Phase 13-pipeline-foundation]: VariantPreview uses --color-bg-raised for gray PDF-viewer background; plan had wrong token name --color-surface-raised
-- [Phase 13-pipeline-foundation]: accentColor hardcoded as #cccccc in PrintApp for Phase 13; Phase 15 reads from DB
-- [Phase 13-pipeline-foundation]: iframe postMessage replaces window.api in PrintApp — Electron preload does not inject into iframes; VariantPreview fetches data and sends via postMessage
-- [Phase 13-pipeline-foundation]: PagedContent splits resume into 1056px discrete page boxes — single scrolling iframe had no visual page boundaries
-- [Phase 14-templates-complete]: Profile.label not in preload interface; used (profile as any)?.label for Executive subtitle — label field deferred
-- [Phase 14-templates-complete]: ExecutiveTemplate showSummary defaults true — the only template with summary on by default
-- [Phase 14-templates-complete]: ClassicTemplate updated: Georgia font, #000000 accent, showSummary guard, skillsDisplay support
-- [Phase 14-templates-complete]: ModernTemplate: Calibri, 40px accent underline, #2563EB default, inline skillsDisplay with accent category labels
-- [Phase 14-templates-complete]: JakeTemplate: Lato, dense 0.6/0.5in margins, Company em-dash Title single-line entry, #333333 default
-- [Phase 14-templates-complete]: DOCX_FONT_MAP: Georgia for Classic, Calibri for Modern/Jake/Minimal, Garamond for Executive — per-template Word fonts
-- [Phase 14-templates-complete]: HeadingLevel.HEADING_1 on all 10 DOCX section headings for ATS parsing alongside visual TextRun styling
-- [Phase 15-controls-page-break-overlay]: templateOptions column stores JSON text parsed in IPC handler with null fallback
-- [Phase 15-controls-page-break-overlay]: Summary exclusion uses sentinel itemType='summary' row (no FK) — executive template is only one with summary shown by default
-- [Phase 15-controls-page-break-overlay]: TEMPLATE_DEFAULTS in renderer types.ts is single source of truth for per-template margin/accent/skillsDisplay defaults
-- [Phase 15-controls-page-break-overlay]: Custom color picker popover — no react-colorful — project uses 100% inline styles, external CSS breaks in file:// context
-- [Phase 15-controls-page-break-overlay]: PDF export path loads templateOptions via getOptions IPC in the same Promise.all as profile/builderData
-- [Phase 15-controls-page-break-overlay]: LAYOUT section collapsed by default — shows margin summary inline when collapsed
-- [Phase 15-controls-page-break-overlay]: PDF routing fix: V2_TEMPLATES Set routes all 5 new templates through print.html PrintApp path
-- [Phase 15-controls-page-break-overlay]: marginsDirty flag: undefined margin = use template default; template switch snaps non-dirty margins to new defaults
-- [Phase 16-cleanup]: SnapshotViewer stubbed to ProfessionalLayout only — full v2.1 template-aware rewrite deferred to Plan 02
-- [Phase 16-cleanup]: export:pdf simplified to single print.html path — legacy theme else branch removed (V2_TEMPLATES covers all valid keys)
-- [Phase 16-cleanup]: variantId=0 sentinel in print.html URL triggers postMessage path in both iframe and BrowserWindow snapshot contexts
-- [Phase 16-cleanup]: SnapshotViewer fetches profile separately (snapshot data lacks profile fields), merges before postMessage to iframe
-- [Phase 16-cleanup]: Unified rendering pipeline complete: preview, PDF export, snapshot view, snapshot export all use print.html
-- [Phase 16-cleanup]: Template dropdown onChange is inline (two calls) — no separate handler; existing layoutTemplate useEffect handles preview re-render
-- [Phase 16-cleanup]: Snapshot PDF zero margins: template CSS padding is sole spacing source, matching iframe viewer behavior
+Key v2.2 decisions from research:
+- Use separate `analysis_bullet_overrides` table (not JSON column on analysisResults) — FK cascades, indexed lookups
+- Use `@dnd-kit` for chip grid drag (not HTML5 DnD) — Electron/Windows pointer-event compatibility
+- Phase 17 (schema) must precede Phase 18 (accept path rewire) atomically — Pitfall 35/36
+- [Phase 17-schema-override-ipc-foundation]: No Drizzle uniqueIndex for analysis_bullet_overrides composite key; raw SQL UNIQUE constraint is authoritative
+- [Phase 17-schema-override-ipc-foundation]: BulletOverride/SkillAddition duplicated in index.d.ts (declaration) and src/shared/overrides.ts (runtime) per project pattern
 
 ### Pending Todos
 
 - Configurable DB location (allow user to set SQLite path, e.g. NAS) — future milestone
-- Validate print.html production URL construction before VariantPreview change (window.location.origin is null in file:// context)
-- Decide snapshot PDF policy before Phase 16: Classic fallback only vs full template-aware snapshot
+- DOCX export does not honor showSummary toggle — tech debt from v2.1
+- TEMPLATE_LIST export in resolveTemplate.ts is orphaned — dropdown uses TEMPLATE_DEFAULTS keys
+- compact prop in ResumeTemplateProps is vestigial — could be cleaned up
 
 ### Blockers/Concerns
 
-- [v2.1 Phase 13]: print.html prod URL construction needs prototype — three options exist (window.__printBase preload global, relative ./print.html, IPC-provided URL); none tested in this codebase yet
+None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-03-26T14:19:54.094Z
-Stopped at: Completed 16-cleanup 16-03-PLAN.md
+Last session: 2026-03-26T21:42:09.805Z
+Stopped at: Completed 17-01-PLAN.md
 Resume file: None

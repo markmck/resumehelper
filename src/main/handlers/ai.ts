@@ -1,7 +1,7 @@
 import { ipcMain, safeStorage } from 'electron'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { db } from '../db'
-import { aiSettings, jobPostings, analysisResults, profile } from '../db/schema'
+import { aiSettings, jobPostings, analysisResults, profile, analysisBulletOverrides } from '../db/schema'
 import { callJobParser, callResumeScorer, deriveOverallScore } from '../lib/aiProvider'
 import { buildResumeTextForLlm } from '../lib/analysisPrompts'
 import { getBuilderDataForVariant } from './export'
@@ -127,13 +127,59 @@ export function registerAiHandlers(): void {
     }
   })
 
-  // Stub — will be implemented in Phase 10
-  ipcMain.handle('ai:acceptSuggestion', async () => {
-    return { error: 'Not yet implemented', code: 'NOT_CONFIGURED' }
+  ipcMain.handle('ai:acceptSuggestion', async (_event, analysisId: number, bulletId: number, text: string) => {
+    try {
+      db.insert(analysisBulletOverrides)
+        .values({
+          analysisId,
+          bulletId,
+          overrideText: text,
+          source: 'ai_suggestion',
+        })
+        .onConflictDoUpdate({
+          target: [analysisBulletOverrides.analysisId, analysisBulletOverrides.bulletId],
+          set: { overrideText: text, source: 'ai_suggestion' },
+        })
+        .run()
+      return { success: true }
+    } catch (err) {
+      console.error('ai:acceptSuggestion error', err)
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
   })
 
-  // Stub — will be implemented in Phase 10
-  ipcMain.handle('ai:dismissSuggestion', async () => {
-    return { error: 'Not yet implemented', code: 'NOT_CONFIGURED' }
+  ipcMain.handle('ai:dismissSuggestion', async (_event, analysisId: number, bulletId: number) => {
+    try {
+      db.delete(analysisBulletOverrides)
+        .where(
+          and(
+            eq(analysisBulletOverrides.analysisId, analysisId),
+            eq(analysisBulletOverrides.bulletId, bulletId)
+          )
+        )
+        .run()
+      return { success: true }
+    } catch (err) {
+      console.error('ai:dismissSuggestion error', err)
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('ai:getOverrides', async (_event, analysisId: number) => {
+    try {
+      const rows = db.select({
+        bulletId: analysisBulletOverrides.bulletId,
+        overrideText: analysisBulletOverrides.overrideText,
+        source: analysisBulletOverrides.source,
+        suggestionId: analysisBulletOverrides.suggestionId,
+      })
+      .from(analysisBulletOverrides)
+      .where(eq(analysisBulletOverrides.analysisId, analysisId))
+      .all()
+      return rows
+    } catch (err) {
+      console.error('ai:getOverrides error', err)
+      return []
+    }
   })
 }
