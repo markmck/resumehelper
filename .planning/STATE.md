@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Three Layer Data
-status: planning
-stopped_at: Phase 18 UI-SPEC approved
-last_updated: "2026-03-26T22:36:04.880Z"
-last_activity: 2026-03-26 — Roadmap created, 20 requirements mapped across 5 phases
+status: executing
+stopped_at: Completed 18-01-PLAN.md
+last_updated: "2026-03-26T22:59:41.962Z"
+last_activity: 2026-03-26
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 5
+  completed_plans: 3
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** v2.2 Three Layer Data — Phase 17: Schema + Override IPC Foundation
+**Current focus:** Phase 18 — three-layer-model-wiring
 
 ## Current Position
 
-Phase: 17 of 21 (Schema + Override IPC Foundation)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-03-26 — Roadmap created, 20 requirements mapped across 5 phases
+Phase: 18 (three-layer-model-wiring) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-03-26
 
 Progress: ░░░░░░░░░░ 0%
 
@@ -50,6 +50,7 @@ Progress: ░░░░░░░░░░ 0%
 | 16-cleanup | 3 | ~23 min | 6 tasks | 15 files |
 | Phase 17-schema-override-ipc-foundation P01 | 10 | 2 tasks | 7 files |
 | Phase 17-schema-override-ipc-foundation P02 | 6 | 2 tasks | 2 files |
+| Phase 18-three-layer-model-wiring P01 | 3 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,8 @@ Key v2.2 decisions from research:
 - [Phase 17-schema-override-ipc-foundation]: acceptSuggestion writes ONLY to analysis_bullet_overrides via upsert on UNIQUE(analysis_id, bullet_id)
 - [Phase 17-schema-override-ipc-foundation]: dismissSuggestion is a hard delete (no soft delete) from analysis_bullet_overrides
 - [Phase 17-schema-override-ipc-foundation]: getOverrides is a dedicated IPC channel returning BulletOverride[], not bundled into getAnalysis
+- [Phase 18-01]: Cast Drizzle .all() result to source union type — Drizzle infers text for enum-like columns, not literal union
+- [Phase 18-01]: select-then-insert for ensureSkillAdditions — analysis_skill_additions has no UNIQUE(analysisId, skillName) constraint
 
 ### Pending Todos
 
@@ -81,6 +84,6 @@ None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-03-26T22:36:04.878Z
-Stopped at: Phase 18 UI-SPEC approved
-Resume file: .planning/phases/18-three-layer-model-wiring/18-UI-SPEC.md
+Last session: 2026-03-26T22:59:41.959Z
+Stopped at: Completed 18-01-PLAN.md
+Resume file: None
