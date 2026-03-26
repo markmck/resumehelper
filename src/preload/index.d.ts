@@ -333,7 +333,7 @@ export interface Api {
     duplicate: (id: number) => Promise<TemplateVariant>
     delete: (id: number) => Promise<void>
     setLayoutTemplate: (id: number, layoutTemplate: string) => Promise<TemplateVariant>
-    getBuilderData: (variantId: number) => Promise<BuilderData>
+    getBuilderData: (variantId: number, analysisId?: number) => Promise<BuilderData>
     setItemExcluded: (
       variantId: number,
       itemType: string,
@@ -396,8 +396,8 @@ export interface Api {
     }) => Promise<Profile>
   }
   exportFile: {
-    pdf: (variantId: number, defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string }>
-    docx: (variantId: number, defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string }>
+    pdf: (variantId: number, defaultFilename: string, analysisId?: number) => Promise<{ canceled: boolean; filePath?: string }>
+    docx: (variantId: number, defaultFilename: string, analysisId?: number) => Promise<{ canceled: boolean; filePath?: string }>
     snapshotPdf: (snapshotData: SubmissionSnapshot, defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string }>
   }
   projects: {
@@ -540,6 +540,9 @@ export interface Api {
     acceptSuggestion: (analysisId: number, bulletId: number, text: string) => Promise<{ success: boolean } | { error: string }>
     dismissSuggestion: (analysisId: number, bulletId: number) => Promise<{ success: boolean } | { error: string }>
     getOverrides: (analysisId: number) => Promise<BulletOverride[]>
+    acceptSkillAddition: (analysisId: number, skillName: string) => Promise<{ success: boolean } | { error: string }>
+    dismissSkillAddition: (analysisId: number, skillName: string) => Promise<{ success: boolean } | { error: string }>
+    ensureSkillAdditions: (analysisId: number, skills: Array<{ skill: string; severity: string; reason?: string; category?: string }>) => Promise<{ success: boolean } | { error: string }>
   }
   jobPostings: {
     list: () => Promise<unknown[]>

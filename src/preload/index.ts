@@ -37,8 +37,8 @@ const api = {
     delete: (id: number) => ipcRenderer.invoke('templates:delete', id),
     setLayoutTemplate: (id: number, layoutTemplate: string) =>
       ipcRenderer.invoke('templates:setLayoutTemplate', id, layoutTemplate),
-    getBuilderData: (variantId: number) =>
-      ipcRenderer.invoke('templates:getBuilderData', variantId),
+    getBuilderData: (variantId: number, analysisId?: number) =>
+      ipcRenderer.invoke('templates:getBuilderData', variantId, analysisId),
     setItemExcluded: (
       variantId: number,
       itemType: string,
@@ -97,10 +97,10 @@ const api = {
     }) => ipcRenderer.invoke('profile:set', data),
   },
   exportFile: {
-    pdf: (variantId: number, defaultFilename: string) =>
-      ipcRenderer.invoke('export:pdf', variantId, defaultFilename),
-    docx: (variantId: number, defaultFilename: string) =>
-      ipcRenderer.invoke('export:docx', variantId, defaultFilename),
+    pdf: (variantId: number, defaultFilename: string, analysisId?: number) =>
+      ipcRenderer.invoke('export:pdf', variantId, defaultFilename, analysisId),
+    docx: (variantId: number, defaultFilename: string, analysisId?: number) =>
+      ipcRenderer.invoke('export:docx', variantId, defaultFilename, analysisId),
     snapshotPdf: (snapshotData: unknown, defaultFilename: string) =>
       ipcRenderer.invoke('export:snapshotPdf', snapshotData, defaultFilename),
   },
@@ -244,6 +244,12 @@ const api = {
       ipcRenderer.invoke('ai:dismissSuggestion', analysisId, bulletId),
     getOverrides: (analysisId: number) =>
       ipcRenderer.invoke('ai:getOverrides', analysisId),
+    acceptSkillAddition: (analysisId: number, skillName: string) =>
+      ipcRenderer.invoke('ai:acceptSkillAddition', analysisId, skillName),
+    dismissSkillAddition: (analysisId: number, skillName: string) =>
+      ipcRenderer.invoke('ai:dismissSkillAddition', analysisId, skillName),
+    ensureSkillAdditions: (analysisId: number, skills: Array<{ skill: string; severity: string; reason?: string; category?: string }>) =>
+      ipcRenderer.invoke('ai:ensureSkillAdditions', analysisId, skills),
   },
   jobPostings: {
     list: () => ipcRenderer.invoke('jobPostings:list'),

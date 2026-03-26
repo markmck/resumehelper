@@ -139,6 +139,8 @@ function PrintApp(): React.JSX.Element {
     const variantId = Number(params.get('variantId'))
     const key = params.get('template') ?? 'classic'
     setTemplateKey(key)
+    const analysisIdParam = params.get('analysisId')
+    const analysisId = analysisIdParam ? Number(analysisIdParam) : undefined
 
     // variantId=0 is the sentinel for snapshot mode — data always arrives via postMessage.
     // This covers both iframe mode (SnapshotViewer) and BrowserWindow mode (snapshotPdf handler).
@@ -149,7 +151,7 @@ function PrintApp(): React.JSX.Element {
     if (!isSnapshotMode && typeof window.api !== 'undefined' && window.api?.profile) {
       Promise.all([
         window.api.profile.get(),
-        window.api.templates.getBuilderData(variantId),
+        window.api.templates.getBuilderData(variantId, analysisId),
         window.api.templates.getOptions(variantId),
       ]).then(([profileData, builderData, opts]) => {
         setData({
