@@ -31,7 +31,7 @@ Phases 8-12 covered: Design system + sidebar navigation, AI provider settings, j
 
 - [x] **Phase 13: Pipeline Foundation** - Unified print.html rendering path with Classic template end-to-end (completed 2026-03-25)
 - [x] **Phase 14: Templates Complete** - All 5 templates with per-template fonts and DOCX support (completed 2026-03-25)
-- [x] **Phase 15: Controls + Page Break Overlay** - Accent color, margin toggle, skills mode, page boundary visualization (completed 2026-03-26)
+- [x] **Phase 15: Controls + Page Break Overlay** - Accent color, margin toggle, skills mode, page boundary visualization (completed 2026-03-26)
 - [ ] **Phase 16: Cleanup** - Remove old resume.json themes, migrate snapshot PDF path
 
 ## Phase Details
@@ -92,7 +92,10 @@ Plans:
   1. Even, Class, and Elegant theme npm packages are uninstalled and all theme registry wiring is gone — no dead code paths remain
   2. ProfessionalLayout component is deleted — Classic template is the replacement and works identically for existing variants
   3. Exporting a PDF from a submission snapshot (old or new) completes without error
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 16-01-PLAN.md — Dead code sweep: uninstall theme packages, delete themes handler, clean themeRegistry, remove preload bridge, strip VariantEditor themes code, remove export:pdf dead branch
+- [ ] 16-02-PLAN.md — Snapshot migration: PrintApp snapshot mode, snapshotPdf handler rewrite, SnapshotViewer iframe rewrite, ProfessionalLayout deletion
 
 ## Progress
 
@@ -102,5 +105,5 @@ Plans:
 | 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
 | 13. Pipeline Foundation | 3/3 | Complete    | 2026-03-25 | - |
 | 14. Templates Complete | 3/3 | Complete    | 2026-03-25 | - |
-| 15. Controls + Page Break Overlay | 3/3 | Complete   | 2026-03-26 | - |
-| 16. Cleanup | v2.1 | 0/? | Not started | - |
+| 15. Controls + Page Break Overlay | 3/3 | Complete    | 2026-03-26 | - |
+| 16. Cleanup | 1/2 | In Progress|  | - |

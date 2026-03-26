@@ -786,8 +786,105 @@ export function registerExportHandlers(): void {
     return { canceled: false, filePath }
   })
 
-  // TODO: rewrite in Plan 02 — snapshot PDF via print.html with layoutTemplate routing
-  ipcMain.handle('export:snapshotPdf', async () => {
-    return { canceled: true, error: 'Snapshot PDF export is being migrated in Phase 16 Plan 02' }
+  // V2.1 template keys — all use the print.html pipeline
+  const V2_TEMPLATES = new Set(['classic', 'modern', 'jake', 'minimal', 'executive'])
+
+  ipcMain.handle('export:snapshotPdf', async (_, snapshotData: {
+    layoutTemplate?: string
+    jobs?: unknown[]
+    skills?: unknown[]
+    projects?: unknown[]
+    education?: unknown[]
+    volunteer?: unknown[]
+    awards?: unknown[]
+    publications?: unknown[]
+    languages?: unknown[]
+    interests?: unknown[]
+    references?: unknown[]
+  }, defaultFilename: string) => {
+    // 1. Show Save As dialog
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'Export Snapshot as PDF',
+      defaultPath: defaultFilename ?? 'resume-snapshot.pdf',
+      filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+    })
+    if (canceled || !filePath) return { canceled: true }
+
+    // 2. Resolve template key — old snapshots (professional/traditional/unknown) fall back to classic
+    const rawTemplate = snapshotData?.layoutTemplate ?? ''
+    const resolvedTemplate = V2_TEMPLATES.has(rawTemplate) ? rawTemplate : 'classic'
+
+    // 3. Fetch current profile from DB (snapshot does not include profile data)
+    const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
+
+    // 4. Build payload matching PrintApp's expected shape
+    const payload = {
+      profile: profileRow ?? { id: 1, name: '', email: '', phone: '', location: '', linkedin: '', summary: '' },
+      jobs: snapshotData?.jobs ?? [],
+      skills: snapshotData?.skills ?? [],
+      projects: snapshotData?.projects ?? [],
+      education: snapshotData?.education ?? [],
+      volunteer: snapshotData?.volunteer ?? [],
+      awards: snapshotData?.awards ?? [],
+      publications: snapshotData?.publications ?? [],
+      languages: snapshotData?.languages ?? [],
+      interests: snapshotData?.interests ?? [],
+      references: snapshotData?.references ?? [],
+    }
+
+    // 5. Determine margins from template defaults (snapshots don't store templateOptions)
+    const marginDefaults = DOCX_MARGIN_DEFAULTS[resolvedTemplate] ?? { top: 1.0, bottom: 1.0, sides: 1.0 }
+
+    // 6. Create a hidden BrowserWindow with preload for IPC support
+    const win = new BrowserWindow({
+      show: false,
+      width: 816,
+      height: 1056,
+      webPreferences: {
+        preload: join(__dirname, '../preload/index.js'),
+        sandbox: false,
+      },
+    })
+
+    // 7. Load print.html with variantId=0 (snapshot sentinel) and resolved template
+    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+      await win.loadURL(
+        `${process.env['ELECTRON_RENDERER_URL']}/print.html?variantId=0&template=${resolvedTemplate}`
+      )
+    } else {
+      await win.loadFile(join(__dirname, '../renderer/print.html'), {
+        query: { variantId: '0', template: resolvedTemplate },
+      })
+    }
+
+    // 8. Wait for PrintApp to signal it's ready to receive data (print:ready IPC)
+    await new Promise<void>((resolve) => {
+      ipcMain.once('print:ready', () => resolve())
+      // Safety timeout — if signal never comes, proceed after 3 seconds
+      setTimeout(() => resolve(), 3000)
+    })
+
+    // 9. Push snapshot data to PrintApp via postMessage using executeJavaScript
+    await win.webContents.executeJavaScript(
+      `window.postMessage(${JSON.stringify({
+        type: 'print-data',
+        template: resolvedTemplate,
+        showSummary: true,
+        payload,
+      })}, '*')`
+    )
+
+    // 10. Settle delay to let React render
+    await new Promise((r) => setTimeout(r, 500))
+
+    // 11. Print to PDF
+    const pdfBuffer = await win.webContents.printToPDF({
+      printBackground: true,
+      pageSize: 'Letter',
+      margins: { top: marginDefaults.top, bottom: marginDefaults.bottom, left: 0, right: 0 },
+    })
+    win.destroy()
+    await fs.writeFile(filePath, pdfBuffer)
+    return { canceled: false, filePath }
   })
 }

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Resume Templates
 status: planning
-stopped_at: Completed 15-controls-page-break-overlay-03-PLAN.md
-last_updated: "2026-03-26T00:11:21.058Z"
+stopped_at: Completed 16-cleanup 16-01-PLAN.md
+last_updated: "2026-03-26T12:47:08.376Z"
 last_activity: 2026-03-25 — v2.1 roadmap created, 21 requirements mapped across 4 phases
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 11
+  completed_plans: 10
   percent: 0
 ---
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 15-controls-page-break-overlay P01 | 8 | 2 tasks | 6 files |
 | Phase 15-controls-page-break-overlay P02 | 10 | 2 tasks | 8 files |
 | Phase 15-controls-page-break-overlay P03 | 4 | 2 tasks | 3 files |
+| Phase 16-cleanup P01 | 12 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,8 @@ Recent decisions affecting current work:
 - [Phase 15-controls-page-break-overlay]: LAYOUT section collapsed by default — shows margin summary inline when collapsed
 - [Phase 15-controls-page-break-overlay]: PDF routing fix: V2_TEMPLATES Set routes all 5 new templates through print.html PrintApp path
 - [Phase 15-controls-page-break-overlay]: marginsDirty flag: undefined margin = use template default; template switch snaps non-dirty margins to new defaults
+- [Phase 16-cleanup]: SnapshotViewer stubbed to ProfessionalLayout only — full v2.1 template-aware rewrite deferred to Plan 02
+- [Phase 16-cleanup]: export:pdf simplified to single print.html path — legacy theme else branch removed (V2_TEMPLATES covers all valid keys)
 
 ### Pending Todos
 
@@ -113,6 +116,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-26T00:11:21.056Z
-Stopped at: Completed 15-controls-page-break-overlay-03-PLAN.md
+Last session: 2026-03-26T12:47:08.374Z
+Stopped at: Completed 16-cleanup 16-01-PLAN.md
 Resume file: None

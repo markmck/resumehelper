@@ -140,9 +140,13 @@ function PrintApp(): React.JSX.Element {
     const key = params.get('template') ?? 'classic'
     setTemplateKey(key)
 
-    // In a BrowserWindow (PDF export), window.api is available via preload.
-    // In an iframe (preview), preload doesn't inject — receive data via postMessage instead.
-    if (typeof window.api !== 'undefined' && window.api?.profile) {
+    // variantId=0 is the sentinel for snapshot mode — data always arrives via postMessage.
+    // This covers both iframe mode (SnapshotViewer) and BrowserWindow mode (snapshotPdf handler).
+    const isSnapshotMode = variantId === 0
+
+    // In a BrowserWindow (PDF export) for a real variant, window.api is available via preload.
+    // In snapshot mode or an iframe (preview), receive data via postMessage instead.
+    if (!isSnapshotMode && typeof window.api !== 'undefined' && window.api?.profile) {
       Promise.all([
         window.api.profile.get(),
         window.api.templates.getBuilderData(variantId),
@@ -174,7 +178,7 @@ function PrintApp(): React.JSX.Element {
       })
       return
     } else {
-      // iframe mode: listen for data from parent VariantPreview
+      // Snapshot mode (variantId=0) or iframe mode: listen for data via postMessage.
       const handler = (event: MessageEvent): void => {
         if (event.data?.type === 'print-data') {
           setData(event.data.payload)
@@ -192,8 +196,16 @@ function PrintApp(): React.JSX.Element {
         }
       }
       window.addEventListener('message', handler)
-      // Signal to parent that we're ready to receive data
-      window.parent.postMessage({ type: 'print-ready' }, '*')
+
+      if (isSnapshotMode && typeof window.electron !== 'undefined') {
+        // Snapshot BrowserWindow mode: signal main process that we're ready to receive data.
+        // The snapshotPdf handler listens for this IPC once, then sends data via executeJavaScript postMessage.
+        window.electron.ipcRenderer.send('print:ready')
+      } else {
+        // iframe mode (SnapshotViewer or VariantPreview): signal parent frame
+        window.parent.postMessage({ type: 'print-ready' }, '*')
+      }
+
       return () => window.removeEventListener('message', handler)
     }
   }, [])
