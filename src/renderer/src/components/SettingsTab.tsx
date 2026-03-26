@@ -8,12 +8,6 @@ const FALLBACK_MODELS: Record<Provider, string[]> = {
   anthropic: ['claude-sonnet-4-5-20250514'],
 }
 
-const THEMES = [
-  { label: 'Even', value: 'even' },
-  { label: 'Class', value: 'class' },
-  { label: 'Elegant', value: 'elegant' },
-]
-
 const cardStyle: React.CSSProperties = {
   padding: 'var(--space-6)',
   border: '1px solid var(--color-border-subtle)',
@@ -78,10 +72,6 @@ export function SettingsTab(): React.JSX.Element {
   const [testMessage, setTestMessage] = useState<string>('')
   const [saving, setSaving] = useState<boolean>(false)
   const [saveError, setSaveError] = useState<string>('')
-  const [theme, setTheme] = useState<string>(
-    () => localStorage.getItem('preferredTheme') ?? 'even',
-  )
-
   const fetchModels = async (p?: Provider): Promise<void> => {
     setModelsLoading(true)
     try {
@@ -185,11 +175,6 @@ export function SettingsTab(): React.JSX.Element {
       setTestStatus('error')
       setTestMessage(err instanceof Error ? err.message : 'Connection failed')
     }
-  }
-
-  function handleThemeChange(value: string): void {
-    setTheme(value)
-    localStorage.setItem('preferredTheme', value)
   }
 
   return (
@@ -417,25 +402,6 @@ export function SettingsTab(): React.JSX.Element {
         )}
       </div>
 
-      {/* Card 2: Appearance */}
-      <div style={cardStyle}>
-        <h2 style={sectionHeadingStyle}>Appearance</h2>
-
-        <div style={fieldGroupStyle}>
-          <label style={labelStyle}>Default Theme</label>
-          <select
-            style={selectStyle}
-            value={theme}
-            onChange={(e) => handleThemeChange(e.target.value)}
-          >
-            {THEMES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
     </div>
   )
 }
