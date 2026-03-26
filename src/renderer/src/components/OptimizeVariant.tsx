@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useToast } from './Toast'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -114,12 +115,10 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
   const [stagedSkills, setStagedSkills] = useState<StagedSkill[]>([])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
-  // ── Save flow state
-  const [saving, setSaving] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [saveAsNew, setSaveAsNew] = useState(false)
-  const [newVariantName, setNewVariantName] = useState('')
-  const [savedMessage, setSavedMessage] = useState<string | null>(null)
+  // ── Preview refresh key (passed to VariantPreview when rendered in this component)
+  const [_previewRefreshKey, setPreviewRefreshKey] = useState(0)
+
+  const { showToast } = useToast()
 
   // ── Load on mount
   useEffect(() => {
@@ -208,6 +207,19 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
     load()
   }, [analysisId])
 
+  // ── Seed skill additions rows on mount
+  useEffect(() => {
+    if (!analysis?.gapSkills?.length) return
+    window.api.ai.ensureSkillAdditions(
+      analysis.id,
+      analysis.gapSkills.map((g) => ({
+        skill: g.skill,
+        severity: g.severity,
+        reason: g.reason,
+      }))
+    )
+  }, [analysis?.id])
+
   // ── Local score computation
   const computedScore = useMemo(() => {
     if (!analysis || !analysis.scoreBreakdown) return analysis?.matchScore ?? 0
@@ -252,9 +264,7 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
   const scoreDelta = computedScore - originalScore
 
   const pendingCount = suggStates.filter((s) => s.state === 'pending').length
-  const acceptedCount = suggStates.filter((s) => s.state === 'accepted').length
   const pendingSkillCount = stagedSkills.filter((s) => s.state === 'pending').length
-  const addedSkillCount = stagedSkills.filter((s) => s.state === 'added').length
 
   // Sum of point impacts for remaining pending suggestions
   const ptsAvailable = useMemo(() => {
@@ -295,9 +305,26 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
   }, [stagedSkills])
 
   // ── Actions
-  const accept = (i: number): void => {
-    setSuggStates((prev) => prev.map((s, idx) => (idx === i ? { ...s, state: 'accepted' } : s)))
+  const accept = async (i: number): Promise<void> => {
+    if (!analysis) return
+    const sugg = analysis.suggestions[i]
+    const bulletId = bulletIdMap.get(sugg.original_text)
+    if (bulletId == null) {
+      console.warn('[OptimizeVariant] No bulletId for suggestion index', i)
+      return
+    }
+    const finalText = suggStates[i].finalText
+    const result = await window.api.ai.acceptSuggestion(analysis.id, bulletId, finalText)
+    if ('error' in result) {
+      console.error('[OptimizeVariant] acceptSuggestion failed', result.error)
+      return
+    }
+    setSuggStates((prev) =>
+      prev.map((s, idx) => (idx === i ? { ...s, state: 'accepted' } : s))
+    )
     if (editingIndex === i) setEditingIndex(null)
+    setPreviewRefreshKey((k) => k + 1)
+    showToast('Suggestion accepted')
   }
 
   const dismiss = (i: number): void => {
@@ -305,18 +332,42 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
     if (editingIndex === i) setEditingIndex(null)
   }
 
-  const undo = (i: number): void => {
-    const orig = analysis?.suggestions[i]?.suggested_text ?? ''
+  const revert = async (i: number): Promise<void> => {
+    if (!analysis) return
+    const sugg = analysis.suggestions[i]
+    const bulletId = bulletIdMap.get(sugg.original_text)
+    if (bulletId == null) return
+    await window.api.ai.dismissSuggestion(analysis.id, bulletId)
     setSuggStates((prev) =>
-      prev.map((s, idx) => (idx === i ? { state: 'pending', finalText: orig } : s))
+      prev.map((s, idx) =>
+        idx === i ? { state: 'pending', finalText: sugg.suggested_text } : s
+      )
     )
+    setPreviewRefreshKey((k) => k + 1)
+    showToast('Suggestion reverted')
   }
 
-  const acceptAll = (): void => {
+  const acceptAll = async (): Promise<void> => {
+    if (!analysis) return
+    const pending = suggStates
+      .map((s, i) => ({ s, i }))
+      .filter(({ s }) => s.state === 'pending')
+
+    const calls = pending.map(({ s, i }) => {
+      const sugg = analysis.suggestions[i]
+      const bulletId = bulletIdMap.get(sugg.original_text)
+      if (bulletId == null) return Promise.resolve(null)
+      return window.api.ai.acceptSuggestion(analysis.id, bulletId, s.finalText)
+    })
+
+    await Promise.all(calls)
+
     setSuggStates((prev) =>
       prev.map((s) => (s.state === 'pending' ? { ...s, state: 'accepted' } : s))
     )
     setEditingIndex(null)
+    setPreviewRefreshKey((k) => k + 1)
+    showToast('All suggestions accepted')
   }
 
   const editFirst = (i: number): void => {
@@ -329,82 +380,23 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
     )
   }
 
-  const addSkill = (i: number): void => {
-    setStagedSkills((prev) => prev.map((s, idx) => (idx === i ? { ...s, state: 'added' } : s)))
-  }
-
-  const skipSkill = (i: number): void => {
-    setStagedSkills((prev) => prev.map((s, idx) => (idx === i ? { ...s, state: 'skipped' } : s)))
-  }
-
-  const undoSkill = (i: number): void => {
-    setStagedSkills((prev) => prev.map((s, idx) => (idx === i ? { ...s, state: 'pending' } : s)))
-  }
-
-  // ── Save handler
-  const handleSave = async (asNew: boolean): Promise<void> => {
+  const acceptSkill = async (skillName: string): Promise<void> => {
     if (!analysis) return
-    setSaving(true)
-    setShowConfirm(false)
-    try {
-      let targetVariantId = analysis.variantId
+    await window.api.ai.acceptSkillAddition(analysis.id, skillName)
+    setStagedSkills((prev) =>
+      prev.map((s) => (s.name === skillName ? { ...s, state: 'added' } : s))
+    )
+    setPreviewRefreshKey((k) => k + 1)
+    showToast('Skill added to analysis')
+  }
 
-      // 1. Duplicate variant if saving as new
-      if (asNew) {
-        const duplicated = await window.api.templates.duplicate(analysis.variantId)
-        const dup = duplicated as { id?: number }
-        if (dup?.id) {
-          targetVariantId = dup.id
-          // Rename the copy if user provided a name
-          const trimmed = newVariantName.trim()
-          if (trimmed) {
-            await window.api.templates.rename(dup.id, trimmed)
-          }
-        }
-      }
-
-      // 2. Write accepted bullet rewrites (global — not per-variant)
-      const suggs = analysis.suggestions ?? []
-      for (let i = 0; i < suggStates.length; i++) {
-        if (suggStates[i].state === 'accepted' && suggs[i]) {
-          const bulletId = bulletIdMap.get(suggs[i].original_text)
-          if (bulletId != null) {
-            await window.api.bullets.update(bulletId, { text: suggStates[i].finalText })
-          } else {
-            console.warn(
-              '[OptimizeVariant] No bullet ID found for original text:',
-              suggs[i].original_text
-            )
-          }
-        }
-      }
-
-      // 3. Create and link added skills
-      for (const sk of stagedSkills) {
-        if (sk.state === 'added') {
-          const created = await window.api.skills.create({ name: sk.name, tags: [] })
-          const createdSkill = created as { id?: number }
-          if (createdSkill?.id != null) {
-            await window.api.templates.setItemExcluded(
-              targetVariantId,
-              'skill',
-              createdSkill.id,
-              false
-            )
-          }
-        }
-      }
-
-      // 4. Stamp analysis status to 'optimized'
-      await window.api.jobPostings.updateAnalysisStatus(analysisId, 'optimized')
-
-      setSavedMessage(asNew ? 'New optimized variant created successfully' : 'Variant optimized successfully')
-    } catch (e) {
-      console.error('[OptimizeVariant] Save error:', e)
-      setSavedMessage('Save failed: ' + (e instanceof Error ? e.message : String(e)))
-    } finally {
-      setSaving(false)
-    }
+  const dismissSkill = async (skillName: string): Promise<void> => {
+    if (!analysis) return
+    await window.api.ai.dismissSkillAddition(analysis.id, skillName)
+    setStagedSkills((prev) =>
+      prev.map((s) => (s.name === skillName ? { ...s, state: 'skipped' } : s))
+    )
+    showToast('Skill dismissed')
   }
 
   // ── Loading / Error states
@@ -470,8 +462,6 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
   const CIRCUMFERENCE = 314 // 2 * pi * 50
   const strokeOffset = CIRCUMFERENCE - (CIRCUMFERENCE * computedScore) / 100
   const ringColor = getScoreColor(computedScore)
-
-  const canSave = acceptedCount > 0 || addedSkillCount > 0
 
   return (
     <div
@@ -878,21 +868,22 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
                           Confirm
                         </button>
                       )}
-                      {(isAccepted || isDismissed) && (
+                      {isAccepted && (
                         <button
-                          onClick={() => undo(i)}
+                          onClick={() => revert(i)}
                           style={{
-                            padding: '5px 12px',
+                            padding: '4px 12px',
                             backgroundColor: 'transparent',
                             color: 'var(--color-text-secondary)',
                             border: '1px solid var(--color-border-default)',
                             borderRadius: 'var(--radius-md)',
                             fontSize: 'var(--font-size-xs)',
+                            fontWeight: 400,
                             cursor: 'pointer',
                             fontFamily: 'var(--font-sans)',
                           }}
                         >
-                          Undo
+                          Revert
                         </button>
                       )}
                     </div>
@@ -921,7 +912,7 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
                     margin: 0,
                   }}
                 >
-                  Add missing skills to variant
+                  Missing skills for this job
                 </h2>
                 {pendingSkillCount > 0 && (
                   <span
@@ -1017,15 +1008,15 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
                                   fontWeight: 600,
                                 }}
                               >
-                                Added
+                                Added to analysis
                               </span>
                             )}
                             {isSkipped && (
                               <span
                                 style={{
                                   padding: '1px 8px',
-                                  backgroundColor: 'rgba(239,68,68,0.10)',
-                                  color: 'var(--color-danger)',
+                                  backgroundColor: 'rgba(160,160,168,0.10)',
+                                  color: 'var(--color-text-secondary)',
                                   borderRadius: 'var(--radius-sm)',
                                   fontSize: 'var(--font-size-xs)',
                                   fontWeight: 600,
@@ -1049,9 +1040,9 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
                           {sk.state === 'pending' && (
                             <>
                               <button
-                                onClick={() => addSkill(i)}
+                                onClick={() => acceptSkill(sk.name)}
                                 style={{
-                                  padding: '5px 12px',
+                                  padding: '4px 12px',
                                   backgroundColor: 'var(--color-accent)',
                                   color: 'white',
                                   border: 'none',
@@ -1062,17 +1053,18 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
                                   fontFamily: 'var(--font-sans)',
                                 }}
                               >
-                                Add skill
+                                Add
                               </button>
                               <button
-                                onClick={() => skipSkill(i)}
+                                onClick={() => dismissSkill(sk.name)}
                                 style={{
-                                  padding: '5px 12px',
+                                  padding: '4px 12px',
                                   backgroundColor: 'transparent',
-                                  color: 'var(--color-text-tertiary)',
-                                  border: 'none',
+                                  color: 'var(--color-text-secondary)',
+                                  border: '1px solid var(--color-border-default)',
                                   borderRadius: 'var(--radius-md)',
                                   fontSize: 'var(--font-size-xs)',
+                                  fontWeight: 400,
                                   cursor: 'pointer',
                                   fontFamily: 'var(--font-sans)',
                                 }}
@@ -1080,23 +1072,6 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
                                 Skip
                               </button>
                             </>
-                          )}
-                          {(isAdded || isSkipped) && (
-                            <button
-                              onClick={() => undoSkill(i)}
-                              style={{
-                                padding: '5px 12px',
-                                backgroundColor: 'transparent',
-                                color: 'var(--color-text-secondary)',
-                                border: '1px solid var(--color-border-default)',
-                                borderRadius: 'var(--radius-md)',
-                                fontSize: 'var(--font-size-xs)',
-                                cursor: 'pointer',
-                                fontFamily: 'var(--font-sans)',
-                              }}
-                            >
-                              Undo
-                            </button>
                           )}
                         </div>
                       </div>
@@ -1387,251 +1362,8 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
             </div>
           )}
 
-          {/* Save success message */}
-          {savedMessage && (
-            <div
-              style={{
-                marginBottom: 'var(--space-4)',
-                padding: 'var(--space-3)',
-                backgroundColor: savedMessage.startsWith('Save failed')
-                  ? 'rgba(239,68,68,0.10)'
-                  : 'rgba(34,197,94,0.10)',
-                border: `1px solid ${savedMessage.startsWith('Save failed') ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
-                borderRadius: 'var(--radius-md)',
-                fontSize: 'var(--font-size-xs)',
-                color: savedMessage.startsWith('Save failed') ? 'var(--color-danger)' : 'var(--color-success)',
-                fontWeight: 500,
-              }}
-            >
-              {savedMessage}
-            </div>
-          )}
-
-          {/* Save buttons */}
-          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <button
-              onClick={() => { setSaveAsNew(false); setShowConfirm(true) }}
-              disabled={!canSave || saving}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: canSave && !saving ? 'var(--color-accent)' : 'var(--color-bg-raised)',
-                color: canSave && !saving ? 'white' : 'var(--color-text-muted)',
-                border: 'none',
-                borderRadius: 'var(--radius-md)',
-                fontSize: 'var(--font-size-sm)',
-                fontWeight: 600,
-                cursor: canSave && !saving ? 'pointer' : 'not-allowed',
-                fontFamily: 'var(--font-sans)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 'var(--space-2)',
-              }}
-            >
-              {saving && !saveAsNew && (
-                <span
-                  style={{
-                    display: 'inline-block',
-                    width: 14,
-                    height: 14,
-                    border: '2px solid rgba(255,255,255,0.4)',
-                    borderTopColor: 'white',
-                    borderRadius: '50%',
-                    animation: 'ov-spin 0.8s linear infinite',
-                  }}
-                />
-              )}
-              Save optimized variant
-            </button>
-            <button
-              onClick={() => { setSaveAsNew(true); setNewVariantName(`${analysis?.variantName ?? 'Variant'} (optimized)`); setShowConfirm(true) }}
-              disabled={!canSave || saving}
-              style={{
-                padding: '7px 16px',
-                backgroundColor: 'transparent',
-                color: canSave && !saving ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
-                border: `1px solid ${canSave && !saving ? 'var(--color-border-default)' : 'var(--color-border-subtle)'}`,
-                borderRadius: 'var(--radius-md)',
-                fontSize: 'var(--font-size-sm)',
-                cursor: canSave && !saving ? 'pointer' : 'not-allowed',
-                fontFamily: 'var(--font-sans)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 'var(--space-2)',
-              }}
-            >
-              {saving && saveAsNew && (
-                <span
-                  style={{
-                    display: 'inline-block',
-                    width: 14,
-                    height: 14,
-                    border: '2px solid rgba(160,160,168,0.4)',
-                    borderTopColor: 'var(--color-text-secondary)',
-                    borderRadius: '50%',
-                    animation: 'ov-spin 0.8s linear infinite',
-                  }}
-                />
-              )}
-              Save as new variant
-            </button>
-            <button
-              onClick={() => {
-                // TODO Phase 11: navigate to submissions with company/role pre-filled
-                onBack()
-              }}
-              style={{
-                padding: '6px 16px',
-                backgroundColor: 'transparent',
-                color: 'var(--color-text-tertiary)',
-                border: 'none',
-                borderRadius: 'var(--radius-md)',
-                fontSize: 'var(--font-size-xs)',
-                cursor: 'pointer',
-                fontFamily: 'var(--font-sans)',
-                textAlign: 'center',
-              }}
-            >
-              Log submission
-            </button>
-          </div>
         </div>
       </div>
-
-      {/* ── Confirmation dialog (inline overlay) */}
-      {showConfirm && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-          onClick={() => setShowConfirm(false)}
-        >
-          <div
-            style={{
-              backgroundColor: 'var(--color-bg-overlay)',
-              border: '1px solid var(--color-border-default)',
-              borderRadius: 'var(--radius-lg)',
-              padding: 'var(--space-6)',
-              maxWidth: 440,
-              width: '90%',
-              fontFamily: 'var(--font-sans)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3
-              style={{
-                fontSize: 'var(--font-size-base)',
-                fontWeight: 700,
-                color: 'var(--color-text-primary)',
-                margin: '0 0 var(--space-3) 0',
-              }}
-            >
-              Confirm changes
-            </h3>
-            <p
-              style={{
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--color-text-secondary)',
-                lineHeight: 1.6,
-                margin: '0 0 var(--space-4) 0',
-              }}
-            >
-              This will update {acceptedCount} bullet{acceptedCount !== 1 ? 's' : ''} and add{' '}
-              {addedSkillCount} skill{addedSkillCount !== 1 ? 's' : ''} in{' '}
-              <strong style={{ color: 'var(--color-text-primary)' }}>
-                {analysis.variantName ?? 'this variant'}
-              </strong>
-              . Bullet text changes apply to all variants that include these bullets.
-              {saveAsNew && (
-                <>
-                  {' '}
-                  A copy of{' '}
-                  <strong style={{ color: 'var(--color-text-primary)' }}>
-                    {analysis.variantName ?? 'this variant'}
-                  </strong>{' '}
-                  will be created first.
-                </>
-              )}
-            </p>
-            {saveAsNew && (
-              <div style={{ marginBottom: 'var(--space-4)' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: 'var(--font-size-xs)',
-                    fontWeight: 500,
-                    textTransform: 'uppercase' as const,
-                    letterSpacing: '0.05em',
-                    color: 'var(--color-text-tertiary)',
-                    marginBottom: 'var(--space-2)',
-                  }}
-                >
-                  New variant name
-                </label>
-                <input
-                  type="text"
-                  value={newVariantName}
-                  onChange={(e) => setNewVariantName(e.target.value)}
-                  placeholder={`${analysis.variantName ?? 'Variant'} (optimized)`}
-                  style={{
-                    width: '100%',
-                    height: 36,
-                    backgroundColor: 'var(--color-bg-input)',
-                    border: '1px solid var(--color-border-default)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '8px 12px',
-                    fontSize: 'var(--font-size-base)',
-                    color: 'var(--color-text-primary)',
-                    outline: 'none',
-                    fontFamily: 'var(--font-sans)',
-                  }}
-                  autoFocus
-                />
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowConfirm(false)}
-                style={{
-                  padding: '7px 16px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--color-text-secondary)',
-                  border: '1px solid var(--color-border-default)',
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: 'var(--font-size-sm)',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-sans)',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleSave(saveAsNew)}
-                style={{
-                  padding: '7px 16px',
-                  backgroundColor: 'var(--color-accent)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: 'var(--font-size-sm)',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-sans)',
-                }}
-              >
-                Save changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
