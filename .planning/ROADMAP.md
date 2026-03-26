@@ -65,7 +65,11 @@ Plans:
   3. Two analyses on the same variant show independent rewrite text — accepting in one does not affect the other
   4. Dismissing a suggestion leaves the bullet unchanged; undoing an accepted suggestion reverts the bullet to base text
   5. A submission created from analysis context freezes the merged (overridden) bullet text in the snapshot, not the base text
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 18-01-PLAN.md — Thread analysisId through main-process handlers, add skill IPC handlers, update preload bridge and PrintApp
+- [ ] 18-02-PLAN.md — Rewire OptimizeVariant to per-click IPC, add revert flow, wire skills, thread analysisId to VariantPreview
+- [ ] 18-03-PLAN.md — Extend buildSnapshotForVariant with override and skill addition merging
 
 ### Phase 19: Analysis Submission Flow
 **Goal**: Users can log a submission directly from the analysis screen with company and role pre-filled, and stale or orphaned analysis states are surfaced clearly
@@ -109,8 +113,8 @@ Plans:
 | 1-7 | v1.0 + v1.1 | - | Complete | 2026-03-23 |
 | 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
 | 13-16 | v2.1 | 12/12 | Complete | 2026-03-26 |
-| 17. Schema + Override IPC Foundation | 2/2 | Complete   | 2026-03-26 | - |
-| 18. Three-Layer Model Wiring | v2.2 | 0/? | Not started | - |
+| 17. Schema + Override IPC Foundation | 2/2 | Complete    | 2026-03-26 | - |
+| 18. Three-Layer Model Wiring | v2.2 | 0/3 | Planning | - |
 | 19. Analysis Submission Flow | v2.2 | 0/? | Not started | - |
 | 20. Skills Chip Grid | v2.2 | 0/? | Not started | - |
 | 21. Variant UX + Cleanup | v2.2 | 0/? | Not started | - |
