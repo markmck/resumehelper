@@ -33,6 +33,19 @@ async function buildSnapshotForVariant(variantId: number): Promise<SubmissionSna
     }
   } catch { /* keep undefined */ }
 
+  // Capture showSummary from the sentinel row in templateVariantItems
+  const summaryRow = await db
+    .select()
+    .from(templateVariantItems)
+    .where(eq(templateVariantItems.variantId, variantId))
+    .then(rows => rows.find(r => r.itemType === 'summary'))
+  const showSummary = summaryRow ? !summaryRow.excluded : true
+  if (templateOptions) {
+    templateOptions.showSummary = showSummary
+  } else {
+    templateOptions = { showSummary }
+  }
+
   const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
   const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
   const allSkills = await db.select().from(skills)
