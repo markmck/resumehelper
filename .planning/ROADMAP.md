@@ -30,7 +30,7 @@ Phases 8-12 covered: Design system + sidebar navigation, AI provider settings, j
 **Milestone Goal:** Replace bundled resume.json themes with 5 purpose-built HTML/CSS templates (Classic, Modern, Jake, Minimal, Executive) with proper page break handling, margin controls, accent color customization, and matching PDF/DOCX export — preview matches export exactly.
 
 - [x] **Phase 13: Pipeline Foundation** - Unified print.html rendering path with Classic template end-to-end (completed 2026-03-25)
-- [x] **Phase 14: Templates Complete** - All 5 templates with per-template fonts and DOCX support (completed 2026-03-25)
+- [x] **Phase 14: Templates Complete** - All 5 templates with per-template fonts and DOCX support (completed 2026-03-25)
 - [ ] **Phase 15: Controls + Page Break Overlay** - Accent color, margin toggle, skills mode, page boundary visualization
 - [ ] **Phase 16: Cleanup** - Remove old resume.json themes, migrate snapshot PDF path
 
@@ -78,7 +78,11 @@ Plans:
   4. User can switch skills display mode between inline and grouped — change reflects in preview and persists per variant
   5. Preview pane shows page boundaries (page 1, gap, page 2) — jobs are never split across pages
   6. Preview updates in real-time when any checkbox or template control changes
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 15-01-PLAN.md — DB schema (templateOptions column), IPC handlers, preload bridge, TypeScript types
+- [ ] 15-02-PLAN.md — Preview header controls (color picker, skills dropdown, two-row layout) + postMessage pipeline + template margin props
+- [ ] 15-03-PLAN.md — Builder pane LAYOUT section (margin sliders, showSummary relocation) + PDF/DOCX export margin integration
 
 ### Phase 16: Cleanup
 **Goal**: Old resume.json themes (Even, Class, Elegant) are fully removed and the submission snapshot PDF path works cleanly with the new template system
@@ -97,6 +101,6 @@ Plans:
 | 1-7 | v1.0 + v1.1 | - | Complete | 2026-03-23 |
 | 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
 | 13. Pipeline Foundation | 3/3 | Complete    | 2026-03-25 | - |
-| 14. Templates Complete | 3/3 | Complete   | 2026-03-25 | - |
-| 15. Controls + Page Break Overlay | v2.1 | 0/? | Not started | - |
+| 14. Templates Complete | 3/3 | Complete    | 2026-03-25 | - |
+| 15. Controls + Page Break Overlay | 1/3 | In Progress|  | - |
 | 16. Cleanup | v2.1 | 0/? | Not started | - |

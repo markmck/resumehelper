@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Resume Templates
 status: planning
-stopped_at: Completed 14-03-PLAN.md
-last_updated: "2026-03-25T20:55:59.261Z"
+stopped_at: Completed 15-controls-page-break-overlay-01-PLAN.md
+last_updated: "2026-03-26T00:00:21.897Z"
 last_activity: 2026-03-25 — v2.1 roadmap created, 21 requirements mapped across 4 phases
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 9
+  completed_plans: 7
   percent: 0
 ---
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 14-templates-complete P02 | 2 | 2 tasks | 2 files |
 | Phase 14-templates-complete P01 | 3 | 3 tasks | 4 files |
 | Phase 14-templates-complete P03 | 2 | 2 tasks | 3 files |
+| Phase 15-controls-page-break-overlay P01 | 8 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,9 @@ Recent decisions affecting current work:
 - [Phase 14-templates-complete]: JakeTemplate: Lato, dense 0.6/0.5in margins, Company em-dash Title single-line entry, #333333 default
 - [Phase 14-templates-complete]: DOCX_FONT_MAP: Georgia for Classic, Calibri for Modern/Jake/Minimal, Garamond for Executive — per-template Word fonts
 - [Phase 14-templates-complete]: HeadingLevel.HEADING_1 on all 10 DOCX section headings for ATS parsing alongside visual TextRun styling
+- [Phase 15-controls-page-break-overlay]: templateOptions column stores JSON text parsed in IPC handler with null fallback
+- [Phase 15-controls-page-break-overlay]: Summary exclusion uses sentinel itemType='summary' row (no FK) — executive template is only one with summary shown by default
+- [Phase 15-controls-page-break-overlay]: TEMPLATE_DEFAULTS in renderer types.ts is single source of truth for per-template margin/accent/skillsDisplay defaults
 
 ### Pending Todos
 
@@ -102,6 +106,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-25T20:55:59.259Z
-Stopped at: Completed 14-03-PLAN.md
+Last session: 2026-03-26T00:00:21.895Z
+Stopped at: Completed 15-controls-page-break-overlay-01-PLAN.md
 Resume file: None

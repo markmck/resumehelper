@@ -22,7 +22,7 @@ Requirements for Resume Templates milestone. Each maps to roadmap phases.
 - [ ] **CTRL-03**: User can toggle between standard and compact margins per template — saved per variant
 - [ ] **CTRL-04**: User can toggle skills display mode (inline vs grouped) per template — saved per variant
 - [ ] **CTRL-05**: User can adjust the bottom page break margin to control when content pushes to the next page — jobs are never split across pages
-- [ ] **CTRL-06**: Template choice, accent color, margins, and skills mode are persisted per variant in the database
+- [x] **CTRL-06**: Template choice, accent color, margins, and skills mode are persisted per variant in the database
 
 ### Preview Quality
 
@@ -90,7 +90,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CTRL-03 | Phase 15 | Pending |
 | CTRL-04 | Phase 15 | Pending |
 | CTRL-05 | Phase 15 | Pending |
-| CTRL-06 | Phase 15 | Pending |
+| CTRL-06 | Phase 15 | Complete |
 | PREV-01 | Phase 15 | Pending |
 | PREV-02 | Phase 15 | Pending |
 | PREV-03 | Phase 13 | Complete |
