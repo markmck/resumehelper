@@ -1,6 +1,5 @@
 import { ipcMain, BrowserWindow, dialog } from 'electron'
 import { join } from 'path'
-import { tmpdir } from 'os'
 import { is } from '@electron-toolkit/utils'
 import { promises as fs } from 'fs'
 import {
@@ -35,8 +34,7 @@ const DOCX_MARGIN_DEFAULTS: Record<string, { top: number; bottom: number; sides:
 import { db } from '../db'
 import { profile, jobs, jobBullets, skills, projects, projectBullets, templateVariantItems, templateVariants, education, volunteer, awards, publications, languages, interests, referenceEntries } from '../db/schema'
 import { eq, asc, desc } from 'drizzle-orm'
-import { buildResumeJson, renderThemeHtml } from '../lib/themeRegistry'
-import { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference, SubmissionSnapshot } from '../../preload/index.d'
+import { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
 
 interface BuilderData {
   jobs: BuilderJob[]
@@ -231,110 +229,61 @@ export function registerExportHandlers(): void {
     })
     if (canceled || !filePath) return { canceled: true }
 
-    // 2. Determine layout: new v2.1 templates (classic/modern/jake/minimal/executive) use print.html path;
-    //    legacy theme keys fall through to old themeRegistry path
+    // 2. Determine layout: all v2.1 templates (classic/modern/jake/minimal/executive) use print.html path
     const variant = db.select().from(templateVariants).where(eq(templateVariants.id, variantId)).get()
     const layoutTemplate = variant?.layoutTemplate ?? 'classic'
-    const V2_TEMPLATES = new Set(['classic', 'modern', 'jake', 'minimal', 'executive'])
-    const isProfessional = V2_TEMPLATES.has(layoutTemplate) || !layoutTemplate || layoutTemplate === 'professional'
 
     // Parse templateOptions for margin values
-    let pdfMarginTop = 0
-    let pdfMarginBottom = 0
-    if (isProfessional) {
-      const marginDefaults = DOCX_MARGIN_DEFAULTS[layoutTemplate] ?? { top: 1.0, bottom: 1.0, sides: 1.0 }
-      try {
-        const opts = variant?.templateOptions ? JSON.parse(variant.templateOptions as string) : {}
-        pdfMarginTop = opts.marginTop ?? marginDefaults.top
-        pdfMarginBottom = opts.marginBottom ?? marginDefaults.bottom
-      } catch {
-        pdfMarginTop = marginDefaults.top
-        pdfMarginBottom = marginDefaults.bottom
-      }
+    const marginDefaults = DOCX_MARGIN_DEFAULTS[layoutTemplate] ?? { top: 1.0, bottom: 1.0, sides: 1.0 }
+    let pdfMarginTop = marginDefaults.top
+    let pdfMarginBottom = marginDefaults.bottom
+    try {
+      const opts = variant?.templateOptions ? JSON.parse(variant.templateOptions as string) : {}
+      pdfMarginTop = opts.marginTop ?? marginDefaults.top
+      pdfMarginBottom = opts.marginBottom ?? marginDefaults.bottom
+    } catch {
+      // keep defaults
     }
 
-    if (isProfessional) {
-      // Professional path: load print.html + wait for print:ready signal
-      const win = new BrowserWindow({
-        show: false,
-        width: 816, // 8.5in * 96dpi
-        height: 1056, // 11in * 96dpi
-        webPreferences: {
-          preload: join(__dirname, '../preload/index.js'),
-          sandbox: false,
-        },
-      })
+    // Load print.html + wait for print:ready signal
+    const win = new BrowserWindow({
+      show: false,
+      width: 816, // 8.5in * 96dpi
+      height: 1056, // 11in * 96dpi
+      webPreferences: {
+        preload: join(__dirname, '../preload/index.js'),
+        sandbox: false,
+      },
+    })
 
-      if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-        await win.loadURL(
-          `${process.env['ELECTRON_RENDERER_URL']}/print.html?variantId=${variantId}&template=${layoutTemplate ?? 'classic'}`
-        )
-      } else {
-        await win.loadFile(join(__dirname, '../renderer/print.html'), {
-          query: { variantId: String(variantId), template: layoutTemplate ?? 'classic' },
-        })
-      }
-
-      // Wait for React to signal readiness
-      await new Promise<void>((resolve) => {
-        ipcMain.once('print:ready', () => resolve())
-        // Safety timeout — if signal never comes, proceed after 3 seconds
-        setTimeout(() => resolve(), 3000)
-      })
-
-      // Small settle delay for final paint
-      await new Promise((r) => setTimeout(r, 200))
-
-      const pdfBuffer = await win.webContents.printToPDF({
-        printBackground: true,
-        pageSize: 'Letter',
-        margins: { top: pdfMarginTop, bottom: pdfMarginBottom, left: 0, right: 0 },
-      })
-      win.destroy()
-      await fs.writeFile(filePath, pdfBuffer)
-      return { canceled: false, filePath }
+    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+      await win.loadURL(
+        `${process.env['ELECTRON_RENDERER_URL']}/print.html?variantId=${variantId}&template=${layoutTemplate ?? 'classic'}`
+      )
     } else {
-      // Theme path: render HTML via themeRegistry, write to temp file, load in hidden window
-      const win = new BrowserWindow({
-        show: false,
-        width: 816,
-        height: 1056,
-        webPreferences: { sandbox: true }, // no preload needed for raw HTML
+      await win.loadFile(join(__dirname, '../renderer/print.html'), {
+        query: { variantId: String(variantId), template: layoutTemplate ?? 'classic' },
       })
-
-      const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
-      const builderData = await getBuilderDataForVariant(variantId)
-      const resumeJson = buildResumeJson(profileRow, builderData)
-      const html = await renderThemeHtml(layoutTemplate, resumeJson)
-
-      const tmpPath = join(tmpdir(), `resume-theme-${variantId}-${Date.now()}.html`)
-      await fs.writeFile(tmpPath, html, 'utf-8')
-
-      await new Promise<void>((resolve) => {
-        let resolved = false
-        const done = (): void => {
-          if (!resolved) {
-            resolved = true
-            resolve()
-          }
-        }
-        win.webContents.once('did-finish-load', () => {
-          setTimeout(done, 500) // settle delay for fonts/images
-        })
-        setTimeout(done, 5000) // safety timeout
-        win.loadFile(tmpPath)
-      })
-
-      const pdfBuffer = await win.webContents.printToPDF({
-        printBackground: true,
-        pageSize: 'Letter',
-        margins: { top: 0, bottom: 0, left: 0, right: 0 },
-      })
-      win.destroy()
-      await fs.unlink(tmpPath).catch(() => {})
-      await fs.writeFile(filePath, pdfBuffer)
-      return { canceled: false, filePath }
     }
+
+    // Wait for React to signal readiness
+    await new Promise<void>((resolve) => {
+      ipcMain.once('print:ready', () => resolve())
+      // Safety timeout — if signal never comes, proceed after 3 seconds
+      setTimeout(() => resolve(), 3000)
+    })
+
+    // Small settle delay for final paint
+    await new Promise((r) => setTimeout(r, 200))
+
+    const pdfBuffer = await win.webContents.printToPDF({
+      printBackground: true,
+      pageSize: 'Letter',
+      margins: { top: pdfMarginTop, bottom: pdfMarginBottom, left: 0, right: 0 },
+    })
+    win.destroy()
+    await fs.writeFile(filePath, pdfBuffer)
+    return { canceled: false, filePath }
   })
 
   ipcMain.handle('export:docx', async (_, variantId: number, defaultFilename: string) => {
@@ -837,72 +786,8 @@ export function registerExportHandlers(): void {
     return { canceled: false, filePath }
   })
 
-  ipcMain.handle('export:snapshotPdf', async (_, snapshotData: SubmissionSnapshot, defaultFilename: string) => {
-    // 1. Show Save As dialog
-    const { canceled, filePath } = await dialog.showSaveDialog({
-      title: 'Export Snapshot as PDF',
-      defaultPath: defaultFilename,
-      filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
-    })
-    if (canceled || !filePath) return { canceled: true }
-
-    // 2. Determine layout from snapshot
-    const layoutTemplate = snapshotData.layoutTemplate ?? 'traditional'
-    const isProfessional = !layoutTemplate || layoutTemplate === 'professional' || layoutTemplate === 'traditional'
-
-    // 3. Render HTML: professional/traditional use 'even' theme as fallback (print.html requires live variantId),
-    //    theme-based layouts use their own theme renderer
-    const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
-    const snapshotBuilderData = {
-      jobs: snapshotData.jobs ?? [],
-      skills: snapshotData.skills ?? [],
-      projects: snapshotData.projects ?? [],
-      education: snapshotData.education ?? [],
-      volunteer: snapshotData.volunteer ?? [],
-      awards: snapshotData.awards ?? [],
-      publications: snapshotData.publications ?? [],
-      languages: snapshotData.languages ?? [],
-      interests: snapshotData.interests ?? [],
-      references: snapshotData.references ?? [],
-    }
-    const resumeJson = buildResumeJson(profileRow, snapshotBuilderData)
-    const themeKey = isProfessional ? 'even' : layoutTemplate
-    const html = await renderThemeHtml(themeKey, resumeJson)
-
-    // 4. Write to temp file and print to PDF
-    const win = new BrowserWindow({
-      show: false,
-      width: 816,
-      height: 1056,
-      webPreferences: { sandbox: true },
-    })
-
-    const tmpPath = join(tmpdir(), `resume-snapshot-${Date.now()}.html`)
-    await fs.writeFile(tmpPath, html, 'utf-8')
-
-    await new Promise<void>((resolve) => {
-      let resolved = false
-      const done = (): void => {
-        if (!resolved) {
-          resolved = true
-          resolve()
-        }
-      }
-      win.webContents.once('did-finish-load', () => {
-        setTimeout(done, 500)
-      })
-      setTimeout(done, 5000)
-      win.loadFile(tmpPath)
-    })
-
-    const pdfBuffer = await win.webContents.printToPDF({
-      printBackground: true,
-      pageSize: 'Letter',
-      margins: { top: 0, bottom: 0, left: 0, right: 0 },
-    })
-    win.destroy()
-    await fs.unlink(tmpPath).catch(() => {})
-    await fs.writeFile(filePath, pdfBuffer)
-    return { canceled: false, filePath }
+  // TODO: rewrite in Plan 02 — snapshot PDF via print.html with layoutTemplate routing
+  ipcMain.handle('export:snapshotPdf', async () => {
+    return { canceled: true, error: 'Snapshot PDF export is being migrated in Phase 16 Plan 02' }
   })
 }

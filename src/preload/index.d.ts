@@ -509,11 +509,6 @@ export interface Api {
     }>
     confirmReplace: (data: unknown) => Promise<{ success: boolean }>
   }
-  themes: {
-    renderHtml: (variantId: number, themeKey: string) => Promise<string | { error: string }>
-    renderSnapshotHtml: (themeKey: string, snapshotData: SubmissionSnapshot) => Promise<string | { error: string }>
-    list: () => Promise<Array<{ key: string; displayName: string }>>
-  }
   settings: {
     getAi: () => Promise<{ provider: string; model: string; hasKey: boolean }>
     setAi: (data: { provider: string; model: string; apiKey: string }) => Promise<{ success: boolean } | { error: string }>

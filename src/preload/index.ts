@@ -225,13 +225,6 @@ const api = {
     parse: () => ipcRenderer.invoke('import:parseResumeJson'),
     confirmReplace: (data: unknown) => ipcRenderer.invoke('import:confirmReplace', data),
   },
-  themes: {
-    renderHtml: (variantId: number, themeKey: string) =>
-      ipcRenderer.invoke('themes:renderHtml', variantId, themeKey),
-    renderSnapshotHtml: (themeKey: string, snapshotData: unknown) =>
-      ipcRenderer.invoke('themes:renderSnapshotHtml', themeKey, snapshotData),
-    list: () => ipcRenderer.invoke('themes:list'),
-  },
   settings: {
     getAi: () => ipcRenderer.invoke('settings:getAi'),
     setAi: (data: { provider: string; model: string; apiKey: string }) =>

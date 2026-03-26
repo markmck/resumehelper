@@ -56,7 +56,6 @@ function normalizeHex(value: string): string {
 function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: VariantEditorProps): React.JSX.Element {
   const [previewVersion, setPreviewVersion] = useState(0)
   const [exporting, setExporting] = useState<'pdf' | 'docx' | null>(null)
-  const [themes, setThemes] = useState<Array<{ key: string; displayName: string }>>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [layoutTemplate, setLayoutTemplate] = useState(
     variant.layoutTemplate && variant.layoutTemplate !== 'traditional' && variant.layoutTemplate !== 'professional'
@@ -80,10 +79,6 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
   const colorPickerRef = useRef<HTMLDivElement>(null)
   const colorDotRef = useRef<HTMLDivElement>(null)
   const { showToast } = useToast()
-
-  useEffect(() => {
-    window.api.themes.list().then(setThemes)
-  }, [])
 
   useEffect(() => {
     const tpl = variant.layoutTemplate
@@ -201,11 +196,6 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
 
   const sanitize = (s: string): string =>
     s.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '')
-
-  const handleThemeChange = async (newTheme: string): Promise<void> => {
-    setLayoutTemplate(newTheme)
-    await window.api.templates.setLayoutTemplate(variant.id, newTheme)
-  }
 
   const handleShowSummaryChange = (shown: boolean): void => {
     setShowSummary(shown)
@@ -419,32 +409,6 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
             }}
           >
             <span style={paneLabelStyle}>Preview</span>
-
-            {/* Template dropdown — leftmost control */}
-            {themes.length > 0 && (
-              <select
-                value={layoutTemplate}
-                onChange={(e) => handleThemeChange(e.target.value)}
-                style={{
-                  backgroundColor: 'var(--color-bg-input)',
-                  border: '1px solid var(--color-border-default)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '3px 8px',
-                  fontSize: 'var(--font-size-xs)',
-                  color: 'var(--color-text-secondary)',
-                  height: 26,
-                  outline: 'none',
-                  fontFamily: 'var(--font-sans)',
-                  marginLeft: 4,
-                }}
-              >
-                {themes.map((t) => (
-                  <option key={t.key} value={t.key}>
-                    {t.displayName}
-                  </option>
-                ))}
-              </select>
-            )}
 
             {/* Color dot trigger — white ring for visibility on dark colors */}
             <div

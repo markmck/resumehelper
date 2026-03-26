@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { BuilderSkill, SubmissionSnapshot } from '../../../preload/index.d'
 import ProfessionalLayout from './ProfessionalLayout'
 
@@ -7,15 +7,8 @@ interface SnapshotViewerProps {
   onClose: () => void
 }
 
-function isBuiltIn(layoutTemplate: string | undefined): boolean {
-  return !layoutTemplate || layoutTemplate === 'professional' || layoutTemplate === 'traditional'
-}
-
+// TODO: Plan 02 — rewrite SnapshotViewer with full v2.1 template-aware snapshot rendering
 function SnapshotViewer({ snapshot, onClose }: SnapshotViewerProps): React.JSX.Element {
-  const isProfessional = isBuiltIn(snapshot.layoutTemplate)
-  const [themeHtml, setThemeHtml] = useState<string | null>(null)
-  const [loading, setLoading] = useState(!isProfessional)
-
   // Escape key to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
@@ -24,23 +17,6 @@ function SnapshotViewer({ snapshot, onClose }: SnapshotViewerProps): React.JSX.E
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
-
-  // Load theme HTML for non-professional snapshots
-  useEffect(() => {
-    if (isProfessional) return
-    window.api.themes
-      .renderSnapshotHtml(snapshot.layoutTemplate, snapshot)
-      .then((result) => {
-        if (typeof result === 'string') {
-          setThemeHtml(result)
-        } else {
-          setThemeHtml(`<html><body style="font-family:sans-serif;padding:2rem;color:#ef4444">
-            <h2>Theme render error</h2><p>${result.error}</p>
-          </body></html>`)
-        }
-      })
-      .finally(() => setLoading(false))
-  }, [snapshot, isProfessional])
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>): void => {
     if (e.target === e.currentTarget) onClose()
@@ -76,31 +52,18 @@ function SnapshotViewer({ snapshot, onClose }: SnapshotViewerProps): React.JSX.E
 
         {/* Modal body */}
         <div>
-          {isProfessional ? (
-            <ProfessionalLayout
-              jobs={snapshot.jobs}
-              skills={skills}
-              projects={snapshot.projects ?? []}
-              education={snapshot.education ?? []}
-              volunteer={snapshot.volunteer ?? []}
-              awards={snapshot.awards ?? []}
-              publications={snapshot.publications ?? []}
-              languages={snapshot.languages ?? []}
-              interests={snapshot.interests ?? []}
-              references={snapshot.references ?? []}
-            />
-          ) : loading ? (
-            <div className="flex items-center justify-center text-zinc-500 text-sm" style={{ padding: '48px' }}>
-              Loading theme...
-            </div>
-          ) : (
-            <iframe
-              srcDoc={themeHtml ?? ''}
-              style={{ width: '100%', height: '70vh', border: 'none', background: 'white' }}
-              sandbox="allow-same-origin allow-scripts"
-              title="Resume Snapshot"
-            />
-          )}
+          <ProfessionalLayout
+            jobs={snapshot.jobs}
+            skills={skills}
+            projects={snapshot.projects ?? []}
+            education={snapshot.education ?? []}
+            volunteer={snapshot.volunteer ?? []}
+            awards={snapshot.awards ?? []}
+            publications={snapshot.publications ?? []}
+            languages={snapshot.languages ?? []}
+            interests={snapshot.interests ?? []}
+            references={snapshot.references ?? []}
+          />
         </div>
       </div>
     </div>
