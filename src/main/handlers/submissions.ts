@@ -1,8 +1,9 @@
 import { ipcMain } from 'electron'
 import { db } from '../db'
-import { submissions, submissionEvents, templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisResults, jobPostings, profile } from '../db/schema'
-import { eq, desc, asc } from 'drizzle-orm'
+import { submissions, submissionEvents, templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisResults, jobPostings, profile, analysisBulletOverrides, analysisSkillAdditions } from '../db/schema'
+import { eq, desc, asc, and } from 'drizzle-orm'
 import type { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
+import { applyOverrides } from '../../shared/overrides'
 
 interface SubmissionSnapshot {
   layoutTemplate: string
@@ -20,7 +21,7 @@ interface SubmissionSnapshot {
   references: BuilderReference[]
 }
 
-async function buildSnapshotForVariant(variantId: number): Promise<SubmissionSnapshot> {
+async function buildSnapshotForVariant(variantId: number, analysisId?: number): Promise<SubmissionSnapshot> {
   const [variant] = await db
     .select({ layoutTemplate: templateVariants.layoutTemplate, templateOptions: templateVariants.templateOptions })
     .from(templateVariants)
@@ -126,12 +127,49 @@ async function buildSnapshotForVariant(variantId: number): Promise<SubmissionSna
     })),
   }))
 
+  // Merge analysis bullet overrides into snapshot (per D-10)
+  if (analysisId != null) {
+    const overrideRows = db.select({
+      bulletId: analysisBulletOverrides.bulletId,
+      overrideText: analysisBulletOverrides.overrideText,
+      source: analysisBulletOverrides.source,
+      suggestionId: analysisBulletOverrides.suggestionId,
+    })
+    .from(analysisBulletOverrides)
+    .where(eq(analysisBulletOverrides.analysisId, analysisId))
+    .all()
+
+    for (const job of jobsWithBullets) {
+      job.bullets = applyOverrides(job.bullets, overrideRows as Parameters<typeof applyOverrides>[1]) as typeof job.bullets
+    }
+  }
+
   const skillsWithExcluded: BuilderSkill[] = allSkills.map((skill) => ({
     id: skill.id,
     name: skill.name,
     tags: JSON.parse(skill.tags) as string[],
     excluded: excludedSkillIds.has(skill.id),
   }))
+
+  // Merge accepted skill additions into snapshot (per D-11)
+  if (analysisId != null) {
+    const acceptedSkills = db.select()
+      .from(analysisSkillAdditions)
+      .where(and(
+        eq(analysisSkillAdditions.analysisId, analysisId),
+        eq(analysisSkillAdditions.status, 'accepted')
+      ))
+      .all()
+
+    for (const sk of acceptedSkills) {
+      skillsWithExcluded.push({
+        id: -1,
+        name: sk.skillName,
+        tags: sk.category ? [sk.category] : [],
+        excluded: false,
+      })
+    }
+  }
 
   const projectsWithBullets: BuilderProject[] = allProjects.map((project) => ({
     id: project.id,
@@ -280,7 +318,7 @@ export function registerSubmissionHandlers(): void {
     ) => {
       let snapshot: SubmissionSnapshot = { layoutTemplate: 'traditional', jobs: [], skills: [], projects: [], education: [], volunteer: [], awards: [], publications: [], languages: [], interests: [], references: [] }
       if (data.variantId != null) {
-        snapshot = await buildSnapshotForVariant(data.variantId)
+        snapshot = await buildSnapshotForVariant(data.variantId, data.analysisId ?? undefined)
       }
 
       const rows = await db
