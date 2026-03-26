@@ -242,6 +242,8 @@ const api = {
       ipcRenderer.invoke('ai:acceptSuggestion', analysisId, bulletId, text),
     dismissSuggestion: (analysisId: number, bulletId: number) =>
       ipcRenderer.invoke('ai:dismissSuggestion', analysisId, bulletId),
+    getOverrides: (analysisId: number) =>
+      ipcRenderer.invoke('ai:getOverrides', analysisId),
   },
   jobPostings: {
     list: () => ipcRenderer.invoke('jobPostings:list'),
