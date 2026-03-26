@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Three Layer Data
 status: ready_to_plan
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-03-26T21:42:09.807Z"
+stopped_at: Completed 17-02-PLAN.md
+last_updated: "2026-03-26T21:44:35.391Z"
 last_activity: 2026-03-26 — Roadmap created, 20 requirements mapped across 5 phases
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 ---
@@ -63,6 +63,7 @@ Progress: ░░░░░░░░░░ 0%
 | 15-controls-page-break-overlay | 3 | ~22 min | 6 tasks | 17 files |
 | 16-cleanup | 3 | ~23 min | 6 tasks | 15 files |
 | Phase 17-schema-override-ipc-foundation P01 | 10 | 2 tasks | 7 files |
+| Phase 17-schema-override-ipc-foundation P02 | 6 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,9 @@ Key v2.2 decisions from research:
 - Phase 17 (schema) must precede Phase 18 (accept path rewire) atomically — Pitfall 35/36
 - [Phase 17-schema-override-ipc-foundation]: No Drizzle uniqueIndex for analysis_bullet_overrides composite key; raw SQL UNIQUE constraint is authoritative
 - [Phase 17-schema-override-ipc-foundation]: BulletOverride/SkillAddition duplicated in index.d.ts (declaration) and src/shared/overrides.ts (runtime) per project pattern
+- [Phase 17-schema-override-ipc-foundation]: acceptSuggestion writes ONLY to analysis_bullet_overrides via upsert on UNIQUE(analysis_id, bullet_id)
+- [Phase 17-schema-override-ipc-foundation]: dismissSuggestion is a hard delete (no soft delete) from analysis_bullet_overrides
+- [Phase 17-schema-override-ipc-foundation]: getOverrides is a dedicated IPC channel returning BulletOverride[], not bundled into getAnalysis
 
 ### Pending Todos
 
@@ -90,6 +94,6 @@ None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-03-26T21:42:09.805Z
-Stopped at: Completed 17-01-PLAN.md
+Last session: 2026-03-26T21:44:35.389Z
+Stopped at: Completed 17-02-PLAN.md
 Resume file: None
