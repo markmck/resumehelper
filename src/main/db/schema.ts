@@ -207,3 +207,33 @@ export const analysisResults = sqliteTable('analysis_results', {
     .notNull()
     .$defaultFn(() => new Date()),
 })
+
+export const analysisBulletOverrides = sqliteTable('analysis_bullet_overrides', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  analysisId: integer('analysis_id')
+    .notNull()
+    .references(() => analysisResults.id, { onDelete: 'cascade' }),
+  bulletId: integer('bullet_id')
+    .notNull()
+    .references(() => jobBullets.id, { onDelete: 'cascade' }),
+  overrideText: text('override_text').notNull(),
+  source: text('source').notNull().default('ai_suggestion'),
+  suggestionId: text('suggestion_id'),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
+export const analysisSkillAdditions = sqliteTable('analysis_skill_additions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  analysisId: integer('analysis_id')
+    .notNull()
+    .references(() => analysisResults.id, { onDelete: 'cascade' }),
+  skillName: text('skill_name').notNull(),
+  reason: text('reason').notNull().default(''),
+  category: text('category').notNull().default(''),
+  status: text('status').notNull().default('pending'),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})

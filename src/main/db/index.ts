@@ -199,6 +199,30 @@ function ensureSchema(): void {
       \`created_at\` integer NOT NULL DEFAULT (unixepoch()),
       FOREIGN KEY (\`submission_id\`) REFERENCES \`submissions\`(\`id\`) ON DELETE cascade
     );
+
+    CREATE TABLE IF NOT EXISTS \`analysis_bullet_overrides\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`analysis_id\` integer NOT NULL,
+      \`bullet_id\` integer NOT NULL,
+      \`override_text\` text NOT NULL,
+      \`source\` text NOT NULL DEFAULT 'ai_suggestion',
+      \`suggestion_id\` text,
+      \`created_at\` integer NOT NULL DEFAULT (unixepoch()),
+      FOREIGN KEY (\`analysis_id\`) REFERENCES \`analysis_results\`(\`id\`) ON DELETE cascade,
+      FOREIGN KEY (\`bullet_id\`) REFERENCES \`job_bullets\`(\`id\`) ON DELETE cascade,
+      UNIQUE (\`analysis_id\`, \`bullet_id\`)
+    );
+
+    CREATE TABLE IF NOT EXISTS \`analysis_skill_additions\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`analysis_id\` integer NOT NULL,
+      \`skill_name\` text NOT NULL,
+      \`reason\` text NOT NULL DEFAULT '',
+      \`category\` text NOT NULL DEFAULT '',
+      \`status\` text NOT NULL DEFAULT 'pending',
+      \`created_at\` integer NOT NULL DEFAULT (unixepoch()),
+      FOREIGN KEY (\`analysis_id\`) REFERENCES \`analysis_results\`(\`id\`) ON DELETE cascade
+    );
   `)
 
   // Add columns that may be missing on existing databases
