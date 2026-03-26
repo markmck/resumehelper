@@ -244,14 +244,29 @@ function VariantBuilder({
       {/* Summary toggle — first in content area */}
       {profileSummary && (
         <div style={{ marginBottom: 'var(--space-4)' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={showSummary}
               onChange={(e) => onShowSummaryChange(e.target.checked)}
-              style={cbStyle}
+              style={{ ...cbStyle, marginTop: 2 }}
             />
-            <span style={{ fontSize: 13 }}>Summary</span>
+            <div>
+              <span style={toggleHeaderStyle(!showSummary)}>Summary</span>
+              <div
+                style={{
+                  ...toggleTextStyle(!showSummary),
+                  fontSize: 'var(--font-size-xs)',
+                  marginTop: 4,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical' as const,
+                  overflow: 'hidden',
+                }}
+              >
+                {profileSummary}
+              </div>
+            </div>
           </label>
           <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', marginTop: 'var(--space-4)' }} />
         </div>

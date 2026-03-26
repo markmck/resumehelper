@@ -73,7 +73,7 @@ export default function ExecutiveTemplate({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-start',
-            borderBottom: '0.5pt solid #999999',
+            borderBottom: showSummary && profile?.summary ? '0.5pt solid #999999' : 'none',
             paddingBottom: '10px',
             marginBottom: '14px',
           }}
@@ -97,7 +97,7 @@ export default function ExecutiveTemplate({
       ) : (
         <div
           style={{
-            borderBottom: '0.5pt solid #999999',
+            borderBottom: showSummary ? '0.5pt solid #999999' : 'none',
             paddingBottom: '10px',
             marginBottom: '14px',
             fontSize: '13px',

@@ -113,10 +113,20 @@ export default function ModernTemplate({
         </div>
       )}
 
-      {/* Summary — plain paragraph, no heading */}
+      {/* Summary — plain paragraph with accent underline separator */}
       {showSummary && profile?.summary && (
-        <div style={{ fontSize: '10.5px', lineHeight: '1.25', color: '#1a1a1a', marginTop: '14px' }}>
-          {profile.summary}
+        <div style={{ marginTop: '14px' }}>
+          <div
+            style={{
+              width: '40px',
+              height: '2px',
+              backgroundColor: accentColor,
+              marginBottom: '8px',
+            }}
+          />
+          <div style={{ fontSize: '10.5px', lineHeight: '1.25', color: '#1a1a1a' }}>
+            {profile.summary}
+          </div>
         </div>
       )}
 

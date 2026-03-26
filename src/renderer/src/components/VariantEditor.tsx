@@ -414,7 +414,7 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
               backgroundColor: 'var(--color-bg-surface)',
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 10,
               position: 'relative',
             }}
           >

@@ -161,6 +161,8 @@ function PrintApp(): React.JSX.Element {
           interests: builderData.interests,
           references: builderData.references,
         })
+        // Apply showSummary from builderData exclusion state
+        setShowSummary(!(builderData.summaryExcluded ?? false))
         // Apply templateOptions from DB for PDF export path
         if (opts) {
           if (opts.accentColor !== undefined) setAccentColor(opts.accentColor)
