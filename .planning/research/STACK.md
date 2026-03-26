@@ -1,8 +1,307 @@
 # Stack Research
 
 **Domain:** Desktop resume management app — PDF/DOCX export, resume templating, AI-assisted job matching
-**Researched:** 2026-03-13 (v1.0), updated 2026-03-14 (v1.1 additions), updated 2026-03-23 (v2.0 AI analysis additions), updated 2026-03-25 (v2.1 template rendering additions)
-**Confidence:** MEDIUM-HIGH for v2.1 section (core font/CSS claims backed by official docs and Chromium behavior; react-colorful React 19 compatibility is MEDIUM — untested, but hooks-only implementation has no known breakage)
+**Researched:** 2026-03-13 (v1.0), updated 2026-03-14 (v1.1 additions), updated 2026-03-23 (v2.0 AI analysis additions), updated 2026-03-25 (v2.1 template rendering additions), updated 2026-03-26 (v2.2 three-layer data model + skills chip UI)
+**Confidence:** HIGH for v2.2 section — all claims backed by existing installed packages, official dnd-kit docs, and Drizzle ORM docs. No new dependencies required.
+
+---
+
+## v2.2 Additions — Three-Layer Data Model, Skills Chip UI, Analysis Overrides
+
+These additions cover: analysis-scoped bullet overrides stored as JSON, skills redesign (chip grid with drag-to-reorder within categories and drag-between-categories), and analysis UX improvements (extract company/role, submit from optimize, edit metadata). The base stack is unchanged — no new npm packages required.
+
+---
+
+### Three-Layer Data Model — Drizzle JSON Column with `.$type<T>()` (No New Library)
+
+**Problem:** AI bullet rewrites currently live on `analysisResults.suggestions` as LLM output strings. The v2.2 requirement is that a user can accept a rewrite for a specific analysis, and that override merges at render time — so the base bullet is preserved, the variant selection layer is preserved, and only the analysis layer adds overrides. Accepted rewrites must survive re-analysis (a new analysis does not wipe accepted overrides from the previous one).
+
+**Recommended: new `analysisOverrides` table + `text({ mode: 'json' }).$type<T>()` column pattern**
+
+Drizzle ORM supports typed JSON columns on SQLite using `text` with `mode: 'json'` and `.$type<T>()` for TypeScript type inference. This is confirmed in official Drizzle docs (orm.drizzle.team/docs/column-types/sqlite). The `text` mode is preferred over `blob` for JSON because SQLite JSON functions only work on TEXT columns — `blob` mode throws errors with JSON functions.
+
+```typescript
+// Schema additions to src/main/db/schema.ts
+
+// Override record for a single accepted bullet rewrite, scoped to one analysis
+type BulletOverride = {
+  bulletId: number
+  overrideText: string       // the accepted rewrite text
+  acceptedAt: string         // ISO timestamp
+}
+
+export const analysisOverrides = sqliteTable('analysis_overrides', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  analysisId: integer('analysis_id')
+    .notNull()
+    .references(() => analysisResults.id, { onDelete: 'cascade' }),
+  bulletId: integer('bullet_id')
+    .notNull()
+    .references(() => jobBullets.id, { onDelete: 'cascade' }),
+  overrideText: text('override_text').notNull(),   // accepted rewrite text
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+```
+
+**Why a separate table over a JSON column on `analysisResults`:**
+A separate table with one row per accepted override gives:
+- Individual delete (dismiss an accepted rewrite without touching other overrides)
+- Clean FK cascade (analysis deleted → overrides deleted; bullet deleted → override deleted)
+- No JSON diff/merge logic on large strings
+- Queryable by `bulletId` — render pipeline can query "does this bullet have an accepted override for this analysis?" in a single indexed lookup
+
+**Why NOT storing accepted overrides in `analysisResults.suggestions` JSON column:**
+The suggestions column is raw LLM output — re-analysis overwrites it. Accepted overrides need to survive re-analysis. Mixing user decisions into the LLM output column conflates two responsibilities and makes re-analysis logic fragile.
+
+**Three-layer merge at render time:**
+```
+Layer 1 (base): jobBullets.text — the canonical bullet
+Layer 2 (variant): templateVariantItems.excluded — is this bullet in the variant at all?
+Layer 3 (analysis): analysisOverrides for (bulletId, analysisId) — use override text if present
+```
+Merge is pure TypeScript at render/export time — no DB join tricks needed. The export handler receives `analysisId?` as an optional param; if present it loads overrides and substitutes bullet text before rendering.
+
+**Confidence: HIGH** — Drizzle `text({ mode: 'json' }).$type<T>()` pattern confirmed in official docs. Table-per-override pattern is standard relational design. No library needed.
+
+---
+
+### Skills Category Schema — `skillCategory` column (No New Library)
+
+**Problem:** The current `skills` table uses a free-form `tags` JSON array (`text('tags').notNull().default('[]')`). The v2.2 requirement is a chip grid with drag-between-categories — meaning each skill belongs to one primary category, not an arbitrary set of tags.
+
+**Recommended: add `category` column to `skills` table, deprecate `tags` freeform array**
+
+```typescript
+// Migration addition — use CREATE TABLE IF NOT EXISTS / ALTER TABLE pattern already established
+// Add category column with default 'Uncategorized' for backward compat
+
+export const skills = sqliteTable('skills', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  category: text('category').notNull().default('Uncategorized'),  // NEW: primary category
+  sortOrder: integer('sort_order').notNull().default(0),           // NEW: for within-category order
+  tags: text('tags').notNull().default('[]'),  // keep for backward compat, but category takes precedence
+})
+```
+
+**Migration approach:** Use the existing `ALTER TABLE skills ADD COLUMN ... DEFAULT ...` in a `try/catch` (already the established pattern for this project — see `CREATE TABLE IF NOT EXISTS` decision in PROJECT.md). Adding `category` with a default of `'Uncategorized'` leaves existing data valid.
+
+**Why one primary `category` instead of many `tags`:** Drag-between-categories semantics require a single authoritative category per skill. With a tags array, "move skill from Frontend to Backend" requires removing one tag and adding another — ambiguous if a skill has 3 tags. A single category column makes the drag target unambiguous.
+
+**Confidence: HIGH** — This is schema design, not a library question. The migration pattern is already established in the project.
+
+---
+
+### Skills Chip Grid with Drag-to-Reorder — `@dnd-kit` (Already Installed)
+
+**Problem:** Skills need a chip grid UI where chips can be reordered within a category (horizontal sort) and dragged between categories (cross-container move). Current UI is a list of `SkillItem` components with no drag UI.
+
+**Already installed:** `@dnd-kit/core` 6.3.1, `@dnd-kit/sortable` 10.0.0, `@dnd-kit/utilities` 3.2.2. No new installation needed.
+
+**Pattern for chip grid with cross-container drag:**
+
+dnd-kit supports multiple SortableContext instances under a single DndContext. This is the canonical pattern for drag-between-containers. The official dnd-kit repo includes a `MultipleContainers` story demonstrating this exact pattern (github.com/clauderic/dnd-kit/blob/master/stories/2%20-%20Presets/Sortable/MultipleContainers.tsx).
+
+Key implementation decisions:
+
+**Sorting strategy:** Use `rectSortingStrategy` from `@dnd-kit/sortable` for the chip grid. This strategy handles variable-width items (chips have different text lengths) and supports both horizontal and mixed-wrap layouts. `verticalListSortingStrategy` is wrong for a horizontal chip grid — it assumes equal-height vertical rows.
+
+**Cross-container move detection:** Use `onDragOver` on the outer `DndContext` to detect when the active item crosses into a different category container, and update React state to "move" the chip to the new category array. On `onDragEnd`, persist to DB.
+
+```typescript
+// Simplified cross-container pattern
+<DndContext
+  sensors={sensors}
+  collisionDetection={closestCenter}
+  onDragOver={handleDragOver}   // moves chip to new category in state
+  onDragEnd={handleDragEnd}     // persists to DB
+>
+  {categories.map((category) => (
+    <SortableContext
+      key={category}
+      items={skillsByCategory[category].map(s => s.id)}
+      strategy={rectSortingStrategy}
+    >
+      <CategoryContainer category={category} skills={skillsByCategory[category]} />
+    </SortableContext>
+  ))}
+</DndContext>
+```
+
+**Drag handle vs. whole chip as drag trigger:** For chips, make the entire chip the drag trigger (no separate handle icon). Use `useSortable` hook in each chip component. The `PointerSensor` with a small activation distance (`{ activationConstraint: { distance: 8 } }`) prevents accidental drags during click-to-edit.
+
+```typescript
+const sensors = useSensors(
+  useSensor(PointerSensor, {
+    activationConstraint: { distance: 8 },  // px before drag starts — prevents click interference
+  }),
+  useSensor(KeyboardSensor, {
+    coordinateGetter: sortableKeyboardCoordinates,
+  }),
+)
+```
+
+**Chip inline rename:** On chip click (not drag), enter an inline edit state — replace chip display with a controlled `<input>`. This is a React state pattern, no library needed. Key constraint: distinguish click (rename intent) from drag start (move intent) using the `distance: 8` activation constraint above. If `onPointerUp` fires without a drag starting, treat as click.
+
+**Why NOT `react-beautiful-dnd`:** Archived by Atlassian in 2023. No React 18/19 support. Uses deprecated React APIs. The project already uses dnd-kit — no reason to add a second DnD library.
+
+**Why NOT `react-dnd`:** Lower-level, requires more boilerplate. dnd-kit's sortable preset is specifically designed for the reorder + cross-container pattern and is already installed.
+
+**Confidence: HIGH** — @dnd-kit/core 6.3.1 and @dnd-kit/sortable 10.0.0 installed and actively used (BulletList.tsx, JobList.tsx, ProjectBulletList.tsx). Cross-container pattern confirmed via official dnd-kit docs and MultipleContainers story in the official repo. `rectSortingStrategy` for variable-width items confirmed via dnd-kit sortable docs.
+
+---
+
+### Chip Component Implementation — Custom (No New Library)
+
+**Problem:** The skills chip UI needs styled chip components that integrate with dnd-kit's `useSortable` hook and the project's 100%-inline-style constraint. External chip libraries (Material UI, PrimeReact) require CSS imports — they are incompatible with the established "inline styles only" constraint for the renderer.
+
+**Recommended: custom chip component (~50 lines) with inline styles**
+
+The chip component is simple: a pill-shaped container with the skill name text, a drag handle (visual cue via cursor), and an inline rename input. No library needed.
+
+```typescript
+// Chip structure (inline styles only, useSortable from @dnd-kit/sortable)
+function SkillChip({ skill, onRename, onDelete }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: skill.id,
+  })
+  const [editing, setEditing] = useState(false)
+
+  const style: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '2px 8px',
+    borderRadius: 'var(--radius-full)',      // token: 9999px
+    background: 'var(--color-surface-raised)',
+    border: '1px solid var(--color-border)',
+    fontSize: 'var(--font-size-sm)',
+    cursor: isDragging ? 'grabbing' : 'grab',
+    opacity: isDragging ? 0.5 : 1,
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {editing
+        ? <input autoFocus value={skill.name} onBlur={handleRenameBlur} onChange={...} />
+        : <span onClick={() => setEditing(true)}>{skill.name}</span>
+      }
+    </div>
+  )
+}
+```
+
+`CSS.Transform.toString` is from `@dnd-kit/utilities` (already installed at 3.2.2).
+
+**Why NOT Material UI Chip:** Requires `@emotion/react` and `@emotion/styled` — both inject CSS at runtime and require a ThemeProvider. Incompatible with the "no external CSS" constraint for this project's renderer.
+
+**Why NOT PrimeReact Chips:** Requires PrimeReact CSS import. Same incompatibility.
+
+**Confidence: HIGH** — CSS.Transform.toString from @dnd-kit/utilities confirmed installed and already used in the project. Inline style chip pattern is consistent with existing codebase conventions.
+
+---
+
+### Analysis UX: Extract Company/Role from Posting — LLM Prompt (No New Library)
+
+**Problem:** The user pastes a job posting and must manually fill in company and role fields. The v2.2 requirement is to extract these automatically from the posting text.
+
+**Recommended: add an extraction step to the existing AI analysis call using `generateObject`**
+
+The existing `ai` SDK + Zod pattern already handles structured extraction. Add a lightweight pre-analysis extraction schema:
+
+```typescript
+const JobMetaSchema = z.object({
+  company: z.string(),
+  role: z.string(),
+})
+
+const { object: meta } = await generateObject({
+  model,
+  schema: JobMetaSchema,
+  prompt: `Extract the company name and job title from this job posting:\n\n${jobText}`,
+})
+```
+
+This runs as a separate, fast call (small output schema = fast inference) before the main analysis call, or can be combined into the main analysis schema as additional fields. No new library needed — the AI SDK and Zod are already in the stack.
+
+**Alternative — regex/heuristic extraction:** Brittle. Job postings vary enormously in format. LLM extraction is more reliable and the infrastructure is already in place.
+
+**Confidence: HIGH** — Uses existing `generateObject` + Zod pattern already validated in production (v2.0).
+
+---
+
+### Analysis Overrides Merge at Export/Render — Pure TypeScript (No New Library)
+
+The merge function that replaces base bullet text with accepted overrides is pure TypeScript logic in the export handler and print renderer. No library is needed. The pattern:
+
+```typescript
+// In export/render pipeline
+async function resolveBullets(
+  bullets: Bullet[],
+  analysisId: number | null,
+  db: Database,
+): Promise<Bullet[]> {
+  if (!analysisId) return bullets
+
+  const overrides = db
+    .select()
+    .from(analysisOverrides)
+    .where(eq(analysisOverrides.analysisId, analysisId))
+    .all()
+
+  const overrideMap = new Map(overrides.map(o => [o.bulletId, o.overrideText]))
+
+  return bullets.map(b => ({
+    ...b,
+    text: overrideMap.get(b.id) ?? b.text,
+  }))
+}
+```
+
+This is called at the point where bullet data is assembled for `PrintApp` / `buildDocx`. It is a pure data transform — no rendering library change needed.
+
+**Confidence: HIGH** — This is application logic, not a library question.
+
+---
+
+## v2.2 Installation
+
+```bash
+# No new npm packages required for v2.2.
+#
+# All v2.2 features use existing installed packages:
+#   @dnd-kit/core@6.3.1, @dnd-kit/sortable@10.0.0, @dnd-kit/utilities@3.2.2
+#   drizzle-orm@0.45.1, better-sqlite3@12.8.0
+#   ai@^6.0.136, zod@^4.3.6
+#
+# Changes required:
+#   - Schema additions (analysisOverrides table, skills.category + skills.sortOrder columns)
+#   - ALTER TABLE migrations using existing try/catch pattern
+#   - New SkillChip component (~50 lines, inline styles, useSortable)
+#   - SkillList refactor to use chip grid with cross-container DnD
+#   - analysisOverrides CRUD IPC handlers in preload/main
+#   - Merge logic in export and print render pipeline
+```
+
+---
+
+## v2.2 What NOT to Add
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `react-beautiful-dnd` | Archived by Atlassian 2023, no React 18/19 support, uses deprecated React APIs | `@dnd-kit/sortable` (already installed) |
+| `react-dnd` | More boilerplate than dnd-kit for this use case; adding a second DnD library is unnecessary | `@dnd-kit` (already installed) |
+| Material UI `<Chip>` | Requires `@emotion/react` + `@emotion/styled` — CSS injection incompatible with file:// renderer | Custom chip component (inline styles) |
+| PrimeReact Chips | Requires PrimeReact CSS import — same incompatibility | Custom chip component (inline styles) |
+| JSON diff/patch library (`fast-json-patch`, `immer`) | Not needed — overrides are stored as individual rows, not JSON diffs | Separate `analysisOverrides` table rows |
+| `drizzle-zod` | Auto-generates Zod schemas from Drizzle tables — useful for API validation but adds a build step for no benefit here. Manual Zod schemas for AI output are already the established pattern | Manual Zod schemas (existing pattern) |
+| Regex/NLP for job parsing | Brittle — job posting formats vary too much | LLM extraction via `generateObject` + Zod |
+
+---
 
 ---
 
@@ -223,7 +522,7 @@ npm install react-colorful
 | @react-pdf/renderer | Separate React renderer — templates would need two implementations (one for preview, one for PDF). Different CSS support from browser | Single template component + `printToPDF` |
 | docxtemplater | Requires .docx template files on disk — same ESM/path problem that killed the old resume.json themes. Overkill for programmatic generation | `docx` 9.6.1 (already in use) |
 | CSS @page rules in templates | Conflicts with printToPDF's `margins` option (Electron issue #8138) — causes layout drift | printToPDF `margins` option (already used) |
-| Google Fonts @import CDN | Network-dependent, offline failure, race condition in hidden BrowserWindow | Bundled woff2 in `src/renderer/public/fonts/` |
+| Google Fonts @import CDN | Network-dependent. Fails if the user is offline. Race condition possible in the hidden BrowserWindow's 200ms settle window | Bundled woff2 in `src/renderer/public/fonts/` |
 | Base64 inline fonts | OTS parsing errors in some Chromium versions; unmaintainable | woff2 file references |
 | vite-plugin-webfont-dl | Downloads fonts at build time but same result as manually placing woff2 files; adds a build-time plugin dependency | Manual download of woff2 files into public/fonts/ |
 | react-color (old library) | Deprecated class component API, 2018-vintage, 25x larger than react-colorful | react-colorful |
@@ -238,19 +537,6 @@ npm install react-colorful
 | docx@9.6.1 (existing) | Electron main process | `Packer.toBuffer()` confirmed working; font embedding not supported by design |
 | woff2 font files | Electron 39 / Chromium 130+ | woff2 natively supported in Chromium — no loader or plugin needed |
 | CSS break-inside/pageBreakInside | Chromium 130+ | Both legacy and modern properties work — use both for safety |
-
----
-
-## v2.1 Sources
-
-- electron-vite.org/guide/assets — public directory behavior for renderer process (MEDIUM confidence — official docs)
-- github.com/electron/electron/issues/8138 — `@page` margin CSS conflicts with printToPDF margins option (MEDIUM confidence — confirmed issue)
-- github.com/dolanmiu/docx/issues/239 — font embedding not supported in docx library (HIGH confidence — open issue, no progress since 2019)
-- github.com/omgovich/react-colorful — react-colorful 5.6.1, zero deps, hooks API (HIGH confidence — official repo)
-- developer.mozilla.org/en-US/docs/Web/CSS/break-inside — CSS Fragmentation support (HIGH confidence — MDN)
-- caniuse.com/css-page-break — page-break property browser support tables (HIGH confidence)
-- fonts.google.com/specimen/Inter, /Lato, /EB+Garamond — OFL license confirmed (HIGH confidence)
-- ATS font guides 2025 — multiple sources (enhancv, jobscan, resumeoptimizerpro) agree on Calibri/Times New Roman/Garamond (MEDIUM confidence — marketing content but consistent across sources)
 
 ---
 
@@ -615,6 +901,8 @@ A ~60–80 line component using React state + IPC query. The autocomplete behavi
 ## Full Updated Installation
 
 ```bash
+# v2.2 — No new npm packages. Schema migrations + component refactor only.
+
 # v2.1 — Template rendering additions
 npm install react-colorful
 # + manually place woff2 font files in src/renderer/public/fonts/
@@ -652,6 +940,13 @@ npm install ai @ai-sdk/anthropic @ai-sdk/openai zod
 | `dangerouslySetInnerHTML` for theme HTML | Cannot inject full `<html><head><body>` into React DOM | `<iframe srcdoc={html}>` |
 | react-color (old library) | Deprecated class components, 2018-vintage, 25x larger | react-colorful |
 | vite-plugin-webfont-dl | Same outcome as placing woff2 manually; adds build plugin complexity | Manual woff2 download into public/fonts/ |
+| `react-beautiful-dnd` | Archived 2023, no React 18/19 support, deprecated APIs | `@dnd-kit/sortable` (already installed) |
+| `react-dnd` | More boilerplate; redundant with dnd-kit already installed | `@dnd-kit/sortable` (already installed) |
+| Material UI `<Chip>` | Requires `@emotion/react` + CSS injection — incompatible with file:// renderer | Custom chip component (inline styles) |
+| PrimeReact Chips | Requires PrimeReact CSS import — same incompatibility | Custom chip component (inline styles) |
+| JSON diff/patch library (`fast-json-patch`, `immer`) | Not needed — overrides are per-row, not JSON diffs | Separate `analysisOverrides` table rows |
+| `drizzle-zod` | Auto-schema generation adds build step for no benefit; manual Zod is established pattern | Manual Zod schemas (existing pattern) |
+| Regex/NLP for job metadata extraction | Brittle — job posting formats vary too much | LLM extraction via `generateObject` |
 
 ---
 
@@ -670,10 +965,20 @@ npm install ai @ai-sdk/anthropic @ai-sdk/openai zod
 | `jsonresume-theme-class` latest | Node.js >=14 | Official jsonresume org theme. |
 | woff2 font files | Electron 39 / Chromium 130+ | Natively supported; no loader needed. |
 | CSS break-inside/pageBreakInside | Chromium 130+ | Use both legacy and modern — confirmed working. |
+| `@dnd-kit/core` 6.3.1 | React 19.2.x | Already installed; latest version as of 2025. Cross-container drag confirmed. |
+| `@dnd-kit/sortable` 10.0.0 | `@dnd-kit/core` 6.x | Already installed; `rectSortingStrategy` for chip grids. |
+| `@dnd-kit/utilities` 3.2.2 | `@dnd-kit/core` 6.x | Already installed; `CSS.Transform.toString` for chip drag transforms. |
 
 ---
 
 ## Sources
+
+**v2.2:**
+- docs.dndkit.com/presets/sortable — sortable strategies including `rectSortingStrategy` (HIGH confidence — official docs)
+- github.com/clauderic/dnd-kit/blob/master/stories/2%20-%20Presets/Sortable/MultipleContainers.tsx — cross-container drag pattern (HIGH confidence — official repo example)
+- docs.dndkit.com/presets/sortable/sortable-context — SortableContext items prop ordering requirement (HIGH confidence — official docs)
+- orm.drizzle.team/docs/column-types/sqlite — `text({ mode: 'json' }).$type<T>()` pattern (HIGH confidence — official Drizzle docs)
+- npm registry: `@dnd-kit/core` 6.3.1 is latest as of March 2025 (MEDIUM confidence — npm search result)
 
 **v2.1:**
 - electron-vite.org/guide/assets — public directory behavior for renderer (MEDIUM confidence)
@@ -695,5 +1000,5 @@ npm install ai @ai-sdk/anthropic @ai-sdk/openai zod
 
 ---
 
-*Stack research for: ResumeHelper — v1.0 export + v1.1 resume.json import/themes + v2.0 AI analysis + v2.1 template rendering*
-*Researched: 2026-03-13 (v1.0), 2026-03-14 (v1.1), 2026-03-23 (v2.0), 2026-03-25 (v2.1)*
+*Stack research for: ResumeHelper — v1.0 export + v1.1 resume.json import/themes + v2.0 AI analysis + v2.1 template rendering + v2.2 three-layer data model*
+*Researched: 2026-03-13 (v1.0), 2026-03-14 (v1.1), 2026-03-23 (v2.0), 2026-03-25 (v2.1), 2026-03-26 (v2.2)*

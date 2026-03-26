@@ -1,8 +1,8 @@
 # Pitfalls Research
 
 **Domain:** Resume management desktop app (Electron + SQLite + AI matching + PDF/DOCX export)
-**Researched:** 2026-03-14 (v1.1 update — appended to v1.0 findings) / 2026-03-23 (v2.0 update — AI integration, LLM API, UI redesign) / 2026-03-25 (v2.1 update — HTML/CSS templates, printToPDF, DOCX, ATS compliance)
-**Confidence:** HIGH for schema/migration and IPC patterns (code verified); MEDIUM for resume.json theme integration (official docs reviewed, no live Electron integration examples found); MEDIUM for LLM integration patterns (official docs + community sources); HIGH for Electron security (official docs + CVE research); HIGH for printToPDF pitfalls (Electron GitHub issue tracker reviewed, codebase audited); MEDIUM for ATS parsing (community sources + 2025/2026 ATS research, behavior varies by ATS vendor)
+**Researched:** 2026-03-14 (v1.1 update — appended to v1.0 findings) / 2026-03-23 (v2.0 update — AI integration, LLM API, UI redesign) / 2026-03-25 (v2.1 update — HTML/CSS templates, printToPDF, DOCX, ATS compliance) / 2026-03-26 (v2.2 update — three-layer data model, analysis overrides, skills redesign, drag-and-drop)
+**Confidence:** HIGH for schema/migration and IPC patterns (code verified); MEDIUM for resume.json theme integration (official docs reviewed, no live Electron integration examples found); MEDIUM for LLM integration patterns (official docs + community sources); HIGH for Electron security (official docs + CVE research); HIGH for printToPDF pitfalls (Electron GitHub issue tracker reviewed, codebase audited); MEDIUM for ATS parsing (community sources + 2025/2026 ATS research, behavior varies by ATS vendor); HIGH for three-layer model migration pitfalls (codebase audited); HIGH for skills tag migration pitfalls (codebase audited); MEDIUM for dnd-kit in Electron (official docs + Electron issue tracker)
 
 ---
 
@@ -880,6 +880,187 @@ Template export foundation phase — test PDF export on both 100% and 125% DPI d
 
 ---
 
+
+---
+
+## v2.2 Pitfalls -- Three-Layer Data Model, Analysis Overrides, Skills Redesign, Drag-and-Drop
+
+The following pitfalls are specific to the v2.2 feature set. They build on the existing codebase where AI suggestions currently mutate variant data globally (bullet text is overwritten in the `job_bullets` table), skills are freeform tags stored as a JSON array on each skill row, and the snapshot system freezes merged content at submission time.
+
+---
+
+### Pitfall 35: AI Suggestions That Mutate Global Bullet Text Break the Three-Layer Contract
+
+**What goes wrong:**
+The current `OptimizeVariant` save handler writes accepted bullet rewrites directly to the `job_bullets` table (`window.api.bullets.update(bulletId, { text: finalText })`). When the three-layer model is introduced -- where the base experience is layer 1, the variant selection is layer 2, and analysis overrides are layer 3 -- this global mutation destroys layer 1. The accepted rewrite permanently replaces the canonical bullet text for every variant and every future analysis. A user who runs two different job analyses on the same variant accepts one rewrite per analysis; the second acceptance overwrites what the first one wrote. Layer separation collapses into a single mutable layer, and the three-layer architecture has no effect.
+
+**Why it happens:**
+The existing code was written before the three-layer model existed. Globally mutating bullet text was the simplest possible implementation. Migrating to analysis-scoped overrides requires a new table (`analysis_overrides` or similar), a merge-at-render function, and updates to the snapshot builder -- all of which are easy to defer "for later."
+
+**How to avoid:**
+Create an `analysis_overrides` table with `(analysis_id, bullet_id, override_text)` as the key. The `OptimizeVariant` save handler writes to this table instead of `job_bullets`. The base `job_bullets.text` is never touched by the optimize flow. Render-time merge: when building content for preview, PDF export, or snapshot, apply overrides on top of base text for the specific analysis. The merge function is: for each bullet in scope, if an override row exists for `(analysis_id, bullet_id)`, use the override text; otherwise use the base text. Update `buildSnapshotForVariant` (in `submissions.ts`) to accept an optional `analysisId` and apply overrides during snapshot construction.
+
+**Warning signs:**
+- `OptimizeVariant` still calls `window.api.bullets.update()` after the three-layer model is in place
+- There is no `analysis_overrides` table in the schema
+- Running two analyses on the same variant produces different bullet text in the base `job_bullets` table
+- The snapshot builder ignores `analysisId` when building the freeze
+
+**Phase to address:**
+Three-layer data model phase -- this is the foundational schema change. It must be done before any UI work on the optimize flow.
+
+---
+
+### Pitfall 36: Snapshot Builder Does Not Resolve the Three-Layer Merge -- Submission Freezes Wrong Text
+
+**What goes wrong:**
+A user analyzes a job posting and accepts a bullet rewrite via the analysis override system. They then create a submission from that analysis. If the snapshot builder (`buildSnapshotForVariant`) does not apply analysis overrides during snapshot construction, the frozen snapshot will contain the base bullet text -- not the accepted rewrite the user intended to submit. The user believes they submitted the AI-tailored resume, but the snapshot (and therefore the PDF in the archive) shows the untailored version.
+
+**Why it happens:**
+`buildSnapshotForVariant` was written before analysis overrides existed. It queries `job_bullets` directly for bullet text. When analysis overrides are stored in a separate table, the snapshot builder has no reason to consult that table unless explicitly updated. The omission is silent -- no error, no warning, just wrong content.
+
+**How to avoid:**
+When a submission is created from an analysis context (i.e., the `analysisId` is known), pass the `analysisId` to the snapshot builder. Inside `buildSnapshotForVariant`, load all `analysis_overrides` rows for that analysis, then apply them as a text-replacement pass over the bullet list before freezing. Add a test: create an analysis override, create a submission from it, read the snapshot JSON, and assert the override text is present -- not the base text.
+
+**Warning signs:**
+- `buildSnapshotForVariant` signature does not accept `analysisId`
+- The submission creation handler does not pass `analysisId` when calling the snapshot builder
+- Snapshot JSON contains base bullet text even after an analysis override was accepted
+
+**Phase to address:**
+Three-layer data model phase -- the snapshot builder must be updated in the same phase that introduces analysis overrides, not in a later cleanup phase.
+
+---
+
+### Pitfall 37: Skills Migration From Freeform Tags to Structured Categories Silently Drops Existing Tag Assignments
+
+**What goes wrong:**
+The current skill schema stores tags as a JSON array on the `skills` row (`tags: text NOT NULL DEFAULT '[]'`). The v2.2 redesign introduces a structured category system where categories are first-class entities (their own table/IDs) and skills belong to categories via foreign key. If the migration is written as "create the new categories table and skills_categories table, then start fresh," all existing tag assignments are silently dropped. Users who had 50 skills organized into categories ("Frontend," "Backend," "DevOps") open the new version to find all their skills are uncategorized.
+
+**Why it happens:**
+Category migration is perceived as an optional data task. "They can re-categorize their skills" seems like an acceptable answer, especially if the number of skills is small. But a desktop app promises to be a reliable store of professional history -- silent data loss destroys trust.
+
+**How to avoid:**
+Write a one-time migration in `ensureSchema()` that reads the existing `tags` JSON array for every skill and creates corresponding category rows (deduplicating by name), then links each skill to its categories. The migration is idempotent: if the new categories table already exists and has rows, skip. The migration SQL pattern: (1) CREATE TABLE skill_categories IF NOT EXISTS; (2) for each distinct tag string found across all `skills.tags` values, INSERT OR IGNORE INTO skill_categories (name); (3) for each skill, parse the tags JSON and insert skill_category_assignments rows.
+
+Write a verification query after migration: count of skills with at least one category assignment should equal count of skills that previously had non-empty tags arrays.
+
+**Warning signs:**
+- Migration only creates new tables without reading the existing `skills.tags` column
+- After upgrade, all skills show "Uncategorized" regardless of existing tags
+- No migration test against a database that contains existing tag data
+
+**Phase to address:**
+Skills redesign phase -- specifically the schema migration step. The migration must run and be verified before the UI is built.
+
+---
+
+### Pitfall 38: Drag-and-Drop Between Skill Categories Breaks on Windows Due to HTML5 DnD Quirks
+
+**What goes wrong:**
+The HTML5 Drag and Drop API has platform-specific quirks in Chromium/Electron on Windows. The most common: `dragover` events fire but `drop` never fires on the target container, so skills dragged between categories appear to move visually but snap back on release. A secondary issue: the drag ghost image is offset incorrectly from the cursor -- the ghost element appears at (0,0) rather than following the pointer, creating a disorienting visual. An Electron issue tracker bug (issue #42252) documents custom drag-and-drop being broken in Electron 28 and later due to Chromium security changes.
+
+**Why it happens:**
+The HTML5 DnD API was designed for file drops, not UI element reordering. It requires `e.preventDefault()` in every `dragover` handler or the drop event never fires -- missing this one call breaks the entire interaction. The `file://` protocol context in Electron adds additional quirks around `dataTransfer` type handling. Ghost image positioning uses `dataTransfer.setDragImage()` which has documented inconsistencies in Chrome.
+
+**How to avoid:**
+Use dnd-kit (`@dnd-kit/core` + `@dnd-kit/sortable`) instead of the native HTML5 DnD API. dnd-kit uses pointer events (not the legacy dragstart/dragover/drop model), has full keyboard accessibility built-in, and avoids the ghost-image and cross-container issues. For the drag preview, use `DragOverlay` -- it renders into a React portal at the document root, eliminating z-index and clipping issues from nested containers.
+
+**Warning signs:**
+- Implementation uses `draggable={true}` + `onDragStart`/`onDragOver`/`onDrop` directly (HTML5 API)
+- Drag-and-drop works on the developer machine but fails on Windows
+- Skill chips snap back to their original position after a drop that visually succeeded
+- No `DragOverlay` component wrapping the dragged chip preview
+
+**Phase to address:**
+Skills redesign phase -- select the DnD library before writing any drag logic. Retrofitting from HTML5 DnD to dnd-kit after UI is built requires a partial rewrite.
+
+---
+
+### Pitfall 39: Inline-Styles-Only Constraint Conflicts With dnd-kit DragOverlay When a Transform Ancestor Exists
+
+**What goes wrong:**
+This project uses inline styles exclusively because the `file://` protocol context in Electron breaks external CSS loading. dnd-kit's `DragOverlay` component uses CSS `transform: translate3d(...)` to position the drag preview. If any ancestor component has an inline `transform` style applied -- for example, the Variant Builder preview pane uses `transform: scale()` to fit the resume preview into the split pane -- the `DragOverlay` portal inherits that stacking context and the drag preview appears in the wrong position or jumps erratically. The transform is double-applied: once by the ancestor, once by dnd-kit's positioning logic.
+
+**Why it happens:**
+`DragOverlay` renders into a React portal at the document root. However, if the portal's mount point is inside an element with a `transform` property, CSS stacking context rules apply and the portal is no longer positioned relative to the viewport -- it is positioned relative to the transformed ancestor. This is CSS specification behavior, not a dnd-kit bug.
+
+**How to avoid:**
+Mount the `DndContext` and `DragOverlay` for the skills chip grid at a level in the component tree above any container with a `transform` applied. The skills section must not be rendered inside the Variant Builder preview pane or any other container with `transform: scale()`. If structural constraints make this difficult, append a separate portal root `div` to `document.body` for the `DragOverlay`.
+
+**Warning signs:**
+- `DragOverlay` renders in the wrong position when dragging
+- The skills chip grid is nested inside a container that uses `transform: scale()` for preview scaling
+- Drag preview jumps to an unexpected location on drag start
+
+**Phase to address:**
+Skills redesign phase -- verify DragOverlay positioning at the start of the phase, before building the full chip grid UI.
+
+---
+
+### Pitfall 40: Toggle-Entire-Job Variant Feature Surfaces Stale Override Rows When Job Is Re-Enabled
+
+**What goes wrong:**
+When the v2.2 "toggle entire job" feature is added, a user excludes a job from their variant. That job has accepted analysis overrides (bullet rewrites) stored in `analysis_overrides`. If the user later re-enables the job, those override rows are still present and the merge-at-render applies them. The user sees accepted rewrites from an old analysis session applied to bullets in a job they expected to be in its base state. The override text may be tailored for a different job posting than the current one.
+
+**Why it happens:**
+Override rows are scoped to `(analysis_id, bullet_id)` and have no knowledge of whether the bullet's parent job is currently included in the variant. The "toggle job off" action writes an exclusion to `templateVariantItems` but does not touch `analysis_overrides`. The two systems are independent and can drift.
+
+**How to avoid:**
+In the merge-at-render function, apply overrides only to bullets whose parent job is currently included in the variant. The guard is: before applying any override for a bullet, check `excludedJobIds.has(bullet.jobId)`. If the job is excluded, skip the override. This is a read-time filter -- no database cleanup needed. Document this as an explicit design decision.
+
+**Warning signs:**
+- Override text appears in the preview for bullets in excluded jobs
+- `buildSnapshotForVariant` applies overrides without first checking if the bullet's parent job is excluded
+- Toggling a job off then back on produces a resume with rewrites from a previous analysis
+
+**Phase to address:**
+Three-layer data model phase -- the merge-at-render function must include the excluded-job guard from the start.
+
+---
+
+### Pitfall 41: Company/Role Auto-Extraction Overwrites User-Entered Metadata Without Confirmation
+
+**What goes wrong:**
+The v2.2 analysis UX adds LLM-powered extraction of company name and role title from the pasted job posting text. If the extraction result is automatically written to the `job_postings` record on receipt of the LLM response -- without user review -- it silently overwrites any company/role text the user manually typed. The user typed "Acme Corp" as the company name. The LLM extracts "ACME Corporation." The user's label is gone. More seriously: if the LLM misreads the posting (extracting a client company instead of the staffing agency, or reading from a "Similar Jobs" sidebar), the wrong metadata is saved.
+
+**Why it happens:**
+Auto-populate feels helpful -- extraction results look authoritative. The assumption is that LLM extraction is always correct and matches the user's preference. In practice, LLM extraction is occasionally wrong, and users have reasons for their specific naming choices (matching their own tracking system, shortening long company names, etc.).
+
+**How to avoid:**
+Treat extracted company/role as pre-fill for editable fields, not as an immediate database write. Pre-populate the text inputs with extracted values, show a visual indicator ("extracted from posting -- review and confirm"), and only write to the database when the user explicitly saves the form. Never overwrite a field the user has manually edited since the last extraction without a conflict warning.
+
+**Warning signs:**
+- Extraction result is written to the database immediately on LLM response, before form save
+- No visual distinction between user-typed and LLM-extracted field values
+- Saving the analysis form automatically commits extracted metadata regardless of user edits
+
+**Phase to address:**
+Analysis UX phase -- establish the extract-then-confirm pattern before wiring up the LLM extraction call.
+
+---
+
+### Pitfall 42: ALTER TABLE Migration Ordering for New Three-Layer Tables Fails Silently
+
+**What goes wrong:**
+The `ensureSchema()` function in `db/index.ts` wraps `ALTER TABLE ADD COLUMN` statements in try/catch blocks that swallow all errors. This is intentional for "column already exists" scenarios. However, the v2.2 migration introduces new tables (`analysis_overrides`, `skill_categories`, `skill_category_assignments`) that reference existing tables via foreign keys. If the CREATE TABLE statements are ordered incorrectly -- for example, `analysis_overrides` references `analysis_results(id)` but appears before `analysis_results` in the schema block -- SQLite will error. The catch block swallows this error. The tables are never created. All subsequent writes to those tables produce "no such table" errors at runtime, not at startup where they would be caught early.
+
+**Why it happens:**
+The pattern of swallowing all ALTER TABLE errors works for column additions (the only error is "duplicate column name"). Applying the same catch-and-ignore pattern to CREATE TABLE statements is a misuse -- CREATE TABLE can fail for many reasons beyond "already exists," including foreign key resolution failures.
+
+**How to avoid:**
+Use `CREATE TABLE IF NOT EXISTS` for all new tables (the IF NOT EXISTS guard handles idempotency without needing try/catch). Order CREATE TABLE statements to satisfy foreign key dependencies (referenced tables before referencing tables). After `ensureSchema()` runs, add a startup validation that queries `sqlite_master` for the names of all expected tables and logs a fatal error -- or throws -- if any are missing. Fail loudly at startup rather than silently at runtime.
+
+**Warning signs:**
+- New `CREATE TABLE` statements are inside the same try/catch block as `ALTER TABLE ADD COLUMN` statements
+- `analysis_overrides` table references `analysis_results` but appears before it in the schema block
+- "No such table: analysis_overrides" appears in runtime handler logs rather than during startup
+- `ensureSchema()` completes without error on an upgraded database but the new tables are absent
+
+**Phase to address:**
+Three-layer data model phase -- schema additions step. Add a startup table-existence assertion as a diagnostic gate.
+
+
 ## Technical Debt Patterns
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
@@ -908,6 +1089,12 @@ Template export foundation phase — test PDF export on both 100% and 125% DPI d
 | Using `docx` library bold/size styling for section headers | Visually identical result | No `Heading1` style node in XML; ATS cannot identify sections | Never for ATS-bound export — always use `heading: HeadingLevel.HEADING_1` |
 | Two-column layout with no ATS warning | Attractive design | ATS reads across columns; job titles and skills merge; resume fails parsing | Acceptable only if clearly labelled as "Visual/Non-ATS" in the UI |
 | Omitting `setZoomFactor(1.0)` on hidden PDF window | No extra code | PDF content scales incorrectly on 125%/150% DPI displays | Never — one-line call that prevents scale drift |
+
+| Mutating global bullet text instead of writing analysis override rows | Simpler save handler | Second analysis overwrites first; three-layer model collapses to one mutable layer | Never once three-layer model is adopted |
+| Building snapshot without applying analysis overrides | Existing snapshot builder works today | Snapshot freezes base text, not the accepted rewrites; user submitted wrong resume | Never -- snapshot builder must be updated in the same phase |
+| Creating new skill category tables without migrating existing tags JSON | New schema works on fresh install | All existing tag assignments silently dropped on upgrade | Never -- migration must read and convert existing tags data |
+| Using HTML5 Drag and Drop API for chip reordering | No extra dependency | Broken on Windows/Electron; ghost image quirks; snap-back on drop | Never -- use dnd-kit pointer events instead |
+| Mounting DndContext/DragOverlay inside a transform-scaled container | Obvious component co-location | DragOverlay position is wrong; drag preview jumps on start | Never -- must mount above any transform ancestor |
 
 ---
 
@@ -941,6 +1128,14 @@ Template export foundation phase — test PDF export on both 100% and 125% DPI d
 | DOCX heading styles | Manual bold/size styling creates no ATS-readable heading structure | Use `heading: HeadingLevel.HEADING_1` for section headers; override visual style via Document `styles` config |
 | Two-column PDF layout + ATS | ATS reads across columns; content scrambled | DOM order must match reading order (experience before sidebar); provide ATS warning in UI |
 
+| dnd-kit in Electron | Using HTML5 dragstart/dragover/drop API for chip reorder | Use `@dnd-kit/core` + `@dnd-kit/sortable` with pointer sensor; avoids all Chromium DnD quirks |
+| dnd-kit DragOverlay + transform ancestor | Mounting DragOverlay inside a `transform: scale()` container | Mount `DndContext` + `DragOverlay` above any transformed ancestor; use document.body portal if needed |
+| `analysis_overrides` table creation | Placing new CREATE TABLE inside the same try/catch as ALTER TABLE ADD COLUMN | Use `CREATE TABLE IF NOT EXISTS` with no try/catch; add startup table-existence assertion |
+| Skills category migration | Creating new category tables without reading existing `skills.tags` JSON | Run a JS migration after table creation: read each skill's tags array, INSERT OR IGNORE categories, link assignments |
+| analysis override + toggle-entire-job | Applying override text to bullets in excluded jobs | Guard merge-at-render: skip overrides for bullets whose parent job is in `excludedJobIds` |
+| Company/role LLM extraction | Auto-saving extracted values to DB on LLM response | Pre-fill editable form fields only; require explicit user save before writing to `job_postings` |
+| `buildSnapshotForVariant` + analysis overrides | Building snapshot without consulting `analysis_overrides` | Pass `analysisId` to snapshot builder; apply overrides before freezing bullet text |
+
 ---
 
 ## Performance Traps
@@ -961,6 +1156,9 @@ Template export foundation phase — test PDF export on both 100% and 125% DPI d
 | Creating a new hidden BrowserWindow for every PDF export | 2–4 second window creation overhead on every export | Reuse a single hidden BrowserWindow for the export lifetime; reload via `loadFile` rather than destroy/recreate | Noticeable from first export click |
 | Re-loading fonts in the hidden PDF window on every export | 200–800ms extra latency per export from font network/disk fetch | Pre-load fonts as local bundled assets; ensure font caching across reloaded PDF windows | Every export if fonts are remote |
 | Live preview re-renders on every character toggle | Visible lag when toggling bullets in the Variant Builder | Debounce preview re-render; only refresh when user pauses toggling (200ms debounce) | With 20+ experience items visible |
+
+| Fetching all analysis overrides for every preview re-render | Visible lag when variant builder toggles bullets | Load overrides once on analysis context mount; reuse in memo | Noticeable with 20+ override rows active |
+| Re-running skills category migration on every app start | Startup delay grows with number of skills | Gate migration with a version flag or check if categories table is already populated | Adds 50-200ms from 500+ skills |
 
 ---
 
@@ -1003,6 +1201,12 @@ Template export foundation phase — test PDF export on both 100% and 125% DPI d
 | No indication of page count in preview | User doesn't know if resume is 1 or 2 pages | Show page count (e.g., "1 of 1 pages") and a visible page break line in the preview |
 | Compact margin toggle has no visible effect in preview | User toggles but can't tell what changed | Preview must re-render immediately on any template control change; margin difference must be visible |
 
+| Analysis overrides not visible in variant preview | User cannot see which bullets are tailored for the current analysis vs. base | Show a subtle highlight or tag on overridden bullets in the variant builder preview |
+| Skills chip grid provides no keyboard reorder path | Power users who keyboard-navigate cannot reorder chips | dnd-kit keyboard sensor is built-in -- enable it and test Tab/Space/Arrow flow |
+| "Toggle entire job" has no visual affordance for partial exclusion | User cannot tell a job is partially included (some bullets excluded) vs. fully excluded | Checkmark/dash/unchecked tri-state indicator at the job-header level |
+| Analysis override accepted but base variant not saved | User accepts rewrites in optimize view but navigates away; override applied to analysis but variant not ready for submission | Show "variants affected" summary before leaving optimize view; surface a "ready to submit" CTA |
+| Company/role fields pre-filled with no indication they came from LLM | User submits wrong company name without noticing | Show "extracted" label on auto-filled fields; allow one-click reset to manually entered value |
+
 ---
 
 ## "Looks Done But Isn't" Checklist
@@ -1041,6 +1245,19 @@ Template export foundation phase — test PDF export on both 100% and 125% DPI d
 - [ ] **DOCX two-column layout:** For a two-column HTML template, export to DOCX. Open in Word. Confirm the DOCX is single-column and linear — no `<w:tbl>` wrapping experience content.
 - [ ] **@page margins:** In each of the 5 templates, inspect the `@page` CSS rule. Confirm it is explicitly declared (not relying on browser defaults). Confirm PDF margins match the declared value.
 
+- [ ] **Analysis overrides -- global mutation removed:** Accept a bullet rewrite in Optimize. Confirm `job_bullets` table is unchanged. Confirm override row exists in `analysis_overrides`.
+- [ ] **Snapshot includes overrides:** Accept a rewrite in Optimize, then create a submission from that analysis. Read the snapshot JSON. Confirm the override text appears, not the base text.
+- [ ] **Skills tag migration:** On a database with existing skills that have tags, upgrade to v2.2. Open skills page. Confirm all skills are in their correct categories -- no skills show Uncategorized when they previously had tags.
+- [ ] **Drag-and-drop -- chip reorder:** Drag a skill chip to a different position within its category. Confirm new order persists after page reload.
+- [ ] **Drag-and-drop -- cross-category:** Drag a skill chip from one category to another. Confirm skill is removed from source category and appears in target category. Confirm persisted in DB.
+- [ ] **Drag-and-drop -- Windows:** Test chip drag-and-drop on Windows (not just macOS). Confirm chips do not snap back on drop.
+- [ ] **DragOverlay position:** Drag a chip. Confirm the drag preview follows the cursor correctly and is not offset to an incorrect position.
+- [ ] **Toggle entire job:** Exclude a job in the variant builder using the new job-level toggle. Confirm all bullets for that job disappear from preview. Confirm re-enabling the job restores them.
+- [ ] **Override + toggle interaction:** Accept a rewrite for bullet B in job J. Exclude job J from the variant. Re-enable job J. Confirm bullet B shows the override text (or base text if the override is analysis-scoped and stale), not an unexpected value.
+- [ ] **Company/role extraction -- confirm flow:** Trigger company/role extraction. Confirm fields are pre-filled but not yet saved. Edit one field. Save. Confirm the edited value (not the extracted value) is stored in the DB.
+- [ ] **New tables startup gate:** Delete the `analysis_overrides` table from the DB manually. Restart the app. Confirm either (a) the app recreates it on startup, or (b) the app logs a fatal error and does not silently proceed.
+- [ ] **Schema migration ordering:** Run `ensureSchema()` on a v2.1 database. Confirm `analysis_overrides`, `skill_categories`, and `skill_category_assignments` all exist after startup. Confirm each has the expected columns.
+
 ---
 
 ## Recovery Strategies
@@ -1071,6 +1288,13 @@ Template export foundation phase — test PDF export on both 100% and 125% DPI d
 | Web fonts absent from PDF (fallback used) | MEDIUM | Bundle WOFF2 files locally and update `@font-face` src; re-export all templates to verify; layout will shift if metrics differ from CDN version |
 | DOCX has no heading structure (ATS fails) | LOW | Change bold paragraphs to `heading: HeadingLevel.HEADING_1` in the export handler; verify in `document.xml`; no user data loss |
 | Two-column template scrambles ATS | LOW | Add ATS warning badge to template UI; no code fix needed for HTML template (ATS warning is sufficient); DOCX export should already be linear |
+
+| Global bullet mutations already made (overrides not migrated) | HIGH | Add `analysis_overrides` table; identify which bullets were rewritten by the optimize flow (compare to LLM suggestions stored in `analysis_results.suggestions`); offer user a "restore original" option per bullet |
+| Skills tag data dropped during category migration | HIGH | Restore from user backup if available; otherwise re-run migration with a corrected script against the existing `skills.tags` JSON column (column still exists even after category tables added) |
+| HTML5 DnD implemented, broken on Windows | MEDIUM | Swap to dnd-kit; the drag state management will need rewriting but the underlying data model (category assignments in DB) is unchanged |
+| DragOverlay position wrong (transform ancestor) | LOW | Move `DndContext` mount point above transform ancestor; no data loss |
+| Company/role auto-saved without confirmation | LOW | Allow user to edit metadata fields on the job posting; one-field fix, no data model changes |
+| Snapshot freezes base text (overrides missing) | MEDIUM | For submissions already made with wrong snapshots: no retroactive fix possible (immutable by design); for future submissions, fix `buildSnapshotForVariant` to apply overrides |
 
 ---
 
@@ -1112,6 +1336,15 @@ Template export foundation phase — test PDF export on both 100% and 125% DPI d
 | Two-column layout scrambles ATS | Template design phase (v2.1) | Run exported PDF through an ATS text extractor; confirm experience section is coherent and not interleaved with skills |
 | DOCX missing heading structure | DOCX export phase (v2.1) | Inspect `document.xml`; confirm `<w:pStyle w:val="Heading1"/>` for all section headers |
 | Background colors absent in PDF | Template implementation phase (v2.1) | Export template with colored elements; open PDF; confirm colors render; grep all `printToPDF` calls |
+
+| AI suggestions mutating global bullet text | Three-layer data model phase (schema) | Verify: after optimize save, `job_bullets.text` is unchanged; override row exists in `analysis_overrides` |
+| Snapshot not applying analysis overrides | Three-layer data model phase (snapshot builder) | Verify: submission snapshot JSON contains override text, not base text |
+| Skills tags dropped in category migration | Skills redesign phase (migration) | Verify: all skills with existing tags have matching category assignments on upgraded DB |
+| HTML5 DnD breaks on Windows | Skills redesign phase (DnD library selection) | Verify: chip reorder works on Windows build; no snap-back on drop |
+| DragOverlay wrong position | Skills redesign phase (DnD implementation) | Verify: drag preview follows cursor correctly; no position offset |
+| Toggle-entire-job surfaces stale overrides | Three-layer data model phase (merge-at-render) | Verify: toggling job off then on does not inject stale override text |
+| Company/role extraction overwrites user input | Analysis UX phase | Verify: extraction pre-fills fields only; DB write requires explicit save |
+| Migration ordering fails silently | Three-layer data model phase (schema) | Verify: startup assertion confirms all new tables exist after schema run |
 
 ---
 
@@ -1166,6 +1399,16 @@ Template export foundation phase — test PDF export on both 100% and 125% DPI d
 - [DOCX generation with docxtemplater — Official Docs](https://docxtemplater.com/docs/get-started-node/)
 - Codebase audit: `src/main/db/index.ts`, `src/main/db/schema.ts`, `src/main/handlers/export.ts`, `src/main/handlers/templates.ts`, `src/renderer/src/components/TagInput.tsx`, `src/preload/index.d.ts`
 
+- [dnd-kit Official Docs -- Overview](https://docs.dndkit.com/)
+- [dnd-kit GitHub -- clauderic/dnd-kit](https://github.com/clauderic/dnd-kit)
+- [Electron issue #42252 -- Custom Drag and Drop broken on Electron 28 and later](https://github.com/electron/electron/issues/42252)
+- [Fileside blog -- Fixing drag and drop in Electron](https://www.fileside.app/blog/2019-04-22_fixing-drag-and-drop/)
+- [SQLite ALTER TABLE docs](https://www.sqlite.org/lang_altertable.html)
+- [SQLite JSON functions docs](https://sqlite.org/json1.html)
+- [Medium -- Custom drag ghost in React: The way that actually works](https://medium.com/@shojib116/custom-drag-ghost-in-react-the-way-that-actually-works-c802e4ec7128)
+- [Electron native file drag-and-drop -- Official Docs](https://www.electronjs.org/docs/latest/tutorial/native-file-drag-drop)
+- Codebase audit: `src/main/db/index.ts`, `src/main/db/schema.ts`, `src/renderer/src/components/OptimizeVariant.tsx`, `src/main/handlers/submissions.ts`, `src/renderer/src/components/SkillList.tsx`
+
 ---
 *Pitfalls research for: Resume management desktop app (Electron + SQLite + AI matching + PDF/DOCX export + HTML/CSS templates)*
-*Researched: 2026-03-14 (v1.1 update: projects section, resume.json import/themes, tag autocomplete) / 2026-03-23 (v2.0 update: LLM integration, API key security, provider abstraction, match scoring, bullet rewrites, UI redesign) / 2026-03-25 (v2.1 update: HTML/CSS templates, printToPDF, DOCX ATS compliance)*
+*Researched: 2026-03-14 (v1.1 update: projects section, resume.json import/themes, tag autocomplete) / 2026-03-23 (v2.0 update: LLM integration, API key security, provider abstraction, match scoring, bullet rewrites, UI redesign) / 2026-03-25 (v2.1 update: HTML/CSS templates, printToPDF, DOCX ATS compliance) / 2026-03-26 (v2.2 update: three-layer data model, analysis-scoped overrides, skills category migration, drag-and-drop chip grid)*

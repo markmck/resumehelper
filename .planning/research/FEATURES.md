@@ -1,8 +1,287 @@
 # Feature Research
 
 **Domain:** Personal resume management and job application tracking desktop app
-**Researched:** 2026-03-13 (v1.0) / 2026-03-14 (v1.1 additions) / 2026-03-23 (v2.0 additions) / 2026-03-25 (v2.1 additions)
+**Researched:** 2026-03-13 (v1.0) / 2026-03-14 (v1.1 additions) / 2026-03-23 (v2.0 additions) / 2026-03-25 (v2.1 additions) / 2026-03-26 (v2.2 additions)
 **Confidence:** HIGH (core patterns verified against competing tools), MEDIUM (UX detail estimates)
+
+---
+
+## v2.2 Feature Landscape (Current Milestone: Three-Layer Data Model)
+
+### Context: What Already Exists
+
+The following are already shipped and must NOT be rebuilt:
+
+- `analysisResults` table with `variantId`, `suggestions` (JSON), `status`, `matchScore`, `keywordHits`, `keywordMisses`, `gapSkills`
+- `OptimizeVariant.tsx` — reads bullet suggestions from analysis and allows per-bullet accept (writes back to DB `jobBullets.text`) or dismiss
+- `VariantBuilder.tsx` — checkbox tree UI for including/excluding bullets, skills, jobs, projects, education, and all resume.json entities
+- `templateVariantItems` — junction table storing per-item exclusions per variant, with `excluded` boolean flag
+- `SkillList.tsx` / `SkillItem.tsx` — tag-grouped list, inline name edit, tag chip edit via `TagInput.tsx`, hover-reveal delete
+- `TagInput.tsx` — chip-style tag editing with autocomplete suggestions
+- `AnalysisResults.tsx` — analysis dashboard showing match score, keyword hits/misses, gap analysis, rewrite suggestions
+- `NewAnalysisForm.tsx` — job posting text paste + variant selector + analyze trigger
+- `SubmissionLogForm.tsx` / `SubmissionAddForm.tsx` — submission creation form (does NOT pre-populate company/role from analysis)
+- `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` — already in package.json, used for job card reorder in `JobItem.tsx`
+
+**The v2.2 milestone restructures where AI rewrites live, redesigns skills management ergonomics, and fills analysis/variant UX gaps.**
+
+---
+
+### Table Stakes (Users Expect These — v2.2)
+
+Features that feel broken or missing given the system already exists. Missing any of these creates obvious workflow friction.
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Analysis-scoped bullet overrides (three-layer model) | Accepted AI rewrites currently overwrite the base bullet permanently — users expect "this is for this job" not "permanently changed" | HIGH | Layer 1: base bullet in `jobBullets.text`. Layer 2: variant excludes/includes bullets via `templateVariantItems`. Layer 3: analysis override stored on `analysisResults` as a JSON map `{ bulletId → overriddenText }`. Render merges: start with base, apply variant selection, apply analysis override if present. Accepted suggestions no longer mutate `jobBullets.text` — they write to `analysisResults.bulletOverrides`. |
+| Submit job from analysis screen | After reviewing analysis results, the natural next action is submitting the application — forcing navigation to Submissions tab is disorienting | LOW | "Log Submission" button in `AnalysisResults.tsx`. Pre-populates company and role from the linked `jobPostings` record. Passes `analysisId` to submission form so `submissions.analysisId` is set at creation. No new DB schema needed — `submissions.analysisId` column already exists. |
+| Auto-extract company/role from job posting | Every AI tool that parses job postings fills in the company and role automatically — manually typing them after pasting the full text feels broken | MEDIUM | During analysis, LLM prompt (or regex heuristic) extracts `company` and `role` from the raw posting text. Store on the `jobPostings` record. Pre-populate the "Log Submission" form. Optionally show extracted values above the posting text in `NewAnalysisForm` for confirmation before running full analysis. |
+| Toggle entire job on/off in variant builder | Users need to exclude all bullets for a job at once (e.g. "leave off old job for this application") — doing it bullet-by-bullet is friction | LOW | Single "exclude job" checkbox at the job header level in `VariantBuilder.tsx`. Checking it excludes the `jobId` entry in `templateVariantItems` (sets `excluded = true` for the job-level item). Template render interprets job-level exclusion as "skip entire job block". Already supported by the `itemType: 'job'` path in the schema — needs UI only. |
+| Chip grid skills display (management view) | Skills are currently shown as a list where each skill is a row with a name and tag chips. A chip grid grouped by category is a standard skills management pattern for large skill sets — the list becomes unwieldy past 20 items | MEDIUM | Replace the skills management list with a grouped chip grid: category headers as section labels, skills as clickable chips within each category. Click chip to select/edit. dnd-kit (already in project) enables drag-chip-to-category reorder. Inline rename on double-click or dedicated edit mode per chip. |
+| Edit submission metadata (company, role, URL, notes) after creation | Users make typos or want to update the URL after submission — there is currently no edit path for existing submissions | LOW | Inline edit or modal form for `submissions.company`, `submissions.role`, `submissions.url`, `submissions.notes`. Existing `InlineEdit.tsx` component handles inline editing pattern. This is purely additive to `SubmissionDetailView.tsx`. |
+
+### Differentiators (Competitive Advantage — v2.2)
+
+Features that make the system qualitatively better than a simple analysis tool, enabled by the three-layer model.
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Per-analysis bullet override with merge-at-render | "This phrasing is right for this job, not my base resume" — contextual tuning without data mutation. No competitor offers per-analysis content that survives independently of the base. | HIGH | `analysisResults` gets a `bulletOverrides TEXT DEFAULT '{}'` column storing `{ [bulletId]: overriddenText }` as JSON. Render path: when building resume content for preview/export in the context of an analysis, merge overrides on top of base text before applying variant exclusions. The `OptimizeVariant` accept flow writes to `bulletOverrides` instead of `jobBullets.text`. Previous "accept" behavior that mutated base text is removed. |
+| Drag skills between categories | Moving a skill to a different category (e.g. "Python" from Languages to Cloud Tools) is direct manipulation — the mental model is immediate. Currently requires editing the skill's tags manually. | MEDIUM | dnd-kit multi-container sortable: each category section is a `SortableContext`. Dragging a chip from one category to another updates that skill's `tags` array. Uses `onDragEnd` to detect container change and call `window.api.skills.update`. Visual feedback: chip gets a drag shadow (elevation), category sections highlight as drop targets. All inline styles (no external CSS). |
+| Inline skill rename in chip grid | Double-clicking a chip to rename it in-place matches established chip UX (e.g. Gmail labels). Currently name edit is done by expanding the row and clicking InlineEdit. | LOW | On double-click, chip enters edit mode: text becomes an input field sized to chip width. Enter/blur commits. Escape cancels. Reuses `InlineEdit.tsx` pattern at chip level. |
+| Analysis shows which variant was analyzed | "I ran this for my Backend variant, not Frontend" — context is visible without navigating away | LOW | Already stored as `analysisResults.variantId` with `variantName` joined in the query. Expose in `AnalysisResults.tsx` header: "Analysis for: Backend Focus variant". Already present in data model, needs display only. |
+| Remove stale "coming soon" UI text | Any "coming soon" message in a shipped product erodes trust and makes features feel half-built | LOW | Audit and remove or replace with accurate state descriptions. Pure cleanup — no behavior change. |
+
+### Anti-Features (v2.2 — Commonly Requested, Often Problematic)
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Retroactively apply analysis overrides to base bullets | "I liked that rewrite — put it in my real resume" | Conflates the three layers intentionally kept separate; damages the isolation that makes the model trustworthy | Provide a deliberate "promote to base" action that makes the intent explicit; auto-promote breaks the contract |
+| Skills drag-reorder within a category | Natural expectation from drag UX | Skill order within a category has no semantic meaning for resume output; templates render skills alphabetically or by insertion order depending on template | If reorder within category is added, it must write `sortOrder` to skills schema (not currently present); defer until there's a clear user need |
+| Free-form skill category management (rename category, delete category, merge categories) | Power-user need as skill lists grow | Categories are derived from the `tags` array — there is no `categories` entity; "renaming a category" means updating every skill's tag; "deleting a category" means removing a tag from all skills; these are high-impact bulk operations | Allow category rename as a bulk-update operation in a dedicated action (not drag); warn about scope before executing |
+| AI auto-generate bullet overrides without user review | Speed: "just rewrite everything for this job" | Reintroduces the AI fabrication risk that is the app's core differentiator to prevent; removes the human-in-the-loop step | All overrides go through the existing per-bullet accept/dismiss UI; batch dismiss is acceptable, batch accept without review is not |
+| Analysis overrides that survive across multiple analyses of the same job | "I want my last rewrites to carry forward to re-analysis" | Re-analysis should start fresh from current base bullets; carrying forward old overrides silently is disorienting and makes score changes harder to interpret | Store overrides per `analysisId`; when re-analyzing, user can view old overrides from previous analysis run as reference |
+| Skills pills display mode in export (PDF/DOCX) | Visual chips are common in modern resume templates | DOCX cannot render chip visual styling; requires non-trivial fallback logic; already noted in v2.1 anti-features as deferred | `skillsDisplayMode: 'pills'` is addressed when DOCX degradation logic is explicitly implemented; do not add to v2.2 scope |
+
+---
+
+### v2.2 Feature Dependencies
+
+```
+[Three-Layer Data Model]
+    └──requires──> [bulletOverrides JSON column on analysisResults]
+                       └──schema migration: ALTER TABLE analysis_results ADD COLUMN bullet_overrides TEXT DEFAULT '{}'
+    └──requires──> [OptimizeVariant: accept writes to bulletOverrides, not jobBullets.text]
+    └──requires──> [Resume render path: merge-at-render logic for analysis context]
+                       └──requires──> [VariantBuilder/preview can receive active analysisId]
+    └──requires──> [Remove old "accept mutates base bullet" behavior]
+                       └──BREAKING: existing accepted suggestions stay in jobBullets.text (no migration of old data needed)
+
+[Submit from Analysis Screen]
+    └──requires──> [Three-Layer Data Model complete] (so submission snapshot captures merged content, not stale base)
+    └──uses──> [submissions.analysisId column (already exists)]
+    └──reads──> [jobPostings.company + jobPostings.role (already stored)]
+    └──pre-populates──> [SubmissionLogForm company/role fields]
+
+[Auto-Extract Company/Role]
+    └──enhances──> [Submit from Analysis Screen]
+    └──writes to──> [jobPostings.company + jobPostings.role]
+    └──triggered during──> [NewAnalysisForm analysis run]
+    NOTE: Can be implemented as LLM extraction step OR regex heuristic — LLM is more reliable
+
+[Toggle Entire Job in Variant Builder]
+    └──reads──> [templateVariantItems with itemType='job' (already in schema)]
+    └──UI only: no schema change needed]
+    └──must be consistent with──> [individual bullet toggles] (job-level exclude overrides bullet-level includes)
+
+[Chip Grid Skills Management]
+    └──replaces──> [SkillList.tsx list rendering] (same data, different layout)
+    └──uses──> [@dnd-kit/core + @dnd-kit/sortable (already installed)]
+    └──requires──> [multi-container DndContext: one SortableContext per category]
+    └──writes to──> [skills.tags via window.api.skills.update on drag-end]
+    └──inline rename uses──> [InlineEdit.tsx pattern]
+
+[Edit Submission Metadata]
+    └──extends──> [SubmissionDetailView.tsx]
+    └──uses──> [InlineEdit.tsx (already exists)]
+    └──no schema change needed]
+
+[Remove Coming Soon Messages]
+    └──no dependencies, no schema change]
+    └──pure cleanup — can be done in any phase]
+```
+
+#### Dependency Notes
+
+- **Three-layer model is the load-bearing dependency for the milestone.** The `bulletOverrides` schema migration and the render-time merge logic must land before `OptimizeVariant` accept behavior changes. Changing accept behavior before the storage target exists would discard accepted rewrites.
+- **Submit from analysis screen requires the three-layer model to be meaningful.** If accept still mutates base bullets, submitting from the analysis screen adds no new value. The value is: submission snapshot captures the merged (overridden) content specific to this analysis.
+- **Toggle entire job is UI-only.** The `itemType: 'job'` path in `templateVariantItems` already handles this — no schema migration needed. This is the lowest-risk item in the milestone.
+- **Chip grid is a display replacement, not a data model change.** Same `skills.tags` structure, same IPC calls. The dnd-kit multi-container pattern handles drag-between-categories via `onDragEnd` detecting a container change and updating the dragged skill's `tags`.
+- **Auto-extract company/role is additive to the existing analysis flow.** It writes to existing columns on `jobPostings`. Can be a post-analysis step or part of the initial parse — whichever reduces latency.
+- **Inline skill rename and chip drag are independent features** sharing the chip grid layout. Can be built incrementally: chip grid layout first, then drag, then inline rename.
+
+---
+
+### v2.2 MVP Definition
+
+#### Launch With (v2.2)
+
+- [ ] `bulletOverrides` column migration on `analysisResults` — gates the entire three-layer model; must land first
+- [ ] `OptimizeVariant` accept writes to `bulletOverrides` instead of `jobBullets.text` — changes the accept behavior
+- [ ] Merge-at-render logic for preview/export when an `analysisId` is in context — makes overrides visible
+- [ ] Toggle entire job on/off in `VariantBuilder.tsx` — low-risk, high-value, UI-only
+- [ ] Submit from analysis screen with pre-populated company/role — closes workflow gap between analyze and log
+- [ ] Auto-extract company/role from posting during analysis — reduces manual re-entry friction
+- [ ] Chip grid skills display in management view — replaces unwieldy list; uses existing dnd-kit install
+- [ ] Edit submission metadata inline — rounds out submission tracking; uses existing `InlineEdit` pattern
+- [ ] Remove stale "coming soon" messages — cleanup; no behavior change
+
+#### Add After Validation (v2.2.x)
+
+- [ ] "Promote override to base bullet" explicit action — deliberate data-model bridge for accepted rewrites user wants permanently
+- [ ] Category rename as bulk tag-update operation — needed when skill sets grow; requires UI to warn about scope
+- [ ] Per-analysis score delta display (improvement vs previous run) — meaningful once users re-run analyses after edits
+
+#### Future Consideration (v2.3+)
+
+- [ ] Skills `pills` display mode in PDF/DOCX — requires explicit DOCX degradation logic; noted as deferred since v2.1
+- [ ] Submission analytics and pattern insights — needs months of history data; deferred per PROJECT.md
+- [ ] AI-powered auto-variant generation — deferred per PROJECT.md
+- [ ] Skills `sortOrder` within categories — only if user research confirms this is needed
+
+---
+
+### v2.2 Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| `bulletOverrides` schema migration | HIGH (gates model) | LOW | P1 |
+| Accept writes to `bulletOverrides` | HIGH | MEDIUM | P1 |
+| Merge-at-render for analysis context | HIGH | MEDIUM | P1 |
+| Toggle entire job in variant builder | HIGH | LOW | P1 |
+| Submit from analysis screen | HIGH | LOW | P1 |
+| Auto-extract company/role | MEDIUM | MEDIUM | P1 |
+| Chip grid skills management | MEDIUM | MEDIUM | P1 |
+| Edit submission metadata | MEDIUM | LOW | P1 |
+| Remove coming soon messages | LOW | LOW | P1 (cleanup) |
+| Promote override to base | MEDIUM | LOW | P2 |
+| Category rename (bulk) | MEDIUM | MEDIUM | P2 |
+| Per-analysis score delta | MEDIUM | LOW | P2 |
+| Skills pills display mode | LOW | HIGH | P3 |
+
+**Priority key:**
+- P1: Must have for v2.2 launch
+- P2: Add after core three-layer model is validated
+- P3: Defer to v2.3+
+
+---
+
+### v2.2 Implementation Notes for Phase Authors
+
+#### Three-Layer Model: Where Each Layer Lives
+
+```
+Layer 1 — Base:         jobBullets.text
+                        Skills in skills table
+                        Jobs in jobs table
+
+Layer 2 — Selection:    templateVariantItems (excluded flag per bullet/job/skill)
+                        One set of selections per variant
+
+Layer 3 — Override:     analysisResults.bulletOverrides (JSON: { bulletId: string → overriddenText: string })
+                        One set of overrides per analysis run
+```
+
+The render path must accept an optional `analysisId`. When present, after applying variant selections (layer 2), any bullet that has an entry in `bulletOverrides` for that analysis should use the override text instead of the base text. When no `analysisId` is present (plain variant preview, export without analysis context), only layers 1 and 2 apply.
+
+#### bulletOverrides Schema Migration
+
+```typescript
+try {
+  db.run(sql`ALTER TABLE analysis_results ADD COLUMN bullet_overrides TEXT DEFAULT '{}'`)
+} catch {
+  // column already exists — safe to ignore
+}
+```
+
+Runtime type:
+```typescript
+type BulletOverrides = Record<string, string> // bulletId (as string) → overridden text
+```
+
+#### Accept Flow Change in OptimizeVariant
+
+Current flow: `window.api.bullets.update(bulletId, { text: suggestedText })` — mutates base.
+
+New flow: `window.api.jobPostings.updateAnalysisBulletOverride(analysisId, bulletId, suggestedText)` — writes to `analysisResults.bulletOverrides` map.
+
+Dismiss flow: unchanged — dismissal is UI state only, no DB write.
+
+The existing `SuggestionEdit` state machine (`pending | accepted | dismissed`) is preserved. Only the persistence target changes.
+
+#### Chip Grid: Multi-Container dnd-kit Pattern
+
+The existing `@dnd-kit/core` and `@dnd-kit/sortable` installs already support multi-container drag. Pattern:
+
+```
+<DndContext onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
+  {categories.map(cat => (
+    <SortableContext key={cat} items={chipIdsInCategory(cat)}>
+      <CategorySection label={cat} chips={skillsInCategory(cat)} />
+    </SortableContext>
+  ))}
+</DndContext>
+```
+
+`handleDragEnd`: if `active.data.current.sortable.containerId !== over.data.current.sortable.containerId`, remove the dragged skill's old category tag and add the new category tag, then call `window.api.skills.update(skillId, { tags: newTags })`.
+
+All drag visual states use inline styles (transform via `CSS.Transform.toString(transform)` from `@dnd-kit/utilities`, already imported in `JobItem.tsx`). No external CSS needed.
+
+#### UX Behavior: Chips vs List
+
+| Behavior | Current List | New Chip Grid |
+|----------|-------------|---------------|
+| Add skill | "+ Add Skill" button → inline form | "+ Add" chip at end of category, or dedicated add button per category |
+| Rename skill | Click row → InlineEdit activates | Double-click chip → chip becomes input |
+| Change category | Edit tags in TagInput row | Drag chip to different category section |
+| Delete skill | Hover → × button appears | Hover chip → × on chip, or dedicated delete in edit mode |
+| Add new category | Tag the skill with a new tag name | Typing a new category name in the add flow creates it |
+
+Chips should display with a subtle border and background, sized to content, with `border-radius: var(--radius-full)` or `var(--radius-sm)` depending on design preference. Hover state: slightly elevated background. Selected/editing state: accent border. Dragging state: shadow + slight scale (via `transform: scale(1.02)` inline style).
+
+#### Auto-Extract Company/Role
+
+Two implementation options:
+
+**Option A — LLM extraction (recommended):** Add a brief structured prompt step before or alongside the main analysis prompt. Ask the LLM to return `{ company, role }` from the raw posting text. Store results in `jobPostings.company` and `jobPostings.role`. These columns already exist and are required fields with defaults (`''`).
+
+**Option B — Regex heuristic:** Parse common patterns ("Company: X", "About [Company]", "We are hiring a [Role]"). Reliable for well-formatted postings; fails on informal postings. Lower cost but higher error rate.
+
+Option A is preferred — the LLM is already being called, and company/role extraction is trivial to add to the prompt. A failed extraction defaults to the current behavior (user fills in manually).
+
+---
+
+### v2.2 Competitor Feature Analysis
+
+| Feature | Jobscan/Teal | Huntr | Our Approach |
+|---------|-------------|-------|--------------|
+| Bullet overrides per job posting | None — all rewrites are permanent | None | Per-analysis override stored separately; base unchanged; merge-at-render |
+| Submit from analysis screen | Teal: yes, inline | Huntr: yes, inline | Submit button in analysis results; pre-populates from jobPosting record |
+| Company/role extraction | Teal: yes (LLM) | No | LLM extraction during analysis; stores to jobPosting record |
+| Skills chip management | Teal: categorized chips | No | Chip grid with drag-between-categories using existing dnd-kit |
+| Toggle whole job in variant | Not applicable (no variants) | Not applicable | Single checkbox at job header level |
+| Edit submission metadata | Both: yes | Yes | Inline edit via existing InlineEdit component |
+
+---
+
+### v2.2 Sources
+
+- dnd-kit multi-container sortable docs: [https://docs.dndkit.com/presets/sortable](https://docs.dndkit.com/presets/sortable) (HIGH confidence — official docs)
+- dnd-kit GitHub (cross-container drag pattern): [https://github.com/clauderic/dnd-kit](https://github.com/clauderic/dnd-kit) (HIGH confidence)
+- Material Design chip component behavior spec: [https://m3.material.io/components/chips/overview](https://m3.material.io/components/chips/overview) (HIGH confidence — authoritative UX spec)
+- Telerik chip UX guidelines: [https://www.telerik.com/design-system/docs/components/chip/](https://www.telerik.com/design-system/docs/components/chip/) (MEDIUM confidence)
+- Chip drag-and-drop visual states: [https://bricxlabs.com/blogs/drag-and-drop-ui](https://bricxlabs.com/blogs/drag-and-drop-ui) (MEDIUM confidence)
+- Codebase analysis: `schema.ts`, `OptimizeVariant.tsx`, `SkillList.tsx`, `SkillItem.tsx`, `TagInput.tsx`, `VariantBuilder.tsx`, `AnalysisResults.tsx`, `JobItem.tsx`, `package.json` (read directly — HIGH confidence)
 
 ---
 
@@ -44,7 +323,7 @@ Features that make the template system feel polished beyond typical resume build
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Page break overlay with page number labels | "Page 1 / Page 2" at each break line — instantly shows if resume is running long before export | LOW | Pure React overlay (`position: absolute`, `pointer-events: none`) over the scrollable preview container. Draw horizontal rules at `n * 1056px`. Add label "Page 2 starts here" at each line. Must be excluded from PrintApp render path. |
+| Page break overlay with page number labels | "Page 1 / Page 2" at each break line — instantly shows if resume is running long before export | LOW | Pure React overlay (`position: absolute`, `pointer-events: none`) over the scrollable preview container. Draw horizontal rules at `n * 1056px` intervals. Add page number labels ("Page 2" etc.) at each line. Must be excluded from PrintApp render path by a `if (isPrintContext) return null` guard. |
 | Compact margin toggle (normal / tight) | Two-state is faster than a slider; maps to clear use cases (tech-dense vs executive-spacious) | LOW | CSS variable swap: `--page-margin: 0.75in` (normal) vs `--page-margin: 0.5in` (tight). Toggling changes content height → page break overlay must re-measure via `ResizeObserver`. |
 | Accent color picker with preset palette | Lets user match industry convention without a full color wheel | LOW | 8-10 curated hex swatches (navy, teal, forest green, slate, burgundy, charcoal, royal blue, black). No freeform hex input for v2.1 — constrains choices to resume-safe colors. |
 | Skills display mode switcher | Different roles suit different skills layouts without re-selecting the whole template | LOW | Two modes for v2.1: `grouped` (bold category + comma list, current behavior) and `inline` (all skills comma-separated, maximum space efficiency). Add `pills` in v2.2 after verifying DOCX degradation logic. |
@@ -649,6 +928,15 @@ Themes export `render(resume: ResumeJson): string`. Output is self-contained HTM
 
 ## Sources
 
+**v2.2 sources:**
+- dnd-kit sortable docs: [https://docs.dndkit.com/presets/sortable](https://docs.dndkit.com/presets/sortable) (HIGH confidence — official)
+- dnd-kit GitHub multi-container pattern: [https://github.com/clauderic/dnd-kit](https://github.com/clauderic/dnd-kit) (HIGH confidence)
+- Material Design 3 chip component spec: [https://m3.material.io/components/chips/overview](https://m3.material.io/components/chips/overview) (HIGH confidence)
+- Telerik chip UX guidelines: [https://www.telerik.com/design-system/docs/components/chip/](https://www.telerik.com/design-system/docs/components/chip/) (MEDIUM confidence)
+- Top 5 React DnD libraries 2025-2026: [https://puckeditor.com/blog/top-5-drag-and-drop-libraries-for-react](https://puckeditor.com/blog/top-5-drag-and-drop-libraries-for-react) (MEDIUM confidence)
+- Smart interface design patterns — badges vs chips: [https://smart-interface-design-patterns.com/articles/badges-chips-tags-pills/](https://smart-interface-design-patterns.com/articles/badges-chips-tags-pills/) (MEDIUM confidence)
+- Codebase analysis: `schema.ts`, `OptimizeVariant.tsx`, `SkillList.tsx`, `SkillItem.tsx`, `VariantBuilder.tsx`, `AnalysisResults.tsx`, `JobItem.tsx`, `package.json` (read directly — HIGH confidence)
+
 **v1.1 sources:**
 - [JSON Resume Schema Documentation](https://docs.jsonresume.org/schema) — projects section field definitions (HIGH confidence)
 - [JSON Resume Theme Development](https://jsonresume.org/theme-development) — render function API and packaging requirements (HIGH confidence)
@@ -666,5 +954,5 @@ Themes export `render(resume: ResumeJson): string`. Output is self-contained HTM
 
 ---
 
-*Feature research for: ResumeHelper v1.0, v1.1, v2.0, and v2.1*
-*Last updated: 2026-03-25*
+*Feature research for: ResumeHelper v1.0, v1.1, v2.0, v2.1, and v2.2*
+*Last updated: 2026-03-26*

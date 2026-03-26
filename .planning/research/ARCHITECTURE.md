@@ -1,645 +1,382 @@
-# Architecture Research
+# Architecture Patterns
 
-**Domain:** Resume template rendering pipeline — Electron + React desktop app
-**Researched:** 2026-03-25
-**Confidence:** HIGH (based on direct codebase inspection)
-
----
-
-## Existing Architecture (v2.0 Baseline)
-
-### System Overview
-
-The existing app has two rendering paths and three consumers of those paths. The v2.1
-template system's primary architectural goal is replacing both paths with a single
-unified path.
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Renderer Process                            │
-│                                                                     │
-│  VariantEditor                                                      │
-│    ├── VariantBuilder (checkbox pane)                               │
-│    └── VariantPreview (preview pane)  ←── layoutTemplate prop       │
-│          ├── IF isBuiltIn('professional')                           │
-│          │     renders: <ProfessionalLayout ...props />             │
-│          └── IF theme ('even'/'class'/'elegant')                    │
-│                loads themeHtml via IPC → <iframe srcDoc={themeHtml}>│
-│                                                                     │
-│  PrintApp  (print.html, hidden BrowserWindow)                       │
-│    └── reads ?variantId, always renders: <ProfessionalLayout />     │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │ IPC (window.api.*)
-┌──────────────────────────────▼──────────────────────────────────────┐
-│                          Main Process                               │
-│                                                                     │
-│  handlers/themes.ts   → themeRegistry.ts → jsonresume-theme-*      │
-│  handlers/export.ts   → getBuilderDataForVariant()                 │
-│    ├── isProfessional? → BrowserWindow(print.html) + print:ready   │
-│    └── isTheme?        → renderThemeHtml() → tmpfile → printToPDF  │
-│                                                                     │
-│  handlers/templates.ts → setLayoutTemplate IPC                     │
-│  db/schema.ts          → templateVariants.layoutTemplate (col)     │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### Current Bifurcation — The Problem to Solve
-
-There are two completely separate rendering paths with incompatible behaviors:
-
-| | Built-in (professional) | Theme path (even/class/elegant) |
-|---|---|---|
-| Preview | React `<ProfessionalLayout />` direct render | iframe with HTML from main process |
-| PDF export | Hidden BrowserWindow loads `print.html` | main writes tmp HTML file, loads in BrowserWindow |
-| Snapshot PDF | Falls back to 'even' via themeRegistry | Uses themeRegistry directly |
-| CSS source | Inline styles (reliable) | jsonresume npm package CSS (unreliable for PDF) |
-| PDF fidelity | Good — same React component in preview and PrintApp | Poor — npm theme packages not tuned for paper output |
-
-The new templates must eliminate this bifurcation. The unified path: every template
-renders via `print.html` / `PrintApp.tsx` BrowserWindow, and preview reuses the same
-URL. This makes layout drift between preview and PDF structurally impossible.
+**Domain:** Resume management desktop app — three-layer data model, analysis-scoped overrides, skills chip UI
+**Researched:** 2026-03-26
+**Focus:** Integration with existing Electron + React 19 + Drizzle ORM + SQLite architecture
 
 ---
 
-## Recommended Architecture for v2.1
+## Existing Architecture Reference
 
-### Core Design Decision: Per-Template React Components, No Shared Base
+Before describing the new patterns, the key existing structures:
 
-**Recommendation:** Build 5 separate React template components (ClassicTemplate,
-ModernTemplate, JakeTemplate, MinimalTemplate, ExecutiveTemplate). Do NOT build a
-shared base component that all templates extend or compose.
+**Data layer (main process):**
+- `src/main/db/schema.ts` — Drizzle table definitions
+- `src/main/db/index.ts` — `ensureSchema()` with `CREATE TABLE IF NOT EXISTS` + `ALTER TABLE` try/catch array
+- `src/main/handlers/` — one file per domain, each exports `register*Handlers()`
 
-**Rationale:**
-- Each of the 5 templates has fundamentally different layouts (2-column vs 1-column,
-  sidebar vs stacked, colored header vs minimal header) — a shared base would add
-  complexity without reducing duplication, because the structure diverges across templates
-- The shared contract IS the `ResumeTemplateProps` TypeScript interface — shared type,
-  not shared component
-- The existing `ProfessionalLayout.tsx` is the right mental model: a self-contained
-  React component with inline styles that renders all resume sections. Replicate that
-  pattern 5 times, diverging per template design
-- CSS-in-JS (inline styles) is already established and proven reliable in this codebase
+**Rendering pipeline:**
+- `print.html` + `PrintApp.tsx` + postMessage — single surface for preview, PDF export, and snapshot viewer
+- Templates receive `BuilderJob[]` / `BuilderSkill[]` etc., filtered by `excluded` flags
 
-**What IS shared across templates:**
-- `ResumeTemplateProps` interface (TypeScript type, not a component)
-- `resolveTemplate(key)` function — the single coupling point from DB string to component
-- `filterResumeData()` utility — consolidates the excluded-item logic currently duplicated
-  in `ProfessionalLayout.tsx` and `themeRegistry.ts`
-
-### Unified Rendering Path (New)
-
-Both preview and PDF export use the same URL: `print.html?variantId=X&template=classic`.
-PrintApp reads both params and renders the appropriate template component. The preview
-pane shows an iframe pointing to this URL. PDF export loads the same URL in a hidden
-BrowserWindow. There is no longer a separate "isProfessional" vs "isTheme" code path.
-
+**Current data contract (`BuilderJob`):**
+```typescript
+interface BuilderBullet { id: number; text: string; sortOrder: number; excluded: boolean }
+interface BuilderJob    { id: number; company: string; role: string; startDate: string;
+                          endDate: string|null; excluded: boolean; bullets: BuilderBullet[] }
 ```
-User picks template in VariantEditor dropdown
-       │
-       ▼
-templateVariants.layoutTemplate = 'classic' | 'modern' | 'jake' | 'minimal' | 'executive'
-       │
-       ├── Preview path
-       │     VariantPreview
-       │       → <iframe src="print.html?variantId=42&template=classic" />
-       │
-       └── Export path
-             export:pdf IPC handler
-               → reads layoutTemplate from DB
-               → BrowserWindow.loadURL("print.html?variantId=42&template=classic")
-               → waits for print:ready IPC signal
-               → printToPDF(...)
-               → PDF is pixel-identical to preview
-```
+
+**Current suggestion flow (v2.1 — the problem being solved):**
+- `OptimizeVariant.tsx` accepts rewrites → mutates `job_bullets.text` in-place globally
+- Accepted skills are written to `skills` table or variant exclusion toggles
+- Changes are permanent and cross-variant — no way to show "what this analysis suggested" without applying it
 
 ---
 
-## Component Responsibilities
+## Recommended Architecture for v2.2
 
-### New vs Modified — Complete List
+### Layer 1 of 3: Base Experience (unchanged)
 
-**New files (create from scratch):**
+`jobs`, `job_bullets`, `skills` tables are the canonical source of truth. They do not change. Users edit bullets here in the Experience tab as before.
 
-| File | Purpose |
-|------|---------|
-| `src/renderer/src/components/templates/types.ts` | `ResumeTemplateProps` interface shared by all 5 templates |
-| `src/renderer/src/components/templates/resolveTemplate.ts` | Maps template key string to React component |
-| `src/renderer/src/components/templates/filterResumeData.ts` | Shared excluded-item filtering utility |
-| `src/renderer/src/components/templates/ClassicTemplate.tsx` | Classic single-column template |
-| `src/renderer/src/components/templates/ModernTemplate.tsx` | Modern template with accent color and distinct header |
-| `src/renderer/src/components/templates/JakeTemplate.tsx` | Jake Gutierrez-style: dense, lines, two-column header |
-| `src/renderer/src/components/templates/MinimalTemplate.tsx` | Minimal, whitespace-heavy, typography-focused |
-| `src/renderer/src/components/templates/ExecutiveTemplate.tsx` | Executive: prominent header, conservative sections |
+No schema changes needed at this layer.
 
-**Modified files (surgical changes):**
+### Layer 2 of 3: Variant Selection (existing)
 
-| File | Change |
-|------|--------|
-| `src/renderer/src/PrintApp.tsx` | Read `template` query param; call `resolveTemplate()` to pick component |
-| `src/renderer/src/components/VariantPreview.tsx` | Drop built-in/theme branch split; render all templates as `<iframe src="print.html?...">` |
-| `src/renderer/src/components/VariantEditor.tsx` | Template controls UI: accent color picker, compact toggle, skills display mode |
-| `src/main/lib/themeRegistry.ts` | Replace THEMES list and `renderThemeHtml()` with new template keys; keep `buildResumeJson()` |
-| `src/main/handlers/export.ts` | Remove isProfessional/isTheme branch split; all templates use print.html path |
-| `src/main/handlers/themes.ts` | Return new TEMPLATE_LIST from `templates:list` IPC |
-| `src/preload/index.ts` | Extend `templates.setLayoutTemplate` signature if template controls add new params |
+`template_variant_items` holds exclusion rows. When `excluded = true` for a bullet/skill/job, the rendering pipeline filters it out. Already working.
 
-**Deleted after migration verified:**
-- `src/renderer/src/components/ProfessionalLayout.tsx`
+**New feature in this layer: job-level toggle.** The handler already exists (`templates:setItemExcluded` with `itemType: 'job'`). The UI in `VariantBuilder.tsx` needs to expose a checkbox/toggle per job header. The cascade to bullets is already implemented in the handler.
 
-**Unchanged:**
-- `src/main/db/schema.ts` — `layoutTemplate` column already exists; no migration needed for basic template selection
-- `src/main/handlers/templates.ts` — `setLayoutTemplate` IPC already exists
-- `src/main/handlers/export.ts` data assembly (`getBuilderDataForVariant`) — unchanged
-- All other handler files
+### Layer 3 of 3: Analysis Overrides (new)
 
----
+Overrides are **scoped to a specific analysis result** and **never touch base data**. They are applied at render time via merge.
 
-## Recommended Project Structure
-
-```
-src/renderer/src/
-├── components/
-│   ├── templates/                    # NEW — all template code
-│   │   ├── types.ts                  # ResumeTemplateProps interface
-│   │   ├── resolveTemplate.ts        # string key → component
-│   │   ├── filterResumeData.ts       # shared excluded-item filtering
-│   │   ├── ClassicTemplate.tsx
-│   │   ├── ModernTemplate.tsx
-│   │   ├── JakeTemplate.tsx
-│   │   ├── MinimalTemplate.tsx
-│   │   └── ExecutiveTemplate.tsx
-│   ├── ProfessionalLayout.tsx        # KEEP until migration complete, then delete
-│   ├── VariantPreview.tsx            # MODIFIED
-│   ├── VariantEditor.tsx             # MODIFIED (template controls)
-│   └── ...
-├── PrintApp.tsx                      # MODIFIED
-└── ...
-
-src/main/
-├── lib/
-│   └── themeRegistry.ts             # MODIFIED
-├── handlers/
-│   ├── export.ts                    # MODIFIED
-│   └── themes.ts                    # MODIFIED
-└── ...
-```
-
-### Structure Rationale
-
-- **`templates/` subdirectory:** Isolates all template code; adding a 6th template
-  later requires adding one file to this directory and one entry in `resolveTemplate.ts`
-- **`types.ts` separate from components:** `ResumeTemplateProps` is consumed by all 5
-  template components, `PrintApp.tsx`, and `filterResumeData.ts` — a shared types file
-  avoids circular imports
-- **`resolveTemplate.ts`:** The only coupling between the DB string value and component
-  code — explicit and in one place; template key typos cause compile errors
-
----
-
-## Architectural Patterns
-
-### Pattern 1: Template Key Registry
-
-**What:** A single function maps a template key string (stored in DB) to a React
-component. All consumers (PrintApp, VariantPreview) call this function rather than
-importing template components directly.
-
-**When to use:** Always — centralizes the DB-string-to-component coupling.
-
-**Trade-offs:** Slight indirection, but prevents template key strings from spreading
-across multiple files.
-
-```typescript
-// templates/resolveTemplate.ts
-import ClassicTemplate from './ClassicTemplate'
-import ModernTemplate from './ModernTemplate'
-import JakeTemplate from './JakeTemplate'
-import MinimalTemplate from './MinimalTemplate'
-import ExecutiveTemplate from './ExecutiveTemplate'
-import type { ResumeTemplateProps } from './types'
-
-const TEMPLATE_MAP: Record<string, React.ComponentType<ResumeTemplateProps>> = {
-  classic:   ClassicTemplate,
-  modern:    ModernTemplate,
-  jake:      JakeTemplate,
-  minimal:   MinimalTemplate,
-  executive: ExecutiveTemplate,
-}
-
-export function resolveTemplate(key: string): React.ComponentType<ResumeTemplateProps> {
-  return TEMPLATE_MAP[key] ?? ClassicTemplate  // Classic is the safe fallback
-}
-
-export const TEMPLATE_LIST = Object.keys(TEMPLATE_MAP).map((key) => ({
-  key,
-  displayName: key.charAt(0).toUpperCase() + key.slice(1),
-}))
-```
-
-### Pattern 2: Print URL with Template Param
-
-**What:** `print.html` currently accepts `?variantId=X`. Extend to
-`?variantId=X&template=classic`. PrintApp reads both params, calls `resolveTemplate()`,
-renders the selected component with data fetched via `window.api`.
-
-**When to use:** This is the unification mechanism — preview iframe and export
-BrowserWindow both point to this URL.
-
-**Trade-offs:** Preview now depends on the print.html load cycle (slightly more overhead
-than inline rendering), but preview fidelity is guaranteed because it uses the exact same
-rendering context as PDF export.
-
-```typescript
-// PrintApp.tsx (modified useEffect)
-const params = new URLSearchParams(window.location.search)
-const variantId = Number(params.get('variantId'))
-const templateKey = params.get('template') ?? 'classic'
-const TemplateComponent = resolveTemplate(templateKey)
-
-// ...fetch data, then render:
-return (
-  <TemplateComponent
-    profile={data.profile}
-    jobs={data.jobs}
-    skills={data.skills}
-    accentColor={data.accentColor ?? '#2563eb'}
-    compact={data.compact ?? false}
-    skillsDisplay={data.skillsDisplay ?? 'grouped'}
-    // ...etc
-  />
-)
-```
-
-### Pattern 3: Preview as iframe Pointing to print.html
-
-**What:** `VariantPreview` renders `<iframe src="print.html?variantId=42&template=classic">`.
-This replaces both the current inline `<ProfessionalLayout />` render and the
-`srcDoc` iframe for jsonresume themes.
-
-**When to use:** All 5 new templates. This is the only preview path after migration.
-
-**Trade-offs:** Requires the renderer to construct the correct URL for both dev (Vite
-dev server URL) and prod (file:// URL). A helper function handles this. The iframe does
-not need a `sandbox` attribute because it loads a fully trusted first-party page.
-
-```typescript
-// VariantPreview.tsx (simplified new form)
-// In dev: Vite serves print.html at the renderer dev URL
-// In prod: file:// points to the bundled print.html
-
-// The renderer can use window.location.origin in dev mode:
-const base = window.location.origin  // e.g., http://localhost:5173 in dev
-const src = `${base}/print.html?variantId=${variantId}&template=${layoutTemplate}`
-
-return (
-  <iframe
-    src={src}
-    style={{ width: '100%', height: '100%', border: 'none' }}
-  />
-)
-```
-
-Note: In production, the renderer runs as a `file://` page. `window.location.origin`
-is `null` for file:// pages. The electron-vite build puts `print.html` in the same
-directory as `index.html`. Use a relative path `./print.html` or expose the print URL
-via an IPC handler or Electron's `app.getPath`. The simplest approach: expose a
-`window.__printBase` global from the preload script set to the correct base URL.
-
-### Pattern 4: Template CSS — Inline Styles with Single Style Tag for Print Rules
-
-**What:** All 5 templates use React inline styles for all visual properties. A single
-`<style>` tag is rendered at the top of each template's output for print-only CSS rules
-that cannot be expressed as inline styles.
-
-**When to use:** Always. This is the existing codebase constraint and the correct
-approach for template components that render in isolated BrowserWindows.
-
-**Rationale:** Templates render inside `print.html` which has no CSS from the main app.
-Inline styles are guaranteed to work regardless of what CSS is or isn't loaded. CSS
-file imports would require correct asset paths in both dev and prod environments —
-unnecessary complexity given that inline styles already work correctly in
-`ProfessionalLayout.tsx`.
-
-**Print-specific CSS (cannot be inline):**
-```typescript
-// At the top of each template's return value:
-<>
-  <style>{`
-    @page { size: letter; margin: 0; }
-    body { margin: 0; background: white; }
-    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  `}</style>
-  <div style={{ fontFamily: 'Calibri, sans-serif', padding: '0.5in', ... }}>
-    {/* template sections */}
-  </div>
-</>
-```
-
-**Accent color pattern:**
-```typescript
-// Templates receive accentColor as a prop, use it in style objects:
-const sectionHeadingStyle: React.CSSProperties = {
-  color: accentColor,
-  borderBottom: `2px solid ${accentColor}`,
-  // ...
-}
-```
-
-### Pattern 5: Template Controls via Extended Variant Schema
-
-**What:** Per-variant template settings (accent color, compact mode, skills display)
-are stored as new columns on `templateVariants` and passed through the data flow to
-the template component via query params or IPC.
-
-**When to use:** Phase where template controls are implemented. Not needed for the
-initial 5 template builds.
-
-**Schema additions (new columns via ALTER TABLE in db/index.ts):**
+**Schema addition — new table:**
 ```sql
-ALTER TABLE template_variants ADD COLUMN accent_color text NOT NULL DEFAULT '#2563eb'
-ALTER TABLE template_variants ADD COLUMN compact integer NOT NULL DEFAULT 0
-ALTER TABLE template_variants ADD COLUMN skills_display text NOT NULL DEFAULT 'grouped'
+CREATE TABLE IF NOT EXISTS analysis_bullet_overrides (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  analysis_id  INTEGER NOT NULL REFERENCES analysis_results(id) ON DELETE CASCADE,
+  bullet_id    INTEGER NOT NULL REFERENCES job_bullets(id) ON DELETE CASCADE,
+  override_text TEXT NOT NULL,
+  UNIQUE(analysis_id, bullet_id)
+);
 ```
 
-**Flow:** `getBuilderData` IPC returns these fields → PrintApp passes them as props to
-template component. `VariantEditor` adds color picker and toggle UI that calls
-`setLayoutTemplate` or a new `setTemplateOptions` IPC.
+Added via the `ensureSchema()` main block — `CREATE TABLE IF NOT EXISTS` handles fresh installs; existing DBs pick it up on next launch because the pattern runs every startup.
+
+**No changes needed** to `analysis_results.suggestions` (JSON column) — it continues to store raw LLM output. Overrides are a separate concern.
+
+---
+
+## Component Boundaries
+
+| Component | Responsibility | Status | Communicates With |
+|-----------|---------------|--------|-------------------|
+| `SkillChipGrid.tsx` | Chip-per-skill display, grouped by tag, drag-between-groups | NEW | `skills:list`, `skills:update`, `skills:delete`, `skills:create` |
+| `SkillChipGroup.tsx` | One category group — header, chip row, drop target | NEW | Parent `SkillChipGrid` |
+| `SkillChip.tsx` | Single chip — inline rename on double-click, drag handle, delete on hover | NEW | Parent `SkillChipGroup` |
+| `SkillList.tsx` | Existing list view — replace body with `SkillChipGrid` | MODIFIED | Same IPC surface |
+| `SkillItem.tsx` | Old row item | REMOVED from Skills tab (can stay for VariantBuilder toggle if needed) | — |
+| `VariantBuilder.tsx` | Add job-level toggle per job header | MODIFIED | `templates:setItemExcluded` (already handles 'job' type) |
+| `OptimizeVariant.tsx` | Accept rewrites → write to `analysis_bullet_overrides` instead of `job_bullets` | MODIFIED | New `ai:saveOverrides` IPC |
+| `AnalysisResults.tsx` | Pre-fill submission form with company/role from analysis; add Submit CTA | MODIFIED | Data already returned by `jobPostings.getAnalysis` |
+| `AnalysisList.tsx` | Add "Submit" CTA directly from list row | MODIFIED | Existing `onLogSubmission` prop pattern |
+| `NewAnalysisForm.tsx` | Auto-extract company/role from pasted job text after LLM parse completes | MODIFIED | `parsedJob` already returned from `ai:analyze` |
+| `PrintApp.tsx` | Accept optional `analysisOverrides` in postMessage payload; merge at render | MODIFIED | postMessage protocol |
+| `SnapshotViewer.tsx` | No change needed — overrides are baked into snapshot at submit time | UNCHANGED | — |
+| `ai:saveOverrides` handler | Write accepted rewrites to `analysis_bullet_overrides` | NEW | `analysis_bullet_overrides` table |
+| `ai:getOverrides` handler | Return overrides for a given `analysisId` | NEW | `analysis_bullet_overrides` table |
+| `buildSnapshotForVariant()` | Accept optional `analysisId`; merge overrides into snapshot before serialization | MODIFIED | `ai:getOverrides` called during snapshot build |
 
 ---
 
 ## Data Flow
 
-### Preview Render Flow (New)
+### Normal preview/export (no analysis overrides)
 
 ```
-User opens Variants tab, selects a variant
-    ↓
-VariantEditor renders VariantPreview with { variantId: 42, layoutTemplate: 'classic' }
-    ↓
-VariantPreview builds iframe src:
-    "{base}/print.html?variantId=42&template=classic"
-    ↓
-iframe loads PrintApp.tsx in isolated page context
-    ↓
-PrintApp reads URL params: variantId=42, template=classic
-PrintApp calls window.api.profile.get() + window.api.templates.getBuilderData(42)
-    ↓
-PrintApp calls resolveTemplate('classic') → ClassicTemplate
-    ↓
-PrintApp renders <ClassicTemplate profile={...} jobs={...} accentColor={...} ... />
-    ↓
-iframe displays rendered template at actual page dimensions
+VariantBuilder → templates:getBuilderData(variantId)
+              → [jobs with excluded flags, skills with excluded flags]
+              → postMessage to PrintApp
+              → resolveTemplate(key)(props)
+              → rendered HTML
 ```
 
-### PDF Export Flow (New, Unified)
+### Preview with analysis overrides applied
 
 ```
-User clicks PDF in VariantEditor
-    ↓
-export:pdf IPC fires with variantId=42
-    ↓
-Handler reads templateVariants.layoutTemplate from DB → 'classic'
-Handler creates hidden BrowserWindow, loads:
-    "{devUrl}/print.html?variantId=42&template=classic"   (dev)
-    "print.html?variantId=42&template=classic"            (prod)
-    ↓
-PrintApp runs IDENTICAL code path to preview iframe
-    ↓
-PrintApp sends 'print:ready' IPC when rendered (existing signal, unchanged)
-    ↓
-Handler calls printToPDF({ printBackground: true, pageSize: 'Letter', margins: {0,0,0,0} })
-    ↓
-PDF matches preview exactly: same URL, same rendering engine, same component code
+OptimizeVariant or AnalysisResults
+  → ai:getOverrides(analysisId)   → [{ bulletId, overrideText }]
+  → templates:getBuilderData(variantId)
+  → merge: for each bullet, if override exists replace .text with overrideText
+  → postMessage to PrintApp with merged BuilderJob[]
+  → rendered HTML  [no schema mutation — base bullets unchanged]
 ```
 
-### Template Selection Flow
-
-```
-User picks 'modern' from template dropdown in VariantEditor
-    ↓
-handleThemeChange('modern') fires
-    ↓
-window.api.templates.setLayoutTemplate(variantId, 'modern') → DB update
-    ↓
-setLayoutTemplate('modern') updates local React state in VariantEditor
-    ↓
-VariantPreview receives new layoutTemplate prop → iframe src changes to ?template=modern
-    ↓
-Iframe reloads, PrintApp renders ModernTemplate, preview updates
-```
-
-### Snapshot PDF Flow (Design Decision Required)
-
-The `export:snapshotPdf` handler currently renders using `buildResumeJson()` +
-`renderThemeHtml()` from themeRegistry — this path is specific to jsonresume themes and
-breaks when old themes are removed.
-
-**Recommended approach:** Snapshots store their own data (jobs, skills, etc.) and the
-`layoutTemplate` at time of submission. To re-export a snapshot as PDF, the handler
-should write the snapshot data to a temporary IPC channel or pass it via query param
-encoding, then load `print.html?snapshotId=tmp` in a hidden BrowserWindow where PrintApp
-can retrieve it. This keeps the single rendering path and is addressable in the phase
-that handles snapshot export.
-
-**Alternative (simpler short-term):** Keep `export:snapshotPdf` using the 'classic'
-template as a hardcoded fallback when old themes are removed, replacing the 'even' theme
-fallback that exists today. Full template-aware snapshot PDF can be addressed in a
-subsequent phase.
-
----
-
-## Integration Points
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| VariantPreview ↔ PrintApp | iframe src URL with query params | variantId + template key; no new IPC handlers needed |
-| export:pdf handler ↔ PrintApp | BrowserWindow URL + print:ready IPC | Existing print:ready signal is unchanged |
-| VariantEditor ↔ themes handler | `themes:list` IPC | Returns new TEMPLATE_LIST instead of old THEMES array |
-| Template components ↔ DB | Unchanged; BuilderData type is unchanged | No schema changes needed for basic template switching |
-| PrintApp ↔ resolveTemplate | Direct import in renderer bundle | Happens at build time; no runtime resolution |
-| Snapshot PDF ↔ template system | Needs design decision (see above) | Current path uses themeRegistry; breaks on theme removal |
-
-### Preload Changes
-
-No new IPC channels are required for basic template switching. The existing
-`templates:setLayoutTemplate` IPC already persists the template key. New IPC may be
-needed when template controls (accent color, compact) are implemented:
-
+**Merge function (pure, ~10 lines):**
 ```typescript
-// Possible addition to preload/index.ts when controls phase is built:
-templates: {
-  // ...existing...
-  setTemplateOptions: (id: number, options: {
-    accentColor?: string
-    compact?: boolean
-    skillsDisplay?: 'grouped' | 'inline'
-  }) => ipcRenderer.invoke('templates:setTemplateOptions', id, options),
+// src/renderer/src/lib/overrides.ts
+export function applyOverrides(
+  jobs: BuilderJob[],
+  overrides: Array<{ bulletId: number; overrideText: string }>
+): BuilderJob[] {
+  const map = new Map(overrides.map(o => [o.bulletId, o.overrideText]))
+  return jobs.map(job => ({
+    ...job,
+    bullets: job.bullets.map(b =>
+      map.has(b.id) ? { ...b, text: map.get(b.id)! } : b
+    ),
+  }))
 }
 ```
 
----
+### Submission snapshot with overrides
 
-## Build Order for Phases
-
-The template system has clear dependencies. This order minimizes risk.
-
-**Phase 1 — Pipeline validation (must be done first):**
-1. Define `ResumeTemplateProps` type in `templates/types.ts`
-2. Implement `filterResumeData()` in `templates/filterResumeData.ts`
-3. Build `ClassicTemplate.tsx` — one full template
-4. Implement `resolveTemplate.ts` with Classic as the only entry
-5. Modify `PrintApp.tsx` to read `template` param and call `resolveTemplate()`
-6. Modify `VariantPreview.tsx` to use `<iframe src="print.html?...">` for all templates
-7. Modify `export.ts` to unify PDF paths (remove isProfessional branch, always use print.html)
-8. Update `themeRegistry.ts` THEMES list to include 'classic' alongside old themes
-9. Validate: preview matches PDF, no layout drift, existing 'professional' path is removed
-
-Do not build all 5 templates before validating the pipeline. Classic proves the
-architecture; the other 4 are incremental.
-
-**Phase 2 — Remaining templates (after pipeline validated):**
-- ModernTemplate, JakeTemplate, MinimalTemplate, ExecutiveTemplate
-- All are independent; each adds one entry to `resolveTemplate.ts`
-- Each follows the same props interface and rendering pattern as Classic
-
-**Phase 3 — Template controls (after at least 2-3 templates exist):**
-- Accent color picker in VariantEditor (template consumes `accentColor` prop)
-- Compact margin toggle (template consumes `compact` prop)
-- Skills display mode toggle (inline pills vs grouped rows)
-- Schema: ADD COLUMN for `accentColor`, `compact`, `skillsDisplay` in templateVariants
-- `getBuilderData` IPC returns these fields (or a new `getTemplateOptions` IPC)
-
-**Phase 4 — Remove old themes:**
-- Remove Even/Class/Elegant npm packages from package.json
-- Remove `renderThemeHtml()` switch cases from themeRegistry
-- Remove old theme code from export.ts (isProfessional branch already gone after Phase 1)
-- Remove `ProfessionalLayout.tsx`
-- Update snapshot PDF path (classic fallback or full solution)
-- Update `THEMES` constant to only list the 5 new templates
-
-**Dependency graph:**
 ```
-types.ts + filterResumeData.ts
-    ↓
-ClassicTemplate.tsx
-    ↓
-resolveTemplate.ts
-    ↓
-PrintApp.tsx (reads ?template param)
-    ↓
-VariantPreview.tsx (iframe path)     export.ts (unified path)
-    ↓
-validate preview = PDF fidelity
-    ↓
-ModernTemplate + JakeTemplate + MinimalTemplate + ExecutiveTemplate (parallel)
-    ↓
-template controls (accentColor, compact, skillsDisplay)
-    ↓
-schema columns + TemplateEditor UI
-    ↓
-remove old themes + ProfessionalLayout.tsx
+submissions:create(variantId, analysisId)
+  → buildSnapshotForVariant(variantId, analysisId?)   [modified signature]
+  → [existing: build jobs/skills/etc with exclusions]
+  → if analysisId: fetch analysis_bullet_overrides for that analysisId
+  → applyOverrides(snapshot.jobs, overrides)   [same merge utility]
+  → JSON.stringify(merged snapshot) → resumeSnapshot column
 ```
 
----
+The snapshot shape is unchanged — `jobs[].bullets[].text` values are just the override values where applicable. The existing `SnapshotViewer` renders them correctly with no changes.
 
-## Anti-Patterns
+### Skills chip drag (category reassignment)
 
-### Anti-Pattern 1: Shared Base Template Component
+```
+User drags chip from "Languages" group to "Frameworks" group
+  → onDrop: compute new tags array (replace old category tag with new one)
+  → optimistic UI update in SkillChipGrid state
+  → skills:update(id, { tags: newTagArray })   [existing IPC]
+  → SkillChipGrid re-computes groups from updated tags
+```
 
-**What people do:** Create `BaseTemplate.tsx` with abstract sections that all templates
-extend or configure through props.
-
-**Why it's wrong:** Resume template layouts differ structurally (1-column vs 2-column,
-sidebar vs stacked, header with accent bar vs minimal header). A shared base becomes
-either a kitchen-sink prop explosion or forces artificial uniformity across designs that
-are supposed to look distinct.
-
-**Do this instead:** Share the `ResumeTemplateProps` TypeScript type and the
-`filterResumeData()` utility. Keep each template's JSX independent. Copy the initial
-structure from Classic to start each new template; diverge freely as the design requires.
-
-### Anti-Pattern 2: CSS Class Files for Template Styles
-
-**What people do:** Write `classic-template.css` files and import them into template
-components.
-
-**Why it's wrong:** Templates render in `print.html` — an isolated BrowserWindow page.
-CSS file loading depends on correct asset URL resolution at runtime. In dev, Vite serves
-files; in prod, they must be bundled with the correct relative paths. The existing codebase
-already hit this problem with ESM themes (the `Class` theme's Handlebars templates
-require disk reads, which broke bundling). Inline styles have zero path-resolution risk.
-
-**Do this instead:** Inline styles as `React.CSSProperties` objects. For print-specific
-rules that cannot be inline (`@page`, print media query), inject a single `<style>` tag
-at the top of the template's rendered output.
-
-### Anti-Pattern 3: Separate Preview and Export Rendering Paths
-
-**What people do:** Render preview inline in the React app (fast, avoids BrowserWindow
-overhead) and use a different rendering path for PDF.
-
-**Why it's wrong:** Any difference between preview and export renders — different fonts,
-different CSS loading, different layout state — causes layout drift. The user sees one
-layout in preview and gets something different in the PDF. This is exactly the current
-problem with Even/Class/Elegant themes, which motivated this entire milestone.
-
-**Do this instead:** Use `print.html` + `PrintApp` for both preview and export. Preview
-is an iframe pointing to the same URL that export uses. Layout drift is structurally
-impossible when both paths use the same URL, same component, and same Chromium engine.
-
-### Anti-Pattern 4: Server-Side React Rendering in Main Process
-
-**What people do:** Have the main process import template components and call
-`ReactDOMServer.renderToStaticMarkup()` to produce HTML, then write to a temp file for
-PDF printing.
-
-**Why it's wrong:** The main process has no DOM. `renderToStaticMarkup()` produces
-HTML structure but does NOT render fonts, resolve CSS cascade, or compute final text
-metrics. Chromium's layout engine is required to get pixel-accurate line heights,
-word-wrap, and page break positions — which is exactly what `printToPDF()` needs to
-match the visual preview.
-
-**Do this instead:** Always render in a Chromium context (a BrowserWindow for export,
-the existing renderer iframe for preview). The `print:ready` pattern already handles
-this correctly.
-
-### Anti-Pattern 5: Keeping isProfessional/isTheme Branches
-
-**What people do:** Add a new 'new-template' case alongside the existing professional
-and theme branches in `export.ts` and `VariantPreview.tsx`.
-
-**Why it's wrong:** Three code paths for rendering means three places to maintain and
-three surfaces for bugs. The whole point of the new architecture is collapsing to one.
-
-**Do this instead:** As part of Phase 1, immediately unify export.ts to one path (the
-print.html BrowserWindow path). Remove the `isProfessional` check. ProfessionalLayout
-becomes Classic template; it uses the same path as everything else.
+No new IPC required. The existing `skills:update` handler accepts `{ tags: string[] }`.
 
 ---
 
-## Scaling Considerations
+## Patterns to Follow
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 5 templates | Current design — inline styles, single PrintApp, TEMPLATE_MAP lookup |
-| 10+ templates | Still fine; `resolveTemplate()` is an O(1) map lookup, adding templates requires no architectural changes |
-| Runtime-installable templates | Would require dynamic `import()` + a template manifest file — explicitly out of scope for v2.1 per PROJECT.md |
+### Pattern 1: Non-Destructive Override Storage
+
+**What:** Store overrides in a join table keyed to `(analysis_id, bullet_id)`. Never mutate base data. Merge only at render time.
+
+**When:** Any time AI-suggested content must be scoped to a specific context without polluting base history.
+
+**Why this fits the existing codebase:** The immutable snapshot principle is already established — `buildSnapshotForVariant` freezes state at submit time. Overrides extend this principle to bullet text: the override is the "what was sent to this job posting" record, not a permanent edit to the bullet.
+
+### Pattern 2: ensureSchema() ALTER TABLE Pattern for New Tables
+
+**What:** New tables go in the `CREATE TABLE IF NOT EXISTS` block in `ensureSchema()`. New columns on existing tables go in the `alterStatements` array (try/catch silently ignores "column already exists").
+
+**When:** Every schema change in this project. Do not use file-based migrations for new tables.
+
+**Example addition for `analysis_bullet_overrides`:**
+```typescript
+// In ensureSchema() main block — append to the sqlite.exec() call:
+CREATE TABLE IF NOT EXISTS \`analysis_bullet_overrides\` (
+  \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  \`analysis_id\` integer NOT NULL,
+  \`bullet_id\` integer NOT NULL,
+  \`override_text\` text NOT NULL,
+  UNIQUE(\`analysis_id\`, \`bullet_id\`),
+  FOREIGN KEY (\`analysis_id\`) REFERENCES \`analysis_results\`(\`id\`) ON DELETE cascade,
+  FOREIGN KEY (\`bullet_id\`) REFERENCES \`job_bullets\`(\`id\`) ON DELETE cascade
+);
+
+// And in schema.ts:
+export const analysisBulletOverrides = sqliteTable('analysis_bullet_overrides', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  analysisId: integer('analysis_id').notNull()
+    .references(() => analysisResults.id, { onDelete: 'cascade' }),
+  bulletId: integer('bullet_id').notNull()
+    .references(() => jobBullets.id, { onDelete: 'cascade' }),
+  overrideText: text('override_text').notNull(),
+})
+```
+
+### Pattern 3: Single postMessage Payload Extension
+
+**What:** PrintApp receives data via postMessage. Extend the payload with an optional `analysisOverrides` field. If absent, behavior is identical to current.
+
+**When:** Whenever rendering needs analysis-specific data without changing the base data path.
+
+**Extension (additive, backward compatible):**
+```typescript
+// PrintApp.tsx postMessage payload:
+interface PostMessagePayload {
+  profile: Profile
+  jobs: BuilderJob[]
+  skills: BuilderSkill[]
+  // ... existing fields unchanged ...
+  analysisOverrides?: Array<{ bulletId: number; overrideText: string }>  // NEW optional
+}
+// In PrintApp useEffect on message receipt:
+const overrides = payload.analysisOverrides ?? []
+const resolvedJobs = overrides.length > 0 ? applyOverrides(payload.jobs, overrides) : payload.jobs
+```
+
+### Pattern 4: Chip UI Using Existing Tag-as-Category Model
+
+**What:** Skills already use `tags: string[]` where the first tag is the display group (see `buildResumeJson` in `themeRegistry.ts`). The chip grid renders this grouping visually. Drag-between-groups mutates `tags[0]` via the existing `skills:update` IPC.
+
+**Why:** Zero schema change. The existing `tags` JSON column handles all state. Drag is a pure UI concern.
+
+**Drag approach — native HTML5:**
+```typescript
+// SkillChip drag source:
+<div draggable onDragStart={e => e.dataTransfer.setData('skillId', String(skill.id))} ...>
+
+// SkillChipGroup drop target:
+<div
+  onDragOver={e => { e.preventDefault(); setDropHighlight(true) }}
+  onDragLeave={() => setDropHighlight(false)}
+  onDrop={e => {
+    e.preventDefault()
+    const skillId = Number(e.dataTransfer.getData('skillId'))
+    onDropSkill(skillId, groupTag)  // parent handles tags:update call
+    setDropHighlight(false)
+  }}
+  style={{ border: dropHighlight ? '1px dashed var(--color-accent)' : '1px solid transparent' }}
+>
+```
+
+Uses only inline styles — compatible with file:// context. No external CSS library.
+
+---
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Writing Rewrites to Base Bullets
+
+**What was happening:** `OptimizeVariant.tsx` `handleSave` calls `window.api.bullets.update(bulletId, { text: finalText })` for accepted suggestions. This overwrites `job_bullets.text` globally.
+
+**Why bad:** The rewrite becomes permanent. Re-analyzing with a different job posting sees the already-rewritten text, not the original. Multiple analyses targeting the same bullet conflict.
+
+**Instead:** Write to `analysis_bullet_overrides`. The base bullet stays untouched.
+
+### Anti-Pattern 2: Storing Override State in analysis_results.suggestions
+
+**What:** Modifying the `suggestions` JSON column to track accepted/dismissed state.
+
+**Why bad:** `suggestions` is LLM output — should be immutable to allow re-reading original suggestions. Mixing state into it means accepted rewrites are lost on re-analysis.
+
+**Instead:** `analysis_bullet_overrides` is the accepted-state record. `suggestions` remains read-only LLM output.
+
+### Anti-Pattern 3: Chip Drag Using External CSS Libraries
+
+**What:** Importing `react-beautiful-dnd`, `@dnd-kit/core`, or similar libraries that ship their own CSS.
+
+**Why bad:** Established constraint — "external CSS breaks in prod file:// context." All layout must use inline styles or existing CSS custom properties.
+
+**Instead:** HTML5 native drag events (`draggable`, `onDragStart`, `onDragOver`, `onDrop`) with inline style state for drop-target highlight.
+
+### Anti-Pattern 4: New IPC Channels for Existing Data
+
+**What:** Creating a `skills:listForChipGrid` handler that returns the same data as `skills:list`.
+
+**Why bad:** Duplication. Grouping logic is pure client-side computation on the existing data shape.
+
+**Instead:** Reuse `skills:list`. `SkillChipGrid` groups the flat list in-component using the existing `tags` array.
+
+---
+
+## Integration Points — New vs Modified Summary
+
+### New (net-new items)
+
+| Item | Type | Location |
+|------|------|----------|
+| `analysis_bullet_overrides` | DB table | `schema.ts` + `ensureSchema()` block |
+| `analysisBulletOverrides` | Drizzle table def | `schema.ts` |
+| `ai:saveOverrides` | IPC handler | `src/main/handlers/ai.ts` |
+| `ai:getOverrides` | IPC handler | `src/main/handlers/ai.ts` |
+| `applyOverrides()` | Utility function | `src/renderer/src/lib/overrides.ts` |
+| `SkillChipGrid.tsx` | React component | `src/renderer/src/components/` |
+| `SkillChipGroup.tsx` | React component | `src/renderer/src/components/` |
+| `SkillChip.tsx` | React component | `src/renderer/src/components/` |
+
+### Modified (existing items that change)
+
+| Item | Change | Risk |
+|------|--------|------|
+| `OptimizeVariant.tsx` | `handleSave` writes to `ai:saveOverrides` instead of `bullets:update` | Medium — core save path |
+| `VariantBuilder.tsx` | Add job-level toggle UI per job header (handler already exists) | Low — additive UI |
+| `SkillList.tsx` | Replace list body with `SkillChipGrid` | Low — same IPC surface |
+| `PrintApp.tsx` | Accept optional `analysisOverrides` in postMessage; merge before render | Low — additive, null-safe |
+| `buildSnapshotForVariant()` in `submissions.ts` | Add optional `analysisId` param; fetch + merge overrides if provided | Low — optional param |
+| `submissions:create` handler | Pass `analysisId` through to `buildSnapshotForVariant` | Low — data already in payload |
+| `AnalysisResults.tsx` | Pre-fill company/role in log submission form (data already present in `raw`) | Low — display only |
+| `AnalysisList.tsx` | Add Submit CTA per row | Low — additive button |
+| `NewAnalysisForm.tsx` | Auto-populate company/role fields after `ai:analyze` returns `parsedJob` | Low — `parsedJob` already returned |
+| Preload `window.api` types | Add `ai.saveOverrides`, `ai.getOverrides` | Low — additive |
+
+---
+
+## Suggested Build Order
+
+Dependencies flow bottom-to-top. Schema and IPC must land before UI.
+
+```
+Phase A — Schema + Override IPC (unblocks everything else)
+  1. Add analysis_bullet_overrides to ensureSchema() and schema.ts
+  2. Implement ai:saveOverrides handler
+  3. Implement ai:getOverrides handler
+  4. Expose both in preload
+  5. Write applyOverrides() utility
+
+Phase B — OptimizeVariant Rewires (depends on Phase A)
+  1. Change handleSave to call ai:saveOverrides (replaces bullets:update calls)
+  2. Add override-aware preview in OptimizeVariant (merge overrides before postMessage)
+  3. Remove "Optimization available in a future update" placeholder text
+
+Phase C — Analysis Submission Flow (depends on Phase A)
+  1. Modify buildSnapshotForVariant() to accept optional analysisId
+  2. Add override merge in submissions:create
+  3. Add "Submit" button to AnalysisList rows
+  4. Pre-fill company/role in SubmissionLogForm from analysis data
+  5. Auto-populate company/role in NewAnalysisForm after parse
+
+Phase D — Skills Chip Grid (independent, can run parallel to B-C)
+  1. Build SkillChip.tsx
+  2. Build SkillChipGroup.tsx
+  3. Build SkillChipGrid.tsx
+  4. Replace SkillList.tsx body
+
+Phase E — Variant UX: Job Toggle (independent, any phase)
+  1. Add job-level toggle checkbox to VariantBuilder.tsx job headers
+  (handler already implemented — UI-only change)
+```
+
+---
+
+## Scalability Considerations
+
+Single-user desktop app — scalability concerns are UI performance and DB state management.
+
+| Concern | Approach |
+|---------|----------|
+| Same bullet accepted in two analyses | `UNIQUE(analysis_id, bullet_id)` — each analysis owns its own overrides, no cross-contamination |
+| SkillChipGrid with 100+ skills | Client-side grouping is O(n); native HTML5 drag has no virtualization requirement at this scale |
+| Snapshot size with overrides | Overrides are merged into `jobs[].bullets[].text` before serialization — snapshot shape unchanged, SnapshotViewer needs no changes |
+| Re-analysis after overrides exist | New analysis gets a new `analysisId`; starts with empty overrides. Old analysis overrides persist and are still viewable. |
+| Deleting a bullet or analysis | `ON DELETE CASCADE` on both FK constraints — orphaned overrides are automatically cleaned |
 
 ---
 
 ## Sources
 
-- Direct codebase inspection: `VariantPreview.tsx`, `PrintApp.tsx`, `ProfessionalLayout.tsx`,
-  `export.ts`, `themeRegistry.ts`, `themes.ts`, `schema.ts`, `VariantEditor.tsx`,
-  `preload/index.ts`, `db/schema.ts`
-- Project decisions: `.planning/PROJECT.md` — inline styles constraint, ESM theme
-  bundling issue (Class theme), DOCX stays built-in only, template rendering is
-  browser-side only
-- Existing proven pattern: `print:ready` IPC signal in export.ts for PDF-ready signaling
-
----
-
-*Architecture research for: ResumeHelper v2.1 Resume Templates*
-*Researched: 2026-03-25*
+- Direct code inspection: `src/main/db/schema.ts` — full table schema
+- Direct code inspection: `src/main/db/index.ts` — `ensureSchema()` pattern, `alterStatements` array
+- Direct code inspection: `src/main/handlers/ai.ts` — current `ai:analyze`, stub `ai:acceptSuggestion`
+- Direct code inspection: `src/main/handlers/templates.ts` — `setItemExcluded` job cascade, `getBuilderData`
+- Direct code inspection: `src/main/handlers/submissions.ts` — `buildSnapshotForVariant`, `submissions:create`
+- Direct code inspection: `src/main/handlers/skills.ts` — `skills:update` accepts `{ tags: string[] }`
+- Direct code inspection: `src/renderer/src/components/OptimizeVariant.tsx` — `handleSave` with `bullets:update` mutation (the anti-pattern being replaced)
+- Direct code inspection: `src/renderer/src/components/SkillList.tsx`, `SkillItem.tsx` — current flat list UI
+- Direct code inspection: `src/renderer/src/components/AnalysisResults.tsx` — `raw.company`/`raw.role` already available
+- Direct code inspection: `src/renderer/src/PrintApp.tsx` — postMessage payload structure
+- Direct code inspection: `src/main/lib/themeRegistry.ts` — `tags[0]` as group key in `buildResumeJson`
+- Confidence: HIGH — all patterns derived from direct source reading of the codebase at v2.1 shipped state

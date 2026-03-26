@@ -1,19 +1,17 @@
 # Project Research Summary
 
-**Project:** ResumeHelper v2.1 — Resume Template System
-**Domain:** Electron desktop app — PDF/DOCX resume export, multi-template rendering pipeline
-**Researched:** 2026-03-25
-**Confidence:** HIGH (codebase inspected directly; all findings grounded in existing code)
-
----
+**Project:** ResumeHelper v2.2 — Three-Layer Data Model
+**Domain:** Desktop resume management app — analysis-scoped overrides, skills chip UI, analysis/variant UX gaps
+**Researched:** 2026-03-26
+**Confidence:** HIGH
 
 ## Executive Summary
 
-ResumeHelper v2.1 is a targeted replacement of three failing jsonresume npm themes (Even, Class, Elegant) with five purpose-built React template components (Classic, Modern, Jake, Minimal, Executive). The root problem is a bifurcated rendering pipeline: the existing "professional" path renders via a React component directly in the renderer, while the "theme" path renders HTML in an iframe from the main process. This structural split causes preview-to-PDF layout drift — the defining trust failure of the current system. The recommended fix eliminates both paths and replaces them with a single unified path: every template renders through `print.html` + `PrintApp.tsx` in a Chromium BrowserWindow, used as both the preview iframe src and the PDF export target.
+ResumeHelper v2.2 solves a specific architectural problem: AI bullet rewrites currently mutate the `job_bullets` table globally, permanently overwriting the user's canonical experience data. The milestone introduces a three-layer model (base experience → variant selection → analysis-scoped overrides) that preserves data integrity while still letting analysis results tailor resume content per job posting. This is the load-bearing change the entire milestone depends on — everything else either requires it or is independent of it.
 
-The implementation requires one new npm package (`react-colorful` for accent color picking), bundled woff2 font files for Inter/Lato/EB Garamond, and surgical modifications to five existing files (PrintApp, VariantPreview, VariantEditor, export.ts, themeRegistry.ts). The core architectural insight is that sharing the same URL between preview and export makes layout drift structurally impossible — the same React component, same Chromium engine, same rendering context. Template components share a TypeScript interface (`ResumeTemplateProps`) and a registry function (`resolveTemplate`), but each template's JSX is independent. No shared base component.
+The recommended approach is a new `analysis_bullet_overrides` table with `(analysis_id, bullet_id)` uniqueness, added via the existing `ensureSchema()` / `CREATE TABLE IF NOT EXISTS` pattern, zero new npm dependencies, and a pure-TypeScript merge function applied at render/export time. Skills management gets a chip grid built on the already-installed `@dnd-kit` packages with a new `category` column on the `skills` table (migrated from the existing `tags` array). Analysis UX gaps — submit from analysis screen, auto-extract company/role, job-level variant toggle — are all low-risk additive changes against existing schema.
 
-The primary risk is the template pipeline migration itself: removing the old bifurcated paths while keeping the app functional requires a careful phase sequence (validate Classic template end-to-end before building the other four; remove old theme wiring only after all five new templates are confirmed working). A secondary risk is the `templateOptions` schema migration — accent color, compact margins, and skills display mode all gate on this column landing correctly in existing users' SQLite databases via `ALTER TABLE` with a `try/catch` guard.
+The dominant risk is schema migration correctness. The project has an established `ensureSchema()` + `ALTER TABLE` try/catch pattern that works, but every new column and table must be verified against existing databases, not just fresh installs. The second risk is the `OptimizeVariant` accept path: changing where rewrites are written is a behavioral break, and it must happen atomically with the storage target existing. Both risks are well-understood and have clear mitigations documented in PITFALLS.md.
 
 ---
 
@@ -21,121 +19,166 @@ The primary risk is the template pipeline migration itself: removing the old bif
 
 ### Recommended Stack
 
-The existing v2.0 stack (Electron 39, React 19, TypeScript, Drizzle ORM, SQLite, docx 9.6.1, electron-vite 5) requires no major additions. One new dependency is warranted: `react-colorful@5.6.1` (2.8KB, zero deps, hooks-only, React 19 compatible) for the accent color picker. Font loading uses bundled woff2 files in `src/renderer/public/fonts/` — no CDN, no Google Fonts import, no base64 encoding. DOCX per-template font selection is a parameter addition to the existing `docx` builder, not a new library.
+No new npm packages are required for v2.2. The entire milestone is built on the existing stack: Electron 39 + React 19 + Drizzle ORM + better-sqlite3 + `@dnd-kit/core 6.3.1` + `@dnd-kit/sortable 10.0.0` + `ai` SDK + Zod. All library capabilities needed for the milestone (cross-container DnD, structured LLM extraction, Drizzle JSON columns, SQL migrations) are already installed and in use.
 
 **Core technologies:**
-- **Electron 39 + `webContents.printToPDF`:** Existing PDF export mechanism — do not replace with puppeteer or @react-pdf/renderer
-- **React 19 inline styles:** Established pattern in `ProfessionalLayout.tsx`; required because templates render in an isolated BrowserWindow with no external CSS available
-- **Bundled woff2 fonts:** Inter (Jake), Lato (Modern/Minimal), EB Garamond (Executive) — placed in `src/renderer/public/fonts/`, copied as-is by electron-vite to both dev and prod
-- **react-colorful@5.6.1:** Accent color picker; only new npm dependency for v2.1
-- **Drizzle `ALTER TABLE` migration:** `templateOptions TEXT DEFAULT '{}'` column on `templateVariants`, added via try/catch `ALTER TABLE` at startup (not via Drizzle file-based migration runner)
+- `@dnd-kit/core` + `@dnd-kit/sortable`: chip grid with cross-container drag — already installed, already used in `BulletList.tsx` / `JobList.tsx`; use `rectSortingStrategy` for variable-width chips, `DragOverlay` for drag preview
+- `drizzle-orm` + `better-sqlite3`: new `analysis_bullet_overrides` table and `skills.category` column added via `ensureSchema()` — no Drizzle file-based migration needed
+- `ai` SDK + `zod`: company/role extraction reuses the existing `generateObject` + Zod pattern from v2.0; no new LLM infrastructure
+- Custom `SkillChip` component (~50 lines, inline styles only): Material UI and PrimeReact chips are incompatible with the `file://` protocol renderer constraint
 
-**What NOT to add:** puppeteer, html2canvas, pdfmake, @react-pdf/renderer, docxtemplater, CSS `@page` rules (conflicts with printToPDF margins per Electron issue #8138), Google Fonts `@import` (offline failure), base64 fonts (OTS parsing errors).
+**Critical version note:** `@dnd-kit/sortable 10.0.0` is installed. Use `rectSortingStrategy` (not `verticalListSortingStrategy`) for the chip grid — the latter assumes equal-height vertical rows and produces wrong behavior with variable-width horizontal chips.
 
 ### Expected Features
 
-The v2.1 milestone has a clear, bounded scope. The old theme system is removed; a new template system replaces it. All features must maintain ATS-clean output (single-column, no tables, no text boxes).
+**Must have for v2.2 launch (P1):**
+- Analysis-scoped bullet overrides (`analysis_bullet_overrides` table + merge-at-render) — gates the entire milestone
+- `OptimizeVariant` accept path writes to override table, not `job_bullets.text` — removes the destructive mutation
+- Merge-at-render for preview/PDF/snapshot when `analysisId` is in context — makes overrides visible
+- Toggle entire job on/off in `VariantBuilder.tsx` — UI-only, handler already implemented
+- Submit from analysis screen with pre-populated company/role — closes the analyze → log submission workflow gap
+- Auto-extract company/role from posting during analysis — eliminates manual re-entry after paste
+- Chip grid skills management — replaces unwieldy list; uses existing `@dnd-kit` install
+- Edit submission metadata inline — uses existing `InlineEdit.tsx` pattern, no schema change
+- Remove stale "coming soon" messages — cleanup, no behavior change
 
-**Must have (table stakes — v2.1 launch):**
-- 5 distinct React template components (Classic, Modern, Jake, Minimal, Executive) — all single-column
-- Preview-to-PDF fidelity via unified `print.html` rendering path — this is the core trust requirement
-- Page break overlay in preview pane — users must see page 2 boundary before exporting
-- `templateOptions` JSON column migration — gates all three customization controls
-- Accent color picker (8-10 preset swatches, no freeform hex input for v2.1)
-- Compact margin toggle (normal / tight — two states only)
-- Skills display mode: `grouped` and `inline` (defer `pills` to v2.2)
-- Remove Even/Class/Elegant theme wiring and iframe path in VariantPreview
+**Add after v2.2 validation (P2):**
+- "Promote override to base bullet" explicit action
+- Category rename as bulk tag-update operation
+- Per-analysis score delta display
 
-**Should have (competitive — v2.1.x after validation):**
-- Skills `pills` display mode with explicit DOCX inline fallback
-- Template thumbnail grid picker (text dropdown is acceptable for v2.1 launch)
+**Defer to v2.3+:**
+- Skills `sortOrder` within categories
+- Skills pills display in PDF/DOCX
+- Submission analytics and pattern insights
+- AI-powered auto-variant generation
 
-**Defer (v2.2+):**
-- A4 page size support (needs different page-height calculations for overlay)
-- User-requested additional templates
-- AI-powered auto-variant generation (already scoped to v2.2 in PROJECT.md)
-
-**Anti-features to reject:** freeform margin sliders, per-section font controls, custom font upload, multi-column templates, live font-size shrink-to-fit, runtime theme install from URL.
+**Anti-features to reject in v2.2:**
+- Auto-promote all accepted rewrites to base bullets (violates layer separation)
+- Batch accept AI rewrites without per-bullet review (reintroduces fabrication risk)
+- Analysis overrides that carry forward across re-analysis (re-analysis must start fresh)
 
 ### Architecture Approach
 
-The core architectural decision is per-template independent React components (no shared base component) connected through a shared TypeScript type and a single registry function. The unified rendering path eliminates the preview/export split: `VariantPreview` renders an `<iframe src="print.html?variantId=X&template=classic">` instead of either a direct React component render or an `srcDoc` iframe. The PDF export handler loads the same URL in a hidden BrowserWindow. `PrintApp.tsx` reads the `?template=` param, calls `resolveTemplate()`, and renders the appropriate component.
+Three new components (`SkillChip`, `SkillChipGroup`, `SkillChipGrid`), one new IPC handler pair (`ai:saveOverrides`, `ai:getOverrides`), one new table (`analysis_bullet_overrides`), one new utility function (`applyOverrides`), and modifications to `OptimizeVariant`, `VariantBuilder`, `PrintApp`, `buildSnapshotForVariant`, `AnalysisResults`, `AnalysisList`, and `NewAnalysisForm`. The rendering pipeline receives an optional `analysisOverrides` field in the postMessage payload — absent means current behavior, present triggers a pure merge. The existing `SnapshotViewer` needs no changes because overrides are baked into the snapshot shape.
 
 **Major components:**
-1. `src/renderer/src/components/templates/` — new directory containing all 5 template components plus `types.ts`, `resolveTemplate.ts`, and `filterResumeData.ts`
-2. `PrintApp.tsx` (modified) — reads `?template=` param, dispatches to `resolveTemplate()`, serves both preview iframes and PDF export BrowserWindows
-3. `VariantPreview.tsx` (modified) — drops built-in/theme branch split; all templates render as `<iframe src="print.html?...">`
-4. `export.ts` (modified) — removes `isProfessional`/`isTheme` branch split; all templates use the `print.html` BrowserWindow path
-5. `themeRegistry.ts` (modified) — replaces old THEMES list and `renderThemeHtml()` with new template keys; `buildResumeJson()` kept
+1. `analysis_bullet_overrides` table — stores `(analysis_id, bullet_id, override_text)` with `UNIQUE(analysis_id, bullet_id)` and `ON DELETE CASCADE` on both FKs; added via `ensureSchema()` main block
+2. `applyOverrides()` utility (`src/renderer/src/lib/overrides.ts`) — pure function, ~10 lines, maps override rows onto `BuilderJob[]` without mutating the input
+3. `SkillChipGrid` component tree — `DndContext` wrapping multiple `SortableContext` containers (one per category), using `rectSortingStrategy` and `DragOverlay`
+4. `buildSnapshotForVariant()` modification — adds optional `analysisId` param; if present, fetches overrides and runs `applyOverrides` before JSON serialization
+
+**Key patterns:**
+- Non-destructive override storage: base data never mutated by the analysis flow
+- `ensureSchema()` for new tables, `ALTER TABLE` try/catch for new columns on existing tables
+- Additive postMessage payload extension: `analysisOverrides?: Array<{...}>` — absent means identical to current behavior
+- Tags-as-categories: `skills.tags[0]` is the display group — `category` column replaces this with a single authoritative category; drag-between-groups updates the column via existing `skills:update` IPC
 
 ### Critical Pitfalls
 
-1. **Keeping isProfessional/isTheme code branches** — Adding new templates alongside old paths creates three rendering surfaces. Collapse to one path in Phase 1 by removing the `isProfessional` check in `export.ts` and the built-in/theme split in `VariantPreview.tsx`.
+The following pitfalls are the highest-risk items for this milestone specifically:
 
-2. **CSS `@page` rules in templates** — Conflicts with `printToPDF`'s `margins` option (Electron issue #8138), causing layout drift between preview and PDF. Use `printToPDF`'s `margins` option only; never add `@page` to template CSS.
+1. **OptimizeVariant still calls `bullets:update` after three-layer model lands** (Pitfall 35) — The accept path change and the storage target must ship atomically. If `analysis_bullet_overrides` exists but `OptimizeVariant` still writes to `job_bullets`, the table is dead code and the bug persists. Block: do the schema + IPC first, change `OptimizeVariant` in the same phase.
 
-3. **CSS file imports for template styles** — Templates render in an isolated `print.html` BrowserWindow page. External CSS file loading breaks in prod due to path resolution differences between dev (Vite) and prod (`file://`). Use inline styles (`React.CSSProperties`) for all visual properties; inject a single `<style>` tag only for print-specific rules that cannot be inline.
+2. **Snapshot builder ignores `analysisId` — submission freezes base text instead of override** (Pitfall 36) — `buildSnapshotForVariant` was written before overrides existed. It must be updated in the same phase that introduces the overrides table, not deferred. Add a test: create override → create submission → read snapshot JSON → assert override text is present.
 
-4. **`templateOptions` schema migration on existing databases** — `CREATE TABLE IF NOT EXISTS` is a no-op on existing tables. The new `template_options` column requires `ALTER TABLE template_variants ADD COLUMN template_options TEXT DEFAULT '{}'` inside a `try/catch` in `db/index.ts` — not a Drizzle file-based migration (the existing `migrate()` catch block swallows errors silently).
+3. **Skills migration silently drops existing tag assignments** (Pitfall 37) — If the migration only creates new tables without reading existing `skills.tags` data, users lose all category organization. The migration must read `tags` JSON for every existing skill, deduplicate category names, and insert assignment rows. Verify with a count assertion post-migration.
 
-5. **Building all 5 templates before validating the pipeline** — The Classic template proves the entire architecture (types, resolveTemplate, PrintApp dispatch, VariantPreview iframe path, unified export). Build and validate Classic end-to-end first. The other four templates are independent increments.
+4. **Drag-and-drop on Windows using HTML5 DnD API** (Pitfall 38) — `dragover`/`drop` has documented Electron/Windows quirks. `@dnd-kit` uses pointer events instead and is already installed. Do not implement the chip drag with native HTML5 DnD even though ARCHITECTURE.md shows a native DnD pattern — STACK.md recommendation supersedes it. See Gaps section.
 
-6. **Snapshot PDF path breaks on old theme removal** — `export:snapshotPdf` currently uses `renderThemeHtml()` from themeRegistry. When Even/Class/Elegant are removed, this path breaks. Short-term fix: hardcode 'classic' as the snapshot template fallback. Full solution (snapshot stores its template key) addressed in the cleanup phase.
-
-7. **`print.html` iframe src in production** — `window.location.origin` is `null` for `file://` pages. The preview iframe URL construction must handle both dev (Vite origin) and prod (relative path via `window.__printBase` global exposed from preload, or a relative `./print.html` path).
+5. **`DragOverlay` transform stacking context conflict** (Pitfall 39) — If the skills chip grid is ever nested inside a container with `transform: scale()` applied (e.g., the preview pane), `DragOverlay` will render in the wrong position. Mount the `DndContext` above any transform-bearing ancestor.
 
 ---
 
 ## Implications for Roadmap
 
-The architecture research defines a clear build order with explicit dependencies. The suggested phase structure directly maps to that dependency graph.
+Based on combined research, the dependency graph is clear and suggests five phases with one critical ordering constraint: schema and IPC must land before any UI that writes to the new table.
 
-### Phase 1: Pipeline Foundation
-**Rationale:** All other work depends on this. The Classic template proves the unified rendering path end-to-end. Cannot safely build remaining templates or remove old code until this is validated.
-**Delivers:** One working template (Classic) with preview-to-PDF fidelity; unified rendering path in PrintApp, VariantPreview, and export.ts; `ResumeTemplateProps` type and `resolveTemplate` registry established.
-**Addresses:** Preview-to-PDF fidelity (table stakes), ATS-clean single-column output
-**Avoids:** Building 5 templates before pipeline is proven; keeping old branch splits alongside new code
+### Phase A: Schema + Override IPC Foundation
 
-### Phase 2: Remaining Templates
-**Rationale:** Classic proves the pattern; Modern, Jake, Minimal, Executive are independent increments that each add one file and one entry in `resolveTemplate.ts`. No new architectural decisions required.
-**Delivers:** 4 remaining template components; users have 5 distinct visual choices
-**Addresses:** 5 distinct template styles (table stakes)
-**Avoids:** Shared base component anti-pattern (each template is independent JSX)
+**Rationale:** The `analysis_bullet_overrides` table is the load-bearing dependency for the entire milestone. Nothing else that involves analysis overrides can be built until this exists. This phase has no UI — it is schema, IPC handlers, the `applyOverrides` utility, and preload exposure.
 
-### Phase 3: Template Controls
-**Rationale:** Controls require the `templateOptions` schema column plus at least 2-3 templates to demonstrate value. Accent color is the highest-visibility feature; compact toggle and skills mode are low-complexity additions.
-**Delivers:** `templateOptions` DB migration; accent color picker (preset swatches); compact margin toggle; skills display mode (grouped + inline)
-**Addresses:** Accent color persists per variant, compact margin toggle, skills display mode (all table stakes)
-**Avoids:** ALTER TABLE on existing databases breaking silently (use try/catch pattern, not Drizzle file-based migration)
+**Delivers:** `analysis_bullet_overrides` table in `ensureSchema()` and `schema.ts`, `ai:saveOverrides` and `ai:getOverrides` handlers, preload types, `applyOverrides()` utility.
 
-### Phase 4: Page Break Overlay
-**Rationale:** Depends on templates rendering at fixed page width inside the preview iframe. The overlay is a React component in `VariantPreview` (not in `PrintApp`) — it must be excluded from the print path. Placed after Phase 3 so it can be tested with compact margin toggle (margin changes affect content height, requiring overlay re-measurement).
-**Delivers:** Page break visualization with page number labels in preview pane; ResizeObserver re-measurement when template options change
-**Addresses:** Page break visualization in preview (table stakes)
-**Avoids:** Overlay appearing in printToPDF output (use `isPrintContext` guard in render)
+**Addresses:** Gates all three-layer model features.
 
-### Phase 5: Cleanup and Old Theme Removal
-**Rationale:** Old theme wiring should be removed only after all 5 new templates are confirmed working. This is the last phase — removing first causes gaps.
-**Delivers:** Removal of Even/Class/Elegant npm packages and `renderThemeHtml()`; removal of `isProfessional` branch in export.ts; deletion of `ProfessionalLayout.tsx`; snapshot PDF path updated to Classic fallback; `THEMES` constant updated to list only 5 new templates
-**Addresses:** Remove Even/Class/Elegant theme wiring (explicitly in v2.1 milestone goal)
-**Avoids:** Snapshot PDF path breakage (Classic fallback handles it in this phase)
+**Avoids:** Pitfall 35 (mutating base bullets), Pitfall 36 (snapshot ignoring overrides) — both are prevented by building the infrastructure correctly before the behavioral changes.
+
+**Research flag:** Standard patterns — skip phase research.
+
+---
+
+### Phase B: OptimizeVariant Rewire + Snapshot Builder Update
+
+**Rationale:** Depends on Phase A. Changes the `OptimizeVariant` accept path from `bullets:update` to `ai:saveOverrides` and updates `buildSnapshotForVariant` to accept `analysisId`. These two changes are coupled — doing `OptimizeVariant` without the snapshot builder update leaves submissions with wrong content (Pitfall 36).
+
+**Delivers:** Non-destructive bullet rewrites scoped to analysis, correct snapshot freezing when a submission is created from analysis context, override-aware preview in `OptimizeVariant`.
+
+**Addresses:** Analysis-scoped bullet overrides (the core three-layer feature), correct submission snapshots.
+
+**Avoids:** Pitfall 35 (accept path mutation), Pitfall 36 (snapshot builder omission).
+
+**Research flag:** Standard patterns — skip phase research.
+
+---
+
+### Phase C: Analysis Submission Flow UX
+
+**Rationale:** Depends on Phase B being complete so that submissions created from analysis context capture merged content. Low-risk: all required schema (`submissions.analysisId`) and data (`jobPostings.company`, `jobPostings.role`) already exist. This phase is additive UI and one LLM extraction step.
+
+**Delivers:** Submit button in `AnalysisResults.tsx` and `AnalysisList.tsx`, pre-populated company/role in submission form, auto-extraction via `generateObject` + Zod, auto-populate in `NewAnalysisForm` after parse.
+
+**Addresses:** Submit from analysis screen, auto-extract company/role.
+
+**Avoids:** Pitfall 20 (unvalidated LLM output) — use existing `generateObject` + Zod schema for extraction.
+
+**Research flag:** Standard patterns — skip phase research.
+
+---
+
+### Phase D: Skills Chip Grid
+
+**Rationale:** Independent of Phases B and C — can run in parallel. The `skills.category` column migration must precede chip grid UI. The `@dnd-kit` cross-container pattern is well-documented and already installed. This phase has the highest implementation complexity in the milestone.
+
+**Delivers:** `skills.category` column migration (with existing `tags` data preserved), `SkillChip` / `SkillChipGroup` / `SkillChipGrid` components, drag-between-categories, inline rename, `SkillList.tsx` refactored to use chip grid.
+
+**Addresses:** Chip grid skills management, inline skill rename, drag skills between categories.
+
+**Avoids:** Pitfall 37 (silent tag data loss during migration), Pitfall 38 (HTML5 DnD on Windows — use `@dnd-kit`), Pitfall 39 (`DragOverlay` transform stacking context).
+
+**Research flag:** Migration logic may need a focused implementation plan — reading and transforming existing JSON data inside `ensureSchema()` is slightly outside the established pattern. Consider a pre-phase plan step.
+
+---
+
+### Phase E: Variant UX + Cleanup
+
+**Rationale:** Fully independent. Job-level toggle in `VariantBuilder.tsx` is UI-only (handler already exists). Submission metadata inline edit uses `InlineEdit.tsx`. Coming-soon message removal is pure cleanup. Bundle these together as a low-risk polish phase.
+
+**Delivers:** Job-level toggle per job header in `VariantBuilder.tsx`, inline edit for submission company/role/URL/notes, removal of stale placeholder text.
+
+**Addresses:** Toggle entire job in variant builder, edit submission metadata, remove coming soon messages.
+
+**Avoids:** No significant pitfall risk — all additive or cleanup changes.
+
+**Research flag:** Skip — all standard patterns.
+
+---
 
 ### Phase Ordering Rationale
 
-- Phase 1 must precede all others: `resolveTemplate.ts` and the unified `print.html` path are load-bearing dependencies for every subsequent template
-- Phase 2 and Phase 3 can partially overlap (building templates 2-5 while controls are being specced), but the `templateOptions` DB migration must land before any controls UI is wired
-- Phase 4 (overlay) requires stable template rendering at fixed dimensions — best after Phase 2 so overlay is testable across all templates; and after Phase 3 so compact margin toggle can be validated against re-measurement
-- Phase 5 (cleanup) is strictly last; removing old code before new code is proven risks regressions for snapshot PDF and variants already using the 'traditional' layout template value
+- Phase A must come first: all override-dependent features are blocked on schema + IPC
+- Phase B must follow Phase A: the accept path change requires the storage target to exist
+- Phase C must follow Phase B: submitting from analysis context is only meaningful when overrides are correctly included in the snapshot
+- Phase D is independent: can run in parallel with B and C, or sequentially after; migration must precede its own UI
+- Phase E is independent: bundle it last to avoid interfering with higher-risk phases
 
 ### Research Flags
 
-Phases with standard, well-documented patterns (skip research-phase):
-- **Phase 2 (remaining templates):** Incremental — each follows the same pattern as Classic; no new architectural decisions
-- **Phase 4 (page break overlay):** Well-understood DOM measurement pattern; implementation notes in FEATURES.md are sufficient (Option A React overlay with `pointer-events: none` is the chosen approach)
+Phases needing deeper research during planning:
+- **Phase D (Skills migration step):** The one-time migration from `tags` JSON array to `category` column involves reading and transforming existing row data inside `ensureSchema()`. The approach is clear but the idempotency check and verification query details may benefit from a focused implementation plan.
 
-Phases that may benefit from targeted research during planning:
-- **Phase 1 (pipeline foundation):** The `print.html` production URL construction (`window.location.origin` is `null` in `file://` context) needs a prototype before VariantPreview is modified; three documented options exist but none has been tested in this codebase
-- **Phase 5 (cleanup):** Snapshot PDF path decision (Classic fallback vs full template-aware snapshot) should be made explicit before this phase begins to avoid scope expansion
+Phases with standard patterns (skip research-phase):
+- **Phase A, B, C, E:** All use established project patterns (Drizzle `ensureSchema()`, IPC handler structure, `generateObject` + Zod, `InlineEdit.tsx`).
 
 ---
 
@@ -143,47 +186,47 @@ Phases that may benefit from targeted research during planning:
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All library choices reference official docs or confirmed GitHub issues; direct codebase inspection |
-| Features | HIGH | Core feature set bounded by existing PROJECT.md milestone goal; ATS guidance from multiple 2025/2026 sources |
-| Architecture | HIGH | Based on direct codebase inspection of all affected files; build order from explicit dependency analysis |
-| Pitfalls | HIGH | Schema/migration and IPC patterns code-verified; `@page` conflict confirmed via Electron issue #8138; MEDIUM on snapshot PDF path (design decision open) |
+| Stack | HIGH | All v2.2 library usage verified against installed packages and official docs; no new dependencies |
+| Features | HIGH | All features verified against existing codebase — schema columns, IPC handlers, components confirmed |
+| Architecture | HIGH | All patterns derived from direct source code inspection of the v2.1 shipped codebase |
+| Pitfalls | HIGH (schema/IPC), MEDIUM (dnd-kit/Electron) | Schema/migration pitfalls code-verified; dnd-kit Electron DnD based on official docs + issue tracker |
 
-**Overall confidence: HIGH**
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **`print.html` production URL construction:** `window.location.origin` is `null` in `file://` context. Three options documented in ARCHITECTURE.md (`window.__printBase` preload global, relative `./print.html` path, IPC-provided URL). Validate with a quick prototype before committing the VariantPreview change.
+- **Conflict: ARCHITECTURE.md vs STACK.md on DnD approach.** ARCHITECTURE.md documents a native HTML5 DnD implementation pattern for the chip grid. STACK.md and PITFALLS.md both recommend `@dnd-kit` and warn against native HTML5 DnD on Windows (Pitfall 38). **Resolution: use `@dnd-kit`.** ARCHITECTURE.md was written before the Windows-specific pitfall was documented; STACK.md supersedes it.
 
-- **Snapshot PDF path:** Classic fallback vs full template-aware snapshot is a product decision, not a technical unknown. Decide before Phase 5 to avoid scope expansion mid-cleanup.
+- **Conflict: FEATURES.md vs ARCHITECTURE.md on override storage shape.** FEATURES.md describes `bulletOverrides` as a JSON column on `analysisResults`. ARCHITECTURE.md and STACK.md both describe a separate `analysis_bullet_overrides` table. **Resolution: use the separate table.** Individual deletes, FK cascades, indexed lookups by `bulletId` — the table design is clearly superior to the JSON column approach.
 
-- **react-colorful React 19 compatibility:** MEDIUM confidence — hooks-only implementation should be fine, but no official compatibility test found. Fallback is native `<input type="color">` + text input (low risk, minimal extra work).
+- **`skills.sortOrder` column:** STACK.md adds `sortOrder` to the `skills` schema addition, but FEATURES.md defers within-category reorder to post-v2.2. The column can be added to the schema as a forward-compat measure (with default 0) without implementing the reorder UI in v2.2. No impact on Phase D deliverables either way.
 
 ---
 
 ## Sources
 
-### Primary (HIGH confidence — direct codebase inspection)
-- `src/renderer/src/components/VariantPreview.tsx` — bifurcated render path (current)
-- `src/renderer/src/PrintApp.tsx` — existing print path and `print:ready` signal
-- `src/renderer/src/components/ProfessionalLayout.tsx` — existing template component pattern (inline styles, page-break-inside)
-- `src/main/handlers/export.ts` — isProfessional/isTheme branch split
-- `src/main/lib/themeRegistry.ts` — existing theme registry and `buildResumeJson()`
-- `src/main/db/schema.ts` — `layoutTemplate` column confirmed; `templateVariants` table structure
-- `.planning/PROJECT.md` — inline styles constraint, ESM theme bundling issue (Class theme), scope boundaries
+### Primary (HIGH confidence — direct code inspection)
+- `src/main/db/schema.ts` — full table schema, confirmed existing columns
+- `src/main/db/index.ts` — `ensureSchema()` pattern, `alterStatements` array
+- `src/main/handlers/ai.ts` — current `ai:analyze`, stub `ai:acceptSuggestion`
+- `src/main/handlers/templates.ts` — `setItemExcluded` job cascade, `getBuilderData`
+- `src/main/handlers/submissions.ts` — `buildSnapshotForVariant`, `submissions:create`
+- `src/main/handlers/skills.ts` — `skills:update` accepts `{ tags: string[] }`
+- `src/renderer/src/components/OptimizeVariant.tsx` — `handleSave` with `bullets:update` (the anti-pattern being replaced)
+- `src/renderer/src/components/SkillList.tsx`, `SkillItem.tsx` — current flat list UI
+- `src/renderer/src/components/AnalysisResults.tsx` — `raw.company`/`raw.role` already available
+- `src/renderer/src/PrintApp.tsx` — postMessage payload structure
+- `src/main/lib/themeRegistry.ts` — `tags[0]` as group key in `buildResumeJson`
 
-### Secondary (MEDIUM-HIGH confidence — official docs)
-- electron-vite.org/guide/assets — public directory behavior for renderer process
-- github.com/electron/electron/issues/8138 — `@page` CSS vs printToPDF margin conflict (confirmed issue)
-- github.com/dolanmiu/docx/issues/239 — font embedding not supported in docx library (open since 2019)
-- github.com/omgovich/react-colorful — react-colorful 5.6.1, zero deps, hooks API
-- fonts.google.com — Inter, Lato, EB Garamond (OFL license, redistribution permitted)
+### Primary (HIGH confidence — official library docs)
+- drizzle-orm docs (orm.drizzle.team) — `text({ mode: 'json' }).$type<T>()` column pattern confirmed
+- dnd-kit official docs + MultipleContainers story — cross-container sortable pattern, `rectSortingStrategy`
+- Electron GitHub issue tracker — Pitfall 38 (DnD on Windows), Pitfall 34 (DPI scale), Pitfall 30 (font loading)
 
-### Tertiary (MEDIUM confidence — community sources)
-- MDN CSS Fragmentation Level 3 — `break-inside: avoid` and `pageBreakInside: avoid` in Chromium 130+
-- 2025/2026 ATS guides — Calibri/Times New Roman/Garamond as safe DOCX fonts; single-column requirement
-- github.com/jakegut/resume — Jake Gutierrez resume template (MIT license, most-forked resume template on GitHub)
+### Secondary (MEDIUM confidence)
+- Community sources on ATS parsing behavior (Pitfalls 31, 32) — behavior varies by vendor
+- dnd-kit `DragOverlay` in Electron stacking context behavior (Pitfall 39) — CSS spec behavior, not Electron-specific testing
 
 ---
-
-*Research completed: 2026-03-25*
+*Research completed: 2026-03-26*
 *Ready for roadmap: yes*
