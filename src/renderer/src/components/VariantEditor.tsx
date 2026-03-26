@@ -410,6 +410,30 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant }: Varia
           >
             <span style={paneLabelStyle}>Preview</span>
 
+            {/* Template selection dropdown */}
+            <select
+              value={layoutTemplate}
+              onChange={(e) => {
+                setLayoutTemplate(e.target.value)
+                window.api.templates.setLayoutTemplate(variant.id, e.target.value)
+              }}
+              style={{
+                fontSize: 13,
+                padding: '2px 6px',
+                borderRadius: 4,
+                border: '1px solid var(--color-border-subtle)',
+                background: 'var(--color-bg-surface)',
+                color: 'var(--color-text-primary)',
+                cursor: 'pointer',
+              }}
+            >
+              {Object.keys(TEMPLATE_DEFAULTS).map((tpl) => (
+                <option key={tpl} value={tpl}>
+                  {tpl.charAt(0).toUpperCase() + tpl.slice(1)}
+                </option>
+              ))}
+            </select>
+
             {/* Color dot trigger — white ring for visibility on dark colors */}
             <div
               ref={colorDotRef}
