@@ -1,6 +1,24 @@
 import { useState, useEffect } from 'react'
 import { TemplateVariant } from '../../../preload/index.d'
 
+function extractCompany(text: string): string | null {
+  const companyLabel = text.match(/^company(?:\s+name)?:\s*(.+)/im)
+  if (companyLabel) return companyLabel[1].trim()
+  const aboutLine = text.match(/^about\s+(.+)/im)
+  if (aboutLine) return aboutLine[1].replace(/[.,!].*$/, '').trim()
+  return null
+}
+
+function extractRole(text: string): string | null {
+  const roleLabel = text.match(/^(?:role|position|job\s+title):\s*(.+)/im)
+  if (roleLabel) return roleLabel[1].trim()
+  const firstLine = text.trim().split('\n')[0]?.trim()
+  if (firstLine && firstLine.length < 80 && !/^(about|we are|join|company)/i.test(firstLine)) {
+    return firstLine
+  }
+  return null
+}
+
 interface Props {
   onBack: () => void
   onStartAnalysis: (jobPostingId: number, variantId: number) => void
@@ -221,7 +239,19 @@ function NewAnalysisForm({ onBack, onStartAnalysis }: Props): React.JSX.Element 
           <div>
             <textarea
               value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
+              onChange={(e) => {
+                const newText = e.target.value
+                setRawText(newText)
+                // Auto-extract company/role from pasted text (D-05, D-06: regex only, no LLM)
+                if (!company) {
+                  const extracted = extractCompany(newText)
+                  if (extracted) setCompany(extracted)
+                }
+                if (!role) {
+                  const extracted = extractRole(newText)
+                  if (extracted) setRole(extracted)
+                }
+              }}
               placeholder="Paste the full job posting text here..."
               style={{
                 width: '100%',

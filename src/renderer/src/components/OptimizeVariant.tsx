@@ -67,6 +67,7 @@ interface BuilderBullet {
 interface OptimizeVariantProps {
   analysisId: number
   onBack: () => void
+  onLogSubmission?: (analysisId: number) => void
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -104,7 +105,7 @@ function pointImpact(kwCount: number): { label: string; color: string; bg: strin
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JSX.Element {
+function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVariantProps): React.JSX.Element {
   // ── Data state
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null)
   const [bulletIdMap, setBulletIdMap] = useState<Map<string, number>>(new Map())
@@ -115,6 +116,9 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
   const [suggStates, setSuggStates] = useState<SuggestionEdit[]>([])
   const [stagedSkills, setStagedSkills] = useState<StagedSkill[]>([])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
+
+  // ── Overrides state (for orphaned override detection)
+  const [overrides, setOverrides] = useState<Array<{ bulletId: number; isOrphaned?: boolean }>>([])
 
   // ── Preview refresh key (passed to VariantPreview when rendered in this component)
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0)
@@ -199,6 +203,10 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
             setStagedSkills(suggestions)
           }
         }
+
+        // Load overrides for orphaned override detection
+        const ovrData = await window.api.ai.getOverrides(analysisId)
+        if (Array.isArray(ovrData)) setOverrides(ovrData)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Unknown error')
       } finally {
@@ -520,6 +528,23 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
           Optimize Variant
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          {onLogSubmission && (
+            <button
+              onClick={() => onLogSubmission(analysisId)}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: 'var(--color-bg-surface)',
+                color: 'var(--color-accent)',
+                border: '1px solid var(--color-accent)',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--font-size-sm)',
+                fontFamily: 'var(--font-sans)',
+                cursor: 'pointer',
+              }}
+            >
+              Log Submission
+            </button>
+          )}
           <span
             style={{
               fontSize: 'var(--font-size-xs)',
@@ -633,6 +658,53 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
                 const isDismissed = st.state === 'dismissed'
                 const isEditing = editingIndex === i
                 const impact = pointImpact(s.target_keywords.length)
+
+                // Check if this suggestion's bullet is orphaned
+                const bulletId = bulletIdMap.get(s.original_text)
+                const override = bulletId != null ? overrides.find(o => o.bulletId === bulletId) : undefined
+                const isOrphaned = override?.isOrphaned === true
+
+                if (isOrphaned) {
+                  return (
+                    <div
+                      key={i}
+                      aria-label="Suggestion for deleted bullet"
+                      style={{
+                        backgroundColor: 'var(--color-bg-raised)',
+                        border: '1px solid var(--color-border-subtle)',
+                        borderRadius: 'var(--radius-lg)',
+                        padding: 'var(--space-4)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', fontWeight: 500 }}>
+                          {analysis.company} · Bullet {i + 1}
+                        </span>
+                        <span
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: 'var(--color-danger-bg)',
+                            color: 'var(--color-danger)',
+                            borderRadius: 'var(--radius-sm)',
+                            fontSize: 11,
+                            fontWeight: 600,
+                          }}
+                        >
+                          Original bullet was deleted.
+                        </span>
+                      </div>
+                      <p style={{
+                        fontSize: 'var(--font-size-sm)',
+                        color: '#4a4a52',
+                        textDecoration: 'line-through',
+                        margin: 0,
+                        lineHeight: 1.6,
+                      }}>
+                        {st.finalText}
+                      </p>
+                    </div>
+                  )
+                }
 
                 return (
                   <div

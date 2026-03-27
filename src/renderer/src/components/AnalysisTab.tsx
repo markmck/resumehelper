@@ -90,6 +90,7 @@ function AnalysisTab({ onLogSubmission, onViewSubmission, initialOptimizeAnalysi
       <OptimizeVariant
         analysisId={screen.analysisId}
         onBack={() => navigateScreen({ name: 'results', analysisId: screen.analysisId })}
+        onLogSubmission={onLogSubmission}
       />
     )
   }
