@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { db } from '../db'
-import { templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisBulletOverrides } from '../db/schema'
+import { templateVariants, templateVariantItems, jobs, jobBullets, skills, skillCategories, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisBulletOverrides } from '../db/schema'
 import { eq, and, asc, desc, inArray } from 'drizzle-orm'
 import { applyOverrides } from '../../shared/overrides'
 
@@ -125,7 +125,16 @@ export function registerTemplateHandlers(): void {
 
     const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
 
-    const allSkills = await db.select().from(skills)
+    const allSkills = await db
+      .select({
+        id: skills.id,
+        name: skills.name,
+        tags: skills.tags,
+        categoryId: skills.categoryId,
+        categoryName: skillCategories.name,
+      })
+      .from(skills)
+      .leftJoin(skillCategories, eq(skills.categoryId, skillCategories.id))
 
     const allProjects = await db.select().from(projects).orderBy(asc(projects.sortOrder))
 
@@ -203,7 +212,9 @@ export function registerTemplateHandlers(): void {
     const skillsWithExcluded = allSkills.map((skill) => ({
       id: skill.id,
       name: skill.name,
-      tags: JSON.parse(skill.tags) as string[],
+      tags: JSON.parse(skill.tags as string) as string[],
+      categoryId: skill.categoryId ?? null,
+      categoryName: skill.categoryName ?? null,
       excluded: excludedSkillIds.has(skill.id),
     }))
 
