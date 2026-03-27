@@ -36,6 +36,7 @@ interface AnalysisData {
   company: string
   role: string
   variantName: string
+  isStale?: boolean
 }
 
 interface ParsedAnalysis {
@@ -81,6 +82,10 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [existingSubmission, setExistingSubmission] = useState<{ id: number; submittedAt: Date | null } | null>(null)
+  const [editingRole, setEditingRole] = useState(false)
+  const [editingCompany, setEditingCompany] = useState(false)
+  const [localRole, setLocalRole] = useState('')
+  const [localCompany, setLocalCompany] = useState('')
 
   useEffect(() => {
     const load = async (): Promise<void> => {
@@ -113,6 +118,13 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
     }
     load()
   }, [analysisId])
+
+  useEffect(() => {
+    if (analysis) {
+      setLocalRole(analysis.raw.role || '')
+      setLocalCompany(analysis.raw.company || '')
+    }
+  }, [analysis])
 
   if (loading) {
     return (
@@ -237,12 +249,100 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
         }}
       >
         <div>
-          <p style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600, margin: 0, color: 'var(--color-text-primary)' }}>
-            {raw.role || 'Unknown Role'}
-          </p>
-          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', margin: '2px 0 0 0' }}>
-            {raw.company || 'Unknown Company'}
-          </p>
+          {editingRole ? (
+            <input
+              autoFocus
+              aria-label="Edit role"
+              value={localRole}
+              onChange={(e) => setLocalRole(e.target.value)}
+              onBlur={async () => {
+                if (localRole !== raw.role) {
+                  await window.api.jobPostings.update(raw.jobPostingId, { role: localRole })
+                  setAnalysis(prev => prev ? { ...prev, raw: { ...prev.raw, role: localRole } } : prev)
+                }
+                setEditingRole(false)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') { setLocalRole(raw.role); setEditingRole(false) }
+              }}
+              placeholder="Role title"
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-text-primary)',
+                backgroundColor: 'var(--color-bg-input)',
+                border: '1px solid var(--color-accent)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '4px 8px',
+                outline: 'none',
+                fontFamily: 'var(--font-sans)',
+                width: 'auto',
+                minWidth: 120,
+              }}
+            />
+          ) : (
+            <p
+              onClick={() => setEditingRole(true)}
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                margin: 0,
+                color: 'var(--color-text-primary)',
+                cursor: 'text',
+                borderBottom: '1px dashed var(--color-border-emphasis)',
+                display: 'inline',
+              }}
+            >
+              {localRole || 'Unknown Role'}
+            </p>
+          )}
+          {editingCompany ? (
+            <input
+              autoFocus
+              aria-label="Edit company"
+              value={localCompany}
+              onChange={(e) => setLocalCompany(e.target.value)}
+              onBlur={async () => {
+                if (localCompany !== raw.company) {
+                  await window.api.jobPostings.update(raw.jobPostingId, { company: localCompany })
+                  setAnalysis(prev => prev ? { ...prev, raw: { ...prev.raw, company: localCompany } } : prev)
+                }
+                setEditingCompany(false)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') { setLocalCompany(raw.company); setEditingCompany(false) }
+              }}
+              placeholder="Company name"
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-secondary)',
+                backgroundColor: 'var(--color-bg-input)',
+                border: '1px solid var(--color-accent)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '4px 8px',
+                outline: 'none',
+                fontFamily: 'var(--font-sans)',
+                width: 'auto',
+                minWidth: 100,
+              }}
+            />
+          ) : (
+            <p
+              onClick={() => setEditingCompany(true)}
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-secondary)',
+                margin: '2px 0 0 0',
+                cursor: 'text',
+                borderBottom: '1px dashed var(--color-border-emphasis)',
+                display: 'inline',
+              }}
+            >
+              {localCompany || 'Unknown Company'}
+            </p>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginLeft: 'auto', flexWrap: 'wrap' }}>
           {raw.variantName && (
@@ -264,6 +364,44 @@ function AnalysisResults({ analysisId, onBack, onReanalyze, onOptimize, onLogSub
           </span>
         </div>
       </div>
+
+      {/* Stale analysis banner */}
+      {raw.isStale && (
+        <div
+          role="alert"
+          style={{
+            backgroundColor: 'var(--color-warning-bg)',
+            border: '1px solid rgba(245, 158, 11, 0.25)',
+            borderRadius: 'var(--radius-md)',
+            padding: '8px var(--space-4)',
+            marginBottom: 'var(--space-5)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-3)',
+          }}
+        >
+          <span style={{ color: 'var(--color-warning)', fontSize: 14 }}>&#9888;</span>
+          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-warning)', flex: 1 }}>
+            Analysis may be outdated — resume content changed since this analysis ran.
+          </span>
+          <button
+            onClick={() => onReanalyze(raw.jobPostingId, raw.variantId)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-warning)',
+              fontSize: 'var(--font-size-sm)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              padding: 0,
+              marginLeft: 'auto',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            Re-analyze
+          </button>
+        </div>
+      )}
 
       {/* 4 metric cards */}
       <div
