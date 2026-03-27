@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import JobList from './JobList'
-import SkillList from './SkillList'
+import SkillChipGrid from './SkillChipGrid'
 import ProfileSettings from './ProfileSettings'
 import ProjectList from './ProjectList'
 import EducationList from './EducationList'
@@ -101,13 +101,6 @@ function ExperienceTab(): React.JSX.Element {
   const [importData, setImportData] = useState<ImportData | null>(null)
   const [importLoading, setImportLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [skillCount, setSkillCount] = useState<number | null>(null)
-
-  useEffect(() => {
-    window.api.skills.list().then((skills) => {
-      setSkillCount(skills.length)
-    })
-  }, [refreshKey])
 
   const handleImportClick = async (): Promise<void> => {
     const result = await window.api.import_.parse()
@@ -137,8 +130,6 @@ function ExperienceTab(): React.JSX.Element {
       setImportLoading(false)
     }
   }
-
-  const skillBadge = skillCount !== null ? `${skillCount} skill${skillCount !== 1 ? 's' : ''}` : undefined
 
   return (
     <div style={{ overflow: 'auto', height: '100vh' }}>
@@ -180,9 +171,9 @@ function ExperienceTab(): React.JSX.Element {
           <JobList key={refreshKey} />
         </CollapsibleSection>
 
-        <CollapsibleSection title="Skills" defaultOpen={false} badge={skillBadge}>
-          <SkillList key={refreshKey} />
-        </CollapsibleSection>
+        <section style={{ marginBottom: 'var(--space-12)' }}>
+          <SkillChipGrid key={refreshKey} />
+        </section>
 
         <CollapsibleSection title="Projects" defaultOpen={false}>
           <ProjectList key={refreshKey} />
