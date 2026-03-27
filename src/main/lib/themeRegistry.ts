@@ -19,7 +19,7 @@ export function buildResumeJson(profileRow: Profile | undefined, builderData: Bu
   // Group skills by first tag
   const skillGroups: Record<string, string[]> = {}
   for (const skill of includedSkills) {
-    const group = skill.tags.length > 0 ? skill.tags[0] : 'Other'
+    const group = skill.categoryName ?? 'Other'
     if (!skillGroups[group]) skillGroups[group] = []
     skillGroups[group].push(skill.name)
   }

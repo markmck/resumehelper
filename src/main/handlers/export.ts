@@ -493,7 +493,7 @@ export function registerExportHandlers(): void {
                       ]
                     : Object.entries(
                         includedSkills.reduce<Record<string, string[]>>((acc, skill) => {
-                          const group = skill.tags.length > 0 ? skill.tags[0] : 'Other'
+                          const group = skill.categoryName ?? 'Other'
                           if (!acc[group]) acc[group] = []
                           acc[group].push(skill.name)
                           return acc

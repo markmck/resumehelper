@@ -59,7 +59,7 @@ export function filterResumeData(props: ResumeTemplateProps): FilteredResumeData
 
   // Group skills by first tag
   const skillGroups = includedSkills.reduce<Record<string, BuilderSkill[]>>((acc, skill) => {
-    const groupKey = skill.tags.length > 0 ? skill.tags[0] : 'Other'
+    const groupKey = skill.categoryName ?? 'Other'
     if (!acc[groupKey]) acc[groupKey] = []
     acc[groupKey].push(skill)
     return acc
