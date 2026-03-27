@@ -118,6 +118,6 @@ Plans:
 | 13-16 | v2.1 | 12/12 | Complete | 2026-03-26 |
 | 17. Schema + Override IPC Foundation | 2/2 | Complete    | 2026-03-26 | - |
 | 18. Three-Layer Model Wiring | v2.2 | 4/4 | Complete    | 2026-03-27 |
-| 19. Analysis Submission Flow | v2.2 | 2/2 | Complete   | 2026-03-27 |
+| 19. Analysis Submission Flow | v2.2 | 2/2 | Complete    | 2026-03-27 |
 | 20. Skills Chip Grid | v2.2 | 0/? | Not started | - |
 | 21. Variant UX + Cleanup | v2.2 | 0/? | Not started | - |
