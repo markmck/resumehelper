@@ -92,6 +92,14 @@ function VariantBuilder({
     window.api.profile.get().then((p) => setProfileSummary(p.summary ?? ''))
   }, [variantId])
 
+  const handleJobToggle = async (jobId: number, currentExcluded: boolean): Promise<void> => {
+    const newExcluded = !currentExcluded
+    await window.api.templates.setItemExcluded(variantId, 'job', jobId, newExcluded)
+    const fresh = await window.api.templates.getBuilderData(variantId)
+    setBuilderData(fresh)
+    onToggle?.()
+  }
+
   const handleBulletToggle = async (jobId: number, bulletId: number, currentExcluded: boolean): Promise<void> => {
     const newExcluded = !currentExcluded
     setBuilderData((prev) => {
@@ -280,7 +288,13 @@ function VariantBuilder({
         ) : (
           builderData.jobs.map((job) => (
             <div key={job.id} style={{ marginBottom: 'var(--space-6)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '8px 0', marginBottom: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '8px 0', marginBottom: 'var(--space-2)', opacity: job.excluded ? 0.5 : 1 }}>
+                <input
+                  type="checkbox"
+                  checked={!job.excluded}
+                  onChange={() => handleJobToggle(job.id, job.excluded)}
+                  style={{ ...cbSmallStyle, cursor: 'pointer' }}
+                />
                 <span style={toggleHeaderStyle(job.excluded)}>{job.company}</span>
                 <span style={companyStyle}>{job.role}</span>
               </div>
