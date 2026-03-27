@@ -81,7 +81,10 @@ Plans:
   3. Company and role on an existing analysis can be edited inline after creation
   4. An analysis that becomes stale (base bullet or variant changed after analysis ran) shows a visible stale indicator
   5. If a bullet referenced by an override has been deleted, the analysis view shows a graceful notice rather than crashing or silently rendering stale text
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 19-01-PLAN.md — Schema updated_at columns, IPC handlers (jobPostings:update, staleness, orphaned overrides), preload/types
+- [ ] 19-02-PLAN.md — Renderer UI: inline editing, stale banner, Log Submission in OptimizeVariant, orphaned rendering, auto-extract
 
 ### Phase 20: Skills Chip Grid
 **Goal**: Skills are displayed and managed as a chip grid with drag-and-drop between categories and inline rename
@@ -115,6 +118,6 @@ Plans:
 | 13-16 | v2.1 | 12/12 | Complete | 2026-03-26 |
 | 17. Schema + Override IPC Foundation | 2/2 | Complete    | 2026-03-26 | - |
 | 18. Three-Layer Model Wiring | v2.2 | 4/4 | Complete    | 2026-03-27 |
-| 19. Analysis Submission Flow | v2.2 | 0/? | Not started | - |
+| 19. Analysis Submission Flow | v2.2 | 0/2 | Not started | - |
 | 20. Skills Chip Grid | v2.2 | 0/? | Not started | - |
 | 21. Variant UX + Cleanup | v2.2 | 0/? | Not started | - |
