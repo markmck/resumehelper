@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Three Layer Data
-status: verifying
-stopped_at: Phase 20 UI-SPEC approved
-last_updated: "2026-03-27T15:58:04.801Z"
+status: executing
+stopped_at: Completed 20-01-PLAN.md
+last_updated: "2026-03-27T16:13:18.562Z"
 last_activity: 2026-03-27
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 11
+  completed_plans: 9
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 19 — analysis-submission-flow
+**Current focus:** Phase 20 — skills-chip-grid
 
 ## Current Position
 
-Phase: 20
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 20 (skills-chip-grid) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-03-27
 
 Progress: ░░░░░░░░░░ 0%
@@ -56,6 +56,7 @@ Progress: ░░░░░░░░░░ 0%
 | Phase 18 P04 | 5 | 1 tasks | 1 files |
 | Phase 19-analysis-submission-flow P01 | 8min | 2 tasks | 9 files |
 | Phase 19-analysis-submission-flow P02 | 8min | 2 tasks | 4 files |
+| Phase 20-skills-chip-grid P01 | 2 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Key v2.2 decisions from research:
 - [Phase 19-01]: Staleness computed on-demand in getAnalysis via analysisEpoch integer comparison — no stored isStale column
 - [Phase 19-01]: ai:getOverrides uses raw SQL LEFT JOIN to detect orphaned overrides, returning isOrphaned: boolean
 - [Phase 19-02]: localRole/localCompany state mirrors prevent flash-back-to-old-value on inline edit blur
+- [Phase 20-01]: skillCategories CREATE TABLE placed before skills in ensureSchema() to satisfy FK ordering
+- [Phase 20-01]: Handler registration belongs in handlers/index.ts, not main/index.ts — centralized registerAllHandlers() pattern
 
 ### Pending Todos
 
@@ -96,6 +99,6 @@ None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-03-27T15:58:04.799Z
-Stopped at: Phase 20 UI-SPEC approved
-Resume file: .planning/phases/20-skills-chip-grid/20-UI-SPEC.md
+Last session: 2026-03-27T16:13:18.559Z
+Stopped at: Completed 20-01-PLAN.md
+Resume file: None

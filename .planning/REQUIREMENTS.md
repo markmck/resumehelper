@@ -29,9 +29,9 @@ Requirements for milestone v2.2 Three Layer Data. Each maps to roadmap phases.
 ### Variant & Experience UX
 
 - [ ] **VARNT-01**: User can toggle entire job on/off in variant builder (all bullets at once)
-- [ ] **VARNT-02**: Skills displayed as chip grid with drag-and-drop between categories
-- [ ] **VARNT-03**: User can rename skill categories inline
-- [ ] **VARNT-04**: User can add new skill categories and drag skills into them
+- [x] **VARNT-02**: Skills displayed as chip grid with drag-and-drop between categories
+- [x] **VARNT-03**: User can rename skill categories inline
+- [x] **VARNT-04**: User can add new skill categories and drag skills into them
 - [ ] **VARNT-05**: Variant cards show correct "last edited" timestamp
 
 ### Template Fixes
@@ -92,9 +92,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ANLYS-03 | Phase 19 | Complete |
 | ANLYS-04 | Phase 19 | Complete |
 | ANLYS-05 | Phase 19 | Complete |
-| VARNT-02 | Phase 20 | Pending |
-| VARNT-03 | Phase 20 | Pending |
-| VARNT-04 | Phase 20 | Pending |
+| VARNT-02 | Phase 20 | Complete |
+| VARNT-03 | Phase 20 | Complete |
+| VARNT-04 | Phase 20 | Complete |
 | VARNT-01 | Phase 21 | Pending |
 | VARNT-05 | Phase 21 | Pending |
 | TMPL-01 | Phase 21 | Pending |
