@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Three Layer Data
 status: verifying
-stopped_at: Phase 21 context gathered
-last_updated: "2026-03-27T16:35:21.423Z"
+stopped_at: Completed 21-02-PLAN.md
+last_updated: "2026-03-27T16:48:28.217Z"
 last_activity: 2026-03-27
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
+  completed_phases: 5
+  total_plans: 13
+  completed_plans: 13
   percent: 0
 ---
 
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 20 — skills-chip-grid
+**Current focus:** Phase 21 — variant-ux-cleanup
 
 ## Current Position
 
-Phase: 21
-Plan: Not started
+Phase: 21 (variant-ux-cleanup) — EXECUTING
+Plan: 2 of 2
 Status: Phase complete — ready for verification
 Last activity: 2026-03-27
 
@@ -59,6 +59,8 @@ Progress: ░░░░░░░░░░ 0%
 | Phase 20-skills-chip-grid P01 | 2 | 2 tasks | 7 files |
 | Phase 20-skills-chip-grid P03 | 5min | 2 tasks | 5 files |
 | Phase 20-skills-chip-grid P02 | 3min | 2 tasks | 2 files |
+| Phase 21-variant-ux-cleanup P01 | 1min | 2 tasks | 3 files |
+| Phase 21-variant-ux-cleanup P02 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -90,6 +92,10 @@ Key v2.2 decisions from research:
 - [Phase 20-03]: All four grouping surfaces use categoryName ?? 'Other' — skills without a category fall into 'Other' group gracefully
 - [Phase 20-02]: Remove CollapsibleSection wrapper for Skills — SkillChipGrid has own panel with border/padding per UI-SPEC
 - [Phase 20-02]: Remove skillCount/skillBadge state from ExperienceTab — SkillChipGrid renders own count badge internally
+- [Phase 21-variant-ux-cleanup]: handleJobToggle does full getBuilderData refresh (not optimistic) because job toggle cascades bullets server-side
+- [Phase 21-variant-ux-cleanup]: updatedAt is optional on TemplateVariant since pre-Phase-19 variants may not have it in DB
+- [Phase 21-variant-ux-cleanup]: Submit button uses disabled={!onLogSubmission} guard — enabled only when parent provides the callback
+- [Phase 21-variant-ux-cleanup]: onLogSubmission threaded through RowProps/AnalysisTableRow keeping row component self-contained
 
 ### Pending Todos
 
@@ -104,6 +110,6 @@ None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-03-27T16:35:21.420Z
-Stopped at: Phase 21 context gathered
-Resume file: .planning/phases/21-variant-ux-cleanup/21-CONTEXT.md
+Last session: 2026-03-27T16:48:28.214Z
+Stopped at: Completed 21-02-PLAN.md
+Resume file: None

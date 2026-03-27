@@ -111,7 +111,10 @@ Plans:
   2. Variant cards display the correct last-edited timestamp, not a stale or wrong value
   3. Modern template renders skills inline without layout breakage
   4. No "coming soon" placeholder text appears anywhere in the app for features that have shipped
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [x] 21-01-PLAN.md — Job-level toggle checkbox in VariantBuilder, variant card timestamp fix (updatedAt)
+- [x] 21-02-PLAN.md — Modern template skills overflow fix, AnalysisList Submit button wiring, coming-soon cleanup
 
 ## Progress
 
@@ -124,4 +127,4 @@ Plans:
 | 18. Three-Layer Model Wiring | v2.2 | 4/4 | Complete    | 2026-03-27 |
 | 19. Analysis Submission Flow | v2.2 | 2/2 | Complete    | 2026-03-27 |
 | 20. Skills Chip Grid | v2.2 | 3/3 | Complete    | 2026-03-27 |
-| 21. Variant UX + Cleanup | v2.2 | 0/? | Not started | - |
+| 21. Variant UX + Cleanup | v2.2 | 2/2 | Complete   | 2026-03-27 |
