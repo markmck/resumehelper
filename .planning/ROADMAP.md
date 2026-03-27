@@ -127,4 +127,4 @@ Plans:
 | 18. Three-Layer Model Wiring | v2.2 | 4/4 | Complete    | 2026-03-27 |
 | 19. Analysis Submission Flow | v2.2 | 2/2 | Complete    | 2026-03-27 |
 | 20. Skills Chip Grid | v2.2 | 3/3 | Complete    | 2026-03-27 |
-| 21. Variant UX + Cleanup | v2.2 | 2/2 | Complete   | 2026-03-27 |
+| 21. Variant UX + Cleanup | v2.2 | 2/2 | Complete    | 2026-03-27 |
