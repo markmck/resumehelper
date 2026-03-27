@@ -99,7 +99,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 20-01-PLAN.md — Schema (skill_categories table, categoryId FK), migration, category CRUD IPC, preload bridge
-- [ ] 20-02-PLAN.md — SkillChipGrid component with @dnd-kit DnD, inline category rename, add/delete skills+categories
+- [x] 20-02-PLAN.md — SkillChipGrid component with @dnd-kit DnD, inline category rename, add/delete skills+categories
 - [x] 20-03-PLAN.md — Downstream integration: update filterResumeData, VariantBuilder, themeRegistry, export to use categoryName
 
 ### Phase 21: Variant UX + Cleanup
@@ -123,5 +123,5 @@ Plans:
 | 17. Schema + Override IPC Foundation | 2/2 | Complete    | 2026-03-26 | - |
 | 18. Three-Layer Model Wiring | v2.2 | 4/4 | Complete    | 2026-03-27 |
 | 19. Analysis Submission Flow | v2.2 | 2/2 | Complete    | 2026-03-27 |
-| 20. Skills Chip Grid | v2.2 | 2/3 | In Progress|  |
+| 20. Skills Chip Grid | v2.2 | 3/3 | Complete    | 2026-03-27 |
 | 21. Variant UX + Cleanup | v2.2 | 0/? | Not started | - |

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Three Layer Data
-status: executing
-stopped_at: Completed 20-03-PLAN.md
-last_updated: "2026-03-27T16:16:13.177Z"
+status: verifying
+stopped_at: Completed 20-02-PLAN.md
+last_updated: "2026-03-27T16:21:53.852Z"
 last_activity: 2026-03-27
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 20 (skills-chip-grid) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
+Phase: 21
+Plan: Not started
+Status: Phase complete — ready for verification
 Last activity: 2026-03-27
 
 Progress: ░░░░░░░░░░ 0%
@@ -58,6 +58,7 @@ Progress: ░░░░░░░░░░ 0%
 | Phase 19-analysis-submission-flow P02 | 8min | 2 tasks | 4 files |
 | Phase 20-skills-chip-grid P01 | 2 | 2 tasks | 7 files |
 | Phase 20-skills-chip-grid P03 | 5min | 2 tasks | 5 files |
+| Phase 20-skills-chip-grid P02 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,8 @@ Key v2.2 decisions from research:
 - [Phase 20-01]: skillCategories CREATE TABLE placed before skills in ensureSchema() to satisfy FK ordering
 - [Phase 20-01]: Handler registration belongs in handlers/index.ts, not main/index.ts — centralized registerAllHandlers() pattern
 - [Phase 20-03]: All four grouping surfaces use categoryName ?? 'Other' — skills without a category fall into 'Other' group gracefully
+- [Phase 20-02]: Remove CollapsibleSection wrapper for Skills — SkillChipGrid has own panel with border/padding per UI-SPEC
+- [Phase 20-02]: Remove skillCount/skillBadge state from ExperienceTab — SkillChipGrid renders own count badge internally
 
 ### Pending Todos
 
@@ -101,6 +104,6 @@ None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-03-27T16:16:13.175Z
-Stopped at: Completed 20-03-PLAN.md
+Last session: 2026-03-27T16:18:05.523Z
+Stopped at: Completed 20-02-PLAN.md
 Resume file: None
