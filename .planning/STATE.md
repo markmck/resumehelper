@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Three Layer Data
 status: verifying
-stopped_at: Phase 20 context gathered
-last_updated: "2026-03-27T15:05:49.888Z"
+stopped_at: Phase 20 UI-SPEC approved
+last_updated: "2026-03-27T15:58:04.801Z"
 last_activity: 2026-03-27
 progress:
   total_phases: 5
@@ -96,6 +96,6 @@ None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-03-27T15:05:49.885Z
-Stopped at: Phase 20 context gathered
-Resume file: .planning/phases/20-skills-chip-grid/20-CONTEXT.md
+Last session: 2026-03-27T15:58:04.799Z
+Stopped at: Phase 20 UI-SPEC approved
+Resume file: .planning/phases/20-skills-chip-grid/20-UI-SPEC.md
