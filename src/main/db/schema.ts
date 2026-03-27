@@ -22,10 +22,17 @@ export const jobBullets = sqliteTable('job_bullets', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }),
 })
 
+export const skillCategories = sqliteTable('skill_categories', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+})
+
 export const skills = sqliteTable('skills', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   tags: text('tags').notNull().default('[]'),
+  categoryId: integer('category_id').references(() => skillCategories.id, { onDelete: 'set null' }),
 })
 
 export const templateVariants = sqliteTable('template_variants', {

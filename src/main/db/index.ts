@@ -35,6 +35,12 @@ function ensureSchema(): void {
       FOREIGN KEY (\`job_id\`) REFERENCES \`jobs\`(\`id\`) ON DELETE cascade
     );
 
+    CREATE TABLE IF NOT EXISTS \`skill_categories\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`name\` text NOT NULL,
+      \`sort_order\` integer NOT NULL DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS \`skills\` (
       \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
       \`name\` text NOT NULL,
@@ -249,10 +255,38 @@ function ensureSchema(): void {
     'ALTER TABLE `template_variants` ADD COLUMN `template_options` text',
     'ALTER TABLE `job_bullets` ADD COLUMN `updated_at` integer',
     'ALTER TABLE `template_variants` ADD COLUMN `updated_at` integer',
+    'ALTER TABLE `skills` ADD COLUMN `category_id` integer REFERENCES `skill_categories`(`id`) ON DELETE set null',
   ]
   for (const sql of alterStatements) {
     try { sqlite.exec(sql) } catch { /* column already exists */ }
   }
+
+  // Migrate skill tags to skill_categories (idempotent — only processes skills with NULL category_id)
+  try {
+    const needsMigration = sqlite.prepare("SELECT COUNT(*) as cnt FROM skills WHERE category_id IS NULL AND tags != '[]' AND tags IS NOT NULL").get() as { cnt: number }
+    if (needsMigration.cnt > 0) {
+      const migrateTx = sqlite.transaction(() => {
+        const rows = sqlite.prepare("SELECT DISTINCT json_extract(tags, '$[0]') as tag FROM skills WHERE tags != '[]' AND tags IS NOT NULL AND json_extract(tags, '$[0]') IS NOT NULL").all() as { tag: string }[]
+        let order = 0
+        for (const row of rows) {
+          if (!row.tag) continue
+          const existing = sqlite.prepare("SELECT id FROM skill_categories WHERE name = ?").get(row.tag) as { id: number } | undefined
+          if (!existing) {
+            sqlite.prepare("INSERT INTO skill_categories (name, sort_order) VALUES (?, ?)").run(row.tag, order++)
+          }
+        }
+        sqlite.exec(`
+          UPDATE skills
+          SET category_id = (
+            SELECT sc.id FROM skill_categories sc
+            WHERE sc.name = json_extract(skills.tags, '$[0]')
+          )
+          WHERE category_id IS NULL AND tags != '[]' AND tags IS NOT NULL
+        `)
+      })
+      migrateTx()
+    }
+  } catch { /* migration already complete or no skills to migrate */ }
 
   // Also run file-based migrations for any ALTER TABLE statements
   // that add columns to existing tables
