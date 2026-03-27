@@ -394,8 +394,8 @@ function NewAnalysisForm({ onBack, onStartAnalysis }: Props): React.JSX.Element 
                           color: isSelected ? 'var(--color-accent-light)' : 'var(--color-text-tertiary)',
                         }}
                       >
-                        {variant.createdAt
-                          ? `Last edited ${new Date(variant.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                        {(variant.updatedAt || variant.createdAt)
+                          ? `Last edited ${new Date((variant.updatedAt || variant.createdAt) as Date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
                           : 'No date'}
                       </div>
                     </div>

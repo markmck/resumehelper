@@ -48,6 +48,7 @@ export interface TemplateVariant {
   layoutTemplate: string
   templateOptions?: TemplateOptions | null
   createdAt: Date
+  updatedAt?: Date
 }
 
 export interface BuilderBullet {
