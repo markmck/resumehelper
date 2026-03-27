@@ -24,10 +24,18 @@ const api = {
   },
   skills: {
     list: () => ipcRenderer.invoke('skills:list'),
-    create: (data: { name: string; tags: string[] }) => ipcRenderer.invoke('skills:create', data),
-    update: (id: number, data: { name?: string; tags?: string[] }) =>
+    create: (data: { name: string; tags: string[]; categoryId?: number | null }) =>
+      ipcRenderer.invoke('skills:create', data),
+    update: (id: number, data: { name?: string; tags?: string[]; categoryId?: number | null }) =>
       ipcRenderer.invoke('skills:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('skills:delete', id),
+    categories: {
+      list: () => ipcRenderer.invoke('skills:categories:list'),
+      create: (data: { name: string }) => ipcRenderer.invoke('skills:categories:create', data),
+      update: (id: number, data: { name?: string; sortOrder?: number }) =>
+        ipcRenderer.invoke('skills:categories:update', id, data),
+      delete: (id: number) => ipcRenderer.invoke('skills:categories:delete', id),
+    },
   },
   templates: {
     list: () => ipcRenderer.invoke('templates:list'),

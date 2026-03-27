@@ -24,6 +24,14 @@ export interface Skill {
   id: number
   name: string
   tags: string[]
+  categoryId: number | null
+  categoryName: string | null
+}
+
+export interface SkillCategory {
+  id: number
+  name: string
+  sortOrder: number
 }
 
 export interface TemplateOptions {
@@ -63,6 +71,8 @@ export interface BuilderSkill {
   id: number
   name: string
   tags: string[]
+  categoryId: number | null
+  categoryName: string | null
   excluded: boolean
 }
 
@@ -323,9 +333,15 @@ export interface Api {
   }
   skills: {
     list: () => Promise<Skill[]>
-    create: (data: { name: string; tags: string[] }) => Promise<Skill>
-    update: (id: number, data: { name?: string; tags?: string[] }) => Promise<Skill>
+    create: (data: { name: string; tags: string[]; categoryId?: number | null }) => Promise<Skill>
+    update: (id: number, data: { name?: string; tags?: string[]; categoryId?: number | null }) => Promise<Skill>
     delete: (id: number) => Promise<void>
+    categories: {
+      list: () => Promise<SkillCategory[]>
+      create: (data: { name: string }) => Promise<SkillCategory>
+      update: (id: number, data: { name?: string; sortOrder?: number }) => Promise<SkillCategory>
+      delete: (id: number) => Promise<void>
+    }
   }
   templates: {
     list: () => Promise<TemplateVariant[]>
