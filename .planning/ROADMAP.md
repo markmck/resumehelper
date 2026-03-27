@@ -84,7 +84,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 19-01-PLAN.md — Schema updated_at columns, IPC handlers (jobPostings:update, staleness, orphaned overrides), preload/types
-- [ ] 19-02-PLAN.md — Renderer UI: inline editing, stale banner, Log Submission in OptimizeVariant, orphaned rendering, auto-extract
+- [x] 19-02-PLAN.md — Renderer UI: inline editing, stale banner, Log Submission in OptimizeVariant, orphaned rendering, auto-extract
 
 ### Phase 20: Skills Chip Grid
 **Goal**: Skills are displayed and managed as a chip grid with drag-and-drop between categories and inline rename
@@ -118,6 +118,6 @@ Plans:
 | 13-16 | v2.1 | 12/12 | Complete | 2026-03-26 |
 | 17. Schema + Override IPC Foundation | 2/2 | Complete    | 2026-03-26 | - |
 | 18. Three-Layer Model Wiring | v2.2 | 4/4 | Complete    | 2026-03-27 |
-| 19. Analysis Submission Flow | v2.2 | 1/2 | In Progress|  |
+| 19. Analysis Submission Flow | v2.2 | 2/2 | Complete   | 2026-03-27 |
 | 20. Skills Chip Grid | v2.2 | 0/? | Not started | - |
 | 21. Variant UX + Cleanup | v2.2 | 0/? | Not started | - |

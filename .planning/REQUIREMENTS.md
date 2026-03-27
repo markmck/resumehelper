@@ -20,8 +20,8 @@ Requirements for milestone v2.2 Three Layer Data. Each maps to roadmap phases.
 
 ### Analysis UX
 
-- [ ] **ANLYS-01**: User can log submission directly from the optimize screen
-- [ ] **ANLYS-02**: Company and role auto-extracted from job posting text when not manually entered
+- [x] **ANLYS-01**: User can log submission directly from the optimize screen
+- [x] **ANLYS-02**: Company and role auto-extracted from job posting text when not manually entered
 - [x] **ANLYS-03**: User can edit company and role after analysis is created
 - [x] **ANLYS-04**: Stale indicator shown when base bullet or variant changes after analysis
 - [x] **ANLYS-05**: Orphaned overrides (deleted base bullets) handled gracefully with UI notice
@@ -87,8 +87,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-05 | Phase 18 | Complete |
 | DATA-06 | Phase 18 | Complete |
 | DATA-07 | Phase 18 | Complete |
-| ANLYS-01 | Phase 19 | Pending |
-| ANLYS-02 | Phase 19 | Pending |
+| ANLYS-01 | Phase 19 | Complete |
+| ANLYS-02 | Phase 19 | Complete |
 | ANLYS-03 | Phase 19 | Complete |
 | ANLYS-04 | Phase 19 | Complete |
 | ANLYS-05 | Phase 19 | Complete |
