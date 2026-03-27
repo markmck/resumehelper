@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useToast } from './Toast'
+import VariantPreview from './VariantPreview'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -116,7 +117,7 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
   // ── Preview refresh key (passed to VariantPreview when rendered in this component)
-  const [_previewRefreshKey, setPreviewRefreshKey] = useState(0)
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0)
 
   const { showToast } = useToast()
 
@@ -1361,6 +1362,35 @@ function OptimizeVariant({ analysisId, onBack }: OptimizeVariantProps): React.JS
               </div>
             </div>
           )}
+
+          {/* ── Live Preview */}
+          <div
+            style={{
+              borderTop: '1px solid var(--color-border-subtle)',
+              marginTop: 'var(--space-5)',
+              paddingTop: 'var(--space-4)',
+            }}
+          >
+            <p
+              style={{
+                fontSize: 'var(--font-size-xs)',
+                fontWeight: 600,
+                color: 'var(--color-text-tertiary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                margin: '0 0 var(--space-3) 0',
+              }}
+            >
+              Live Preview
+            </p>
+            <div style={{ height: 400 }}>
+              <VariantPreview
+                variantId={analysis.variantId}
+                analysisId={analysis.id}
+                refreshKey={previewRefreshKey}
+              />
+            </div>
+          </div>
 
         </div>
       </div>

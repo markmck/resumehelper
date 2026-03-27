@@ -10,11 +10,11 @@ Requirements for milestone v2.2 Three Layer Data. Each maps to roadmap phases.
 ### Three-Layer Data Model
 
 - [x] **DATA-01**: Analysis bullet overrides stored in dedicated table with (analysisId, bulletId) key
-- [ ] **DATA-02**: Accepting an AI suggestion writes override to analysis, not to base bullet or variant
+- [x] **DATA-02**: Accepting an AI suggestion writes override to analysis, not to base bullet or variant
 - [x] **DATA-03**: Preview/export merges base text → variant selection → analysis overrides with correct precedence
 - [x] **DATA-04**: Variant preview without analysis context shows base text only (no overrides)
 - [x] **DATA-05**: Same variant analyzed against two jobs produces independent override sets
-- [ ] **DATA-06**: Dismissing a suggestion creates no override; undoing acceptance removes override and reverts to base
+- [x] **DATA-06**: Dismissing a suggestion creates no override; undoing acceptance removes override and reverts to base
 - [x] **DATA-07**: Submission snapshot captures fully merged three-layer result, immutable after creation
 - [x] **DATA-08**: AI skill suggestions stored on analysis only, not added to variant or base
 
@@ -81,11 +81,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | DATA-01 | Phase 17 | Complete |
 | DATA-08 | Phase 17 | Complete |
-| DATA-02 | Phase 18 | Pending |
+| DATA-02 | Phase 18 | Complete |
 | DATA-03 | Phase 18 | Complete |
 | DATA-04 | Phase 18 | Complete |
 | DATA-05 | Phase 18 | Complete |
-| DATA-06 | Phase 18 | Pending |
+| DATA-06 | Phase 18 | Complete |
 | DATA-07 | Phase 18 | Complete |
 | ANLYS-01 | Phase 19 | Pending |
 | ANLYS-02 | Phase 19 | Pending |

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Three Layer Data
-status: executing
-stopped_at: Completed 18-03-PLAN.md
-last_updated: "2026-03-26T23:02:16.812Z"
+status: verifying
+stopped_at: Completed 18-02-PLAN.md
+last_updated: "2026-03-26T23:06:37.195Z"
 last_activity: 2026-03-26
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 Phase: 18 (three-layer-model-wiring) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-03-26
 
 Progress: ░░░░░░░░░░ 0%
@@ -52,6 +52,7 @@ Progress: ░░░░░░░░░░ 0%
 | Phase 17-schema-override-ipc-foundation P02 | 6 | 2 tasks | 2 files |
 | Phase 18-three-layer-model-wiring P01 | 3 | 2 tasks | 6 files |
 | Phase 18-three-layer-model-wiring P03 | 5 | 1 tasks | 1 files |
+| Phase 18 P02 | 311 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Key v2.2 decisions from research:
 - [Phase 18-01]: Cast Drizzle .all() result to source union type — Drizzle infers text for enum-like columns, not literal union
 - [Phase 18-01]: select-then-insert for ensureSkillAdditions — analysis_skill_additions has no UNIQUE(analysisId, skillName) constraint
 - [Phase 18-three-layer-model-wiring]: buildSnapshotForVariant uses applyOverrides from shared/overrides for bullet merge; sentinel id: -1 for analysis-added skills safe in frozen JSON snapshot
+- [Phase 18]: dismiss (pending->dismissed) calls no IPC; only revert (accepted->pending) calls ai:dismissSuggestion
+- [Phase 18]: [Phase 18-02]: batch save (handleSave, canSave, confirmation dialog) removed entirely from OptimizeVariant; per-click IPC is the persistence model
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-03-26T23:02:16.809Z
-Stopped at: Completed 18-03-PLAN.md
+Last session: 2026-03-26T23:06:37.193Z
+Stopped at: Completed 18-02-PLAN.md
 Resume file: None
