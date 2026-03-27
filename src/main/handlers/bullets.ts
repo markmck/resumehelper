@@ -20,7 +20,7 @@ export function registerBulletHandlers(): void {
   )
 
   ipcMain.handle('bullets:update', async (_, id: number, data: { text?: string }) => {
-    const rows = await db.update(jobBullets).set(data).where(eq(jobBullets.id, id)).returning()
+    const rows = await db.update(jobBullets).set({ ...data, updatedAt: new Date() }).where(eq(jobBullets.id, id)).returning()
     return rows[0]
   })
 

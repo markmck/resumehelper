@@ -19,6 +19,7 @@ export const jobBullets = sqliteTable('job_bullets', {
     .references(() => jobs.id, { onDelete: 'cascade' }),
   text: text('text').notNull(),
   sortOrder: integer('sort_order').notNull().default(0),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }),
 })
 
 export const skills = sqliteTable('skills', {
@@ -35,6 +36,7 @@ export const templateVariants = sqliteTable('template_variants', {
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }),
 })
 
 export const projects = sqliteTable('projects', {

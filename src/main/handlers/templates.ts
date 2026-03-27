@@ -615,6 +615,8 @@ export function registerTemplateHandlers(): void {
           })
         }
       }
+      // Stamp variant updated_at for staleness detection
+      await db.update(templateVariants).set({ updatedAt: new Date() }).where(eq(templateVariants.id, variantId))
     },
   )
 }
