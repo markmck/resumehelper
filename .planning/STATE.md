@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Three Layer Data
 status: verifying
-stopped_at: Completed 18-02-PLAN.md
-last_updated: "2026-03-26T23:06:37.195Z"
-last_activity: 2026-03-26
+stopped_at: Completed 18-04-PLAN.md
+last_updated: "2026-03-27T02:21:14.581Z"
+last_activity: 2026-03-27
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 6
+  completed_plans: 6
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 Phase: 18 (three-layer-model-wiring) — EXECUTING
 Plan: 3 of 3
 Status: Phase complete — ready for verification
-Last activity: 2026-03-26
+Last activity: 2026-03-27
 
 Progress: ░░░░░░░░░░ 0%
 
@@ -53,6 +53,7 @@ Progress: ░░░░░░░░░░ 0%
 | Phase 18-three-layer-model-wiring P01 | 3 | 2 tasks | 6 files |
 | Phase 18-three-layer-model-wiring P03 | 5 | 1 tasks | 1 files |
 | Phase 18 P02 | 311 | 2 tasks | 2 files |
+| Phase 18 P04 | 5 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,7 @@ Key v2.2 decisions from research:
 - [Phase 18-three-layer-model-wiring]: buildSnapshotForVariant uses applyOverrides from shared/overrides for bullet merge; sentinel id: -1 for analysis-added skills safe in frozen JSON snapshot
 - [Phase 18]: dismiss (pending->dismissed) calls no IPC; only revert (accepted->pending) calls ai:dismissSuggestion
 - [Phase 18]: [Phase 18-02]: batch save (handleSave, canSave, confirmation dialog) removed entirely from OptimizeVariant; per-click IPC is the persistence model
+- [Phase 18]: VariantPreview rendered in 400px height container inside OptimizeVariant right pane scroll column with analysisId for override-merged preview
 
 ### Pending Todos
 
@@ -89,6 +91,6 @@ None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-03-26T23:06:37.193Z
-Stopped at: Completed 18-02-PLAN.md
+Last session: 2026-03-27T02:21:14.579Z
+Stopped at: Completed 18-04-PLAN.md
 Resume file: None
