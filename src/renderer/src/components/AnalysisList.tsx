@@ -21,6 +21,7 @@ interface Props {
   onViewResult: (analysisId: number) => void
   onReanalyze: (jobPostingId: number, variantId: number) => void
   onOptimize: (analysisId: number) => void
+  onLogSubmission?: (analysisId: number) => void
 }
 
 function getScoreColor(score: number): string {
@@ -99,7 +100,7 @@ const tdStyle: React.CSSProperties = {
   color: 'var(--color-text-secondary)',
 }
 
-function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze, onOptimize }: Props): React.JSX.Element {
+function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze, onOptimize, onLogSubmission }: Props): React.JSX.Element {
   const [rows, setRows] = useState<AnalysisRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -525,6 +526,7 @@ function AnalysisList({ onNewAnalysis, onViewResult, onReanalyze, onOptimize }: 
                       onViewResult={onViewResult}
                       onReanalyze={onReanalyze}
                       onOptimize={onOptimize}
+                      onLogSubmission={onLogSubmission}
                       onContextMenu={(e, id, company) => setContextMenu({ x: e.clientX, y: e.clientY, id, company })}
                     />
                   ))
@@ -688,10 +690,11 @@ interface RowProps {
   onViewResult: (analysisId: number) => void
   onReanalyze: (jobPostingId: number, variantId: number) => void
   onOptimize: (analysisId: number) => void
+  onLogSubmission?: (analysisId: number) => void
   onContextMenu: (e: React.MouseEvent, jobPostingId: number, company: string) => void
 }
 
-function AnalysisTableRow({ row, onViewResult, onReanalyze, onOptimize, onContextMenu }: RowProps): React.JSX.Element {
+function AnalysisTableRow({ row, onViewResult, onReanalyze, onOptimize, onLogSubmission, onContextMenu }: RowProps): React.JSX.Element {
   const [hovered, setHovered] = useState(false)
   const scoreColor = getScoreColor(row.matchScore)
   const scoreBg = getScoreBgColor(row.matchScore)
@@ -878,9 +881,8 @@ function AnalysisTableRow({ row, onViewResult, onReanalyze, onOptimize, onContex
           <ActionBtn
             label="Submit"
             variant="default"
-            onClick={() => {}}
-            disabled={true}
-            title="Coming in Phase 11"
+            onClick={() => onLogSubmission?.(row.analysisId)}
+            disabled={!onLogSubmission}
           />
         </div>
       </td>

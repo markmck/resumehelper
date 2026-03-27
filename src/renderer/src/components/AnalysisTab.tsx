@@ -59,6 +59,7 @@ function AnalysisTab({ onLogSubmission, onViewSubmission, initialOptimizeAnalysi
           navigateScreen({ name: 'analyzing', jobPostingId, variantId })
         }
         onOptimize={(analysisId) => navigateScreen({ name: 'optimize', analysisId })}
+        onLogSubmission={onLogSubmission}
       />
     )
   }
