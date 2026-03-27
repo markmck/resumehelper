@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Three Layer Data
 status: executing
-stopped_at: Completed 20-01-PLAN.md
-last_updated: "2026-03-27T16:13:18.562Z"
+stopped_at: Completed 20-03-PLAN.md
+last_updated: "2026-03-27T16:16:13.177Z"
 last_activity: 2026-03-27
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 11
-  completed_plans: 9
+  completed_plans: 10
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 ## Current Position
 
 Phase: 20 (skills-chip-grid) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-03-27
 
@@ -57,6 +57,7 @@ Progress: ░░░░░░░░░░ 0%
 | Phase 19-analysis-submission-flow P01 | 8min | 2 tasks | 9 files |
 | Phase 19-analysis-submission-flow P02 | 8min | 2 tasks | 4 files |
 | Phase 20-skills-chip-grid P01 | 2 | 2 tasks | 7 files |
+| Phase 20-skills-chip-grid P03 | 5min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,7 @@ Key v2.2 decisions from research:
 - [Phase 19-02]: localRole/localCompany state mirrors prevent flash-back-to-old-value on inline edit blur
 - [Phase 20-01]: skillCategories CREATE TABLE placed before skills in ensureSchema() to satisfy FK ordering
 - [Phase 20-01]: Handler registration belongs in handlers/index.ts, not main/index.ts — centralized registerAllHandlers() pattern
+- [Phase 20-03]: All four grouping surfaces use categoryName ?? 'Other' — skills without a category fall into 'Other' group gracefully
 
 ### Pending Todos
 
@@ -99,6 +101,6 @@ None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-03-27T16:13:18.559Z
-Stopped at: Completed 20-01-PLAN.md
+Last session: 2026-03-27T16:16:13.175Z
+Stopped at: Completed 20-03-PLAN.md
 Resume file: None
