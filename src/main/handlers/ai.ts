@@ -1,6 +1,6 @@
 import { ipcMain, safeStorage } from 'electron'
 import { eq, and } from 'drizzle-orm'
-import { db } from '../db'
+import { db, sqlite } from '../db'
 import { aiSettings, jobPostings, analysisResults, profile, analysisBulletOverrides, analysisSkillAdditions } from '../db/schema'
 import { callJobParser, callResumeScorer, deriveOverallScore } from '../lib/aiProvider'
 import { buildResumeTextForLlm } from '../lib/analysisPrompts'
@@ -167,16 +167,24 @@ export function registerAiHandlers(): void {
 
   ipcMain.handle('ai:getOverrides', async (_event, analysisId: number) => {
     try {
-      const rows = db.select({
-        bulletId: analysisBulletOverrides.bulletId,
-        overrideText: analysisBulletOverrides.overrideText,
-        source: analysisBulletOverrides.source,
-        suggestionId: analysisBulletOverrides.suggestionId,
-      })
-      .from(analysisBulletOverrides)
-      .where(eq(analysisBulletOverrides.analysisId, analysisId))
-      .all()
-      return rows
+      const rows = sqlite.prepare(`
+        SELECT abo.bullet_id AS bulletId, abo.override_text AS overrideText,
+               abo.source, abo.suggestion_id AS suggestionId,
+               CASE WHEN jb.id IS NULL THEN 1 ELSE 0 END AS isOrphaned
+        FROM analysis_bullet_overrides abo
+        LEFT JOIN job_bullets jb ON jb.id = abo.bullet_id
+        WHERE abo.analysis_id = ?
+      `).all(analysisId) as Array<{
+        bulletId: number
+        overrideText: string
+        source: string
+        suggestionId: string | null
+        isOrphaned: 0 | 1
+      }>
+      return rows.map(r => ({
+        ...r,
+        isOrphaned: r.isOrphaned === 1,
+      }))
     } catch (err) {
       console.error('ai:getOverrides error', err)
       return []

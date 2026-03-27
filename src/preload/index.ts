@@ -255,6 +255,8 @@ const api = {
     list: () => ipcRenderer.invoke('jobPostings:list'),
     create: (data: { company: string; role: string; rawText: string }) =>
       ipcRenderer.invoke('jobPostings:create', data),
+    update: (id: number, data: { company?: string; role?: string }) =>
+      ipcRenderer.invoke('jobPostings:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('jobPostings:delete', id),
     getAnalysis: (id: number) => ipcRenderer.invoke('jobPostings:getAnalysis', id),
     updateAnalysisStatus: (analysisId: number, status: string) =>

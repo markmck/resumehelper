@@ -287,6 +287,7 @@ export interface BulletOverride {
   overrideText: string
   source: 'ai_suggestion' | 'manual_edit'
   suggestionId: string | null
+  isOrphaned?: boolean
 }
 
 export interface SkillAddition {
@@ -547,6 +548,7 @@ export interface Api {
   jobPostings: {
     list: () => Promise<unknown[]>
     create: (data: { company: string; role: string; rawText: string }) => Promise<unknown>
+    update: (id: number, data: { company?: string; role?: string }) => Promise<unknown>
     delete: (id: number) => Promise<void>
     getAnalysis: (id: number) => Promise<Record<string, unknown> | null>
     updateAnalysisStatus: (analysisId: number, status: string) => Promise<void>

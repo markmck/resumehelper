@@ -8,6 +8,7 @@ export interface BulletOverride {
   overrideText: string
   source: 'ai_suggestion' | 'manual_edit'
   suggestionId: string | null
+  isOrphaned?: boolean
 }
 
 export interface SkillAddition {

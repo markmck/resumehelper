@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { db } from '../db'
+import { db, sqlite } from '../db'
 import { jobPostings, analysisResults, templateVariants } from '../db/schema'
 import { eq, desc } from 'drizzle-orm'
 
@@ -81,6 +81,21 @@ export function registerJobPostingHandlers(): void {
     }
   )
 
+  // Updates a job posting's company and/or role
+  ipcMain.handle('jobPostings:update', async (_event, id: number, data: { company?: string; role?: string }) => {
+    try {
+      const result = await db
+        .update(jobPostings)
+        .set(data)
+        .where(eq(jobPostings.id, id))
+        .returning()
+      return result[0]
+    } catch (err) {
+      console.error('jobPostings:update error', err)
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
   // Deletes a job posting by id (cascade removes analysis_results)
   ipcMain.handle('jobPostings:delete', async (_event, id: number) => {
     try {
@@ -138,6 +153,25 @@ export function registerJobPostingHandlers(): void {
         variantName = variant?.name ?? null
       }
 
+      // Compute staleness (D-07, D-08): on-demand, no stored column
+      let isStale = false
+      if (analysis.variantId != null) {
+        const analysisEpoch = Math.floor(new Date(analysis.analysisCreatedAt as unknown as string | number).getTime() / 1000)
+        const bulletStale = sqlite.prepare(`
+          SELECT 1 FROM job_bullets jb
+          JOIN template_variant_items tvi ON tvi.bullet_id = jb.id AND tvi.variant_id = ?
+          WHERE (tvi.excluded = 0 OR tvi.excluded IS NULL)
+            AND jb.updated_at > ?
+          LIMIT 1
+        `).get(analysis.variantId, analysisEpoch) != null
+
+        const variantStale = sqlite.prepare(`
+          SELECT 1 FROM template_variants WHERE id = ? AND updated_at > ? LIMIT 1
+        `).get(analysis.variantId, analysisEpoch) != null
+
+        isStale = bulletStale || variantStale
+      }
+
       // Mark as reviewed if currently unreviewed
       if (analysis.status === 'unreviewed') {
         db.update(analysisResults)
@@ -178,6 +212,7 @@ export function registerJobPostingHandlers(): void {
         company: analysis.company,
         role: analysis.role,
         rawText: analysis.rawText,
+        isStale,
       }
     } catch (err) {
       console.error('jobPostings:getAnalysis error', err)
