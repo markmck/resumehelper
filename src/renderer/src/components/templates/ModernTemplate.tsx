@@ -223,7 +223,7 @@ export default function ModernTemplate({
               Object.entries(skillGroups).map(([group, groupSkills]) => (
                 <div
                   key={group}
-                  style={{ fontSize: '10.5px', marginBottom: '4px', color: '#1a1a1a' }}
+                  style={{ fontSize: '10.5px', marginBottom: '4px', color: '#1a1a1a', overflowWrap: 'break-word', wordBreak: 'break-word' }}
                 >
                   <span style={{ fontWeight: '600', color: accentColor }}>{group}: </span>
                   <span>{groupSkills.map((s) => s.name).join(', ')}</span>
@@ -233,7 +233,7 @@ export default function ModernTemplate({
               Object.entries(skillGroups).map(([group, groupSkills]) => (
                 <div
                   key={group}
-                  style={{ fontSize: '10.5px', marginBottom: '4px', color: '#1a1a1a' }}
+                  style={{ fontSize: '10.5px', marginBottom: '4px', color: '#1a1a1a', overflowWrap: 'break-word', wordBreak: 'break-word' }}
                 >
                   <span style={{ fontWeight: 'bold' }}>{group}: </span>
                   <span>{groupSkills.map((s) => s.name).join(', ')}</span>
