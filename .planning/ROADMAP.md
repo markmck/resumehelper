@@ -83,7 +83,7 @@ Plans:
   5. If a bullet referenced by an override has been deleted, the analysis view shows a graceful notice rather than crashing or silently rendering stale text
 **Plans**: 2 plans
 Plans:
-- [ ] 19-01-PLAN.md — Schema updated_at columns, IPC handlers (jobPostings:update, staleness, orphaned overrides), preload/types
+- [x] 19-01-PLAN.md — Schema updated_at columns, IPC handlers (jobPostings:update, staleness, orphaned overrides), preload/types
 - [ ] 19-02-PLAN.md — Renderer UI: inline editing, stale banner, Log Submission in OptimizeVariant, orphaned rendering, auto-extract
 
 ### Phase 20: Skills Chip Grid
@@ -118,6 +118,6 @@ Plans:
 | 13-16 | v2.1 | 12/12 | Complete | 2026-03-26 |
 | 17. Schema + Override IPC Foundation | 2/2 | Complete    | 2026-03-26 | - |
 | 18. Three-Layer Model Wiring | v2.2 | 4/4 | Complete    | 2026-03-27 |
-| 19. Analysis Submission Flow | v2.2 | 0/2 | Not started | - |
+| 19. Analysis Submission Flow | v2.2 | 1/2 | In Progress|  |
 | 20. Skills Chip Grid | v2.2 | 0/? | Not started | - |
 | 21. Variant UX + Cleanup | v2.2 | 0/? | Not started | - |

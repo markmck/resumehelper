@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Three Layer Data
-status: verifying
-stopped_at: Phase 19 UI-SPEC approved
-last_updated: "2026-03-27T02:52:44.247Z"
+status: executing
+stopped_at: Completed 19-01-PLAN.md
+last_updated: "2026-03-27T13:00:10.335Z"
 last_activity: 2026-03-27
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 18 — three-layer-model-wiring
+**Current focus:** Phase 19 — analysis-submission-flow
 
 ## Current Position
 
-Phase: 19
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 19 (analysis-submission-flow) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-03-27
 
 Progress: ░░░░░░░░░░ 0%
@@ -54,6 +54,7 @@ Progress: ░░░░░░░░░░ 0%
 | Phase 18-three-layer-model-wiring P03 | 5 | 1 tasks | 1 files |
 | Phase 18 P02 | 311 | 2 tasks | 2 files |
 | Phase 18 P04 | 5 | 1 tasks | 1 files |
+| Phase 19-analysis-submission-flow P01 | 8min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,8 @@ Key v2.2 decisions from research:
 - [Phase 18]: dismiss (pending->dismissed) calls no IPC; only revert (accepted->pending) calls ai:dismissSuggestion
 - [Phase 18]: [Phase 18-02]: batch save (handleSave, canSave, confirmation dialog) removed entirely from OptimizeVariant; per-click IPC is the persistence model
 - [Phase 18]: VariantPreview rendered in 400px height container inside OptimizeVariant right pane scroll column with analysisId for override-merged preview
+- [Phase 19-01]: Staleness computed on-demand in getAnalysis via analysisEpoch integer comparison — no stored isStale column
+- [Phase 19-01]: ai:getOverrides uses raw SQL LEFT JOIN to detect orphaned overrides, returning isOrphaned: boolean
 
 ### Pending Todos
 
@@ -91,6 +94,6 @@ None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-03-27T02:52:44.244Z
-Stopped at: Phase 19 UI-SPEC approved
-Resume file: .planning/phases/19-analysis-submission-flow/19-UI-SPEC.md
+Last session: 2026-03-27T13:00:10.332Z
+Stopped at: Completed 19-01-PLAN.md
+Resume file: None
