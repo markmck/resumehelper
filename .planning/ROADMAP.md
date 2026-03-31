@@ -154,3 +154,11 @@ Plans:
 
 Plans:
 - [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.4: Job Posting URL Scraping (BACKLOG)
+**Goal:** Scrape job posting content from a URL instead of requiring manual paste — fetch and extract job description, company, and role from job board links (LinkedIn, Indeed, etc.)
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
