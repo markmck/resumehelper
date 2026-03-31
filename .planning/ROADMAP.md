@@ -128,3 +128,13 @@ Plans:
 | 19. Analysis Submission Flow | v2.2 | 2/2 | Complete    | 2026-03-27 |
 | 20. Skills Chip Grid | v2.2 | 3/3 | Complete    | 2026-03-27 |
 | 21. Variant UX + Cleanup | v2.2 | 2/2 | Complete    | 2026-03-27 |
+
+## Backlog
+
+### Phase 999.1: ATS Score Threshold Setting (BACKLOG)
+**Goal:** Let users set a minimum match score target so they can focus tailoring effort on high-match postings
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
