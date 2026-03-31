@@ -146,3 +146,11 @@ Plans:
 
 Plans:
 - [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.3: Import Resume from Existing PDF (BACKLOG)
+**Goal:** Allow users to import their experience data from an existing PDF resume, parsing jobs, bullets, skills, and education into the structured DB
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
