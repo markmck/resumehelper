@@ -36,11 +36,25 @@ Requirements for milestone v2.2 Three Layer Data. Each maps to roadmap phases.
 
 ### Template Fixes
 
-- [ ] **TMPL-01**: Modern template renders skills inline correctly
+- [x] **TMPL-01**: Modern template renders skills inline correctly
 
 ### Cleanup
 
-- [ ] **CLNP-01**: All stale "coming soon" messages removed for shipped features
+- [x] **CLNP-01**: All stale "coming soon" messages removed for shipped features
+
+## v2.3 Requirements
+
+Requirements for milestone v2.3 Job Hunt Accelerator.
+
+### ATS Score Threshold
+
+- [ ] **ATS-01**: score_threshold integer column on templateVariants with default 80, persisted in DB
+- [ ] **ATS-02**: IPC handlers (get/set) for reading and writing a variant's score threshold
+- [ ] **ATS-03**: Threshold slider (0-100, step 5) on OptimizeVariant with debounced auto-save
+- [ ] **ATS-04**: Score ring and label on OptimizeVariant use threshold-relative color bands (green at/above, yellow within 15, red below)
+- [ ] **ATS-05**: Score display shows "72 (+6)" format with target arc tick on SVG ring
+- [ ] **ATS-06**: Below-target callout on OptimizeVariant listing pending rewrites, missing keywords, skill suggestions — updates live
+- [ ] **ATS-07**: Soft warning in SubmissionLogForm when score < threshold — informational only, non-blocking
 
 ## Future Requirements
 
@@ -97,14 +111,21 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VARNT-04 | Phase 20 | Complete |
 | VARNT-01 | Phase 21 | Complete |
 | VARNT-05 | Phase 21 | Complete |
-| TMPL-01 | Phase 21 | Pending |
-| CLNP-01 | Phase 21 | Pending |
+| TMPL-01 | Phase 21 | Complete |
+| CLNP-01 | Phase 21 | Complete |
+| ATS-01 | Phase 22 | Planned |
+| ATS-02 | Phase 22 | Planned |
+| ATS-03 | Phase 22 | Planned |
+| ATS-04 | Phase 22 | Planned |
+| ATS-05 | Phase 22 | Planned |
+| ATS-06 | Phase 22 | Planned |
+| ATS-07 | Phase 22 | Planned |
 
 **Coverage:**
-- v2.2 requirements: 20 total
-- Mapped to phases: 20
-- Unmapped: 0 ✓
+- v2.2 requirements: 20 total — 20 complete
+- v2.3 requirements: 7 total — 0 complete
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-26*
-*Last updated: 2026-03-26 — traceability filled after roadmap creation*
+*Last updated: 2026-04-01 — v2.3 ATS requirements added for Phase 22*
