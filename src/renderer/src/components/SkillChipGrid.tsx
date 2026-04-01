@@ -557,7 +557,11 @@ function SkillChipGrid(): React.JSX.Element {
   const [addCategoryHovered, setAddCategoryHovered] = useState(false)
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),

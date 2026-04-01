@@ -27,7 +27,7 @@ function formatDate(val: Date | null | string): string {
   if (!val) return '—'
   const d = new Date(val)
   if (isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function filterSubmissions(subs: Submission[], filter: FilterKey, search: string): Submission[] {

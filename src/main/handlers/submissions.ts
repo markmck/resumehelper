@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { db } from '../db'
-import { submissions, submissionEvents, templateVariants, templateVariantItems, jobs, jobBullets, skills, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisResults, jobPostings, profile, analysisBulletOverrides, analysisSkillAdditions } from '../db/schema'
+import { submissions, submissionEvents, templateVariants, templateVariantItems, jobs, jobBullets, skills, skillCategories, projects, projectBullets, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisResults, jobPostings, profile, analysisBulletOverrides, analysisSkillAdditions } from '../db/schema'
 import { eq, desc, asc, and } from 'drizzle-orm'
 import type { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
 import { applyOverrides } from '../../shared/overrides'
@@ -56,7 +56,13 @@ async function buildSnapshotForVariant(variantId: number, analysisId?: number): 
 
   const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
   const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
-  const allSkills = await db.select().from(skills)
+  const allSkills = await db.select({
+    id: skills.id,
+    name: skills.name,
+    tags: skills.tags,
+    categoryId: skills.categoryId,
+    categoryName: skillCategories.name,
+  }).from(skills).leftJoin(skillCategories, eq(skills.categoryId, skillCategories.id))
   const allProjects = await db.select().from(projects).orderBy(asc(projects.sortOrder))
   const allProjectBullets = await db.select().from(projectBullets).orderBy(asc(projectBullets.sortOrder))
   const allEducation = await db.select().from(education)
@@ -147,7 +153,9 @@ async function buildSnapshotForVariant(variantId: number, analysisId?: number): 
   const skillsWithExcluded: BuilderSkill[] = allSkills.map((skill) => ({
     id: skill.id,
     name: skill.name,
-    tags: JSON.parse(skill.tags) as string[],
+    tags: JSON.parse(skill.tags as string) as string[],
+    categoryId: skill.categoryId ?? null,
+    categoryName: skill.categoryName ?? null,
     excluded: excludedSkillIds.has(skill.id),
   }))
 
@@ -165,7 +173,9 @@ async function buildSnapshotForVariant(variantId: number, analysisId?: number): 
       skillsWithExcluded.push({
         id: -1,
         name: sk.skillName,
-        tags: sk.category ? [sk.category] : [],
+        tags: sk.category && sk.category !== '' ? [sk.category] : [],
+        categoryId: null,
+        categoryName: sk.category && sk.category !== '' ? sk.category : null,
         excluded: false,
       })
     }

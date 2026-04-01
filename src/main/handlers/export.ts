@@ -32,7 +32,7 @@ const DOCX_MARGIN_DEFAULTS: Record<string, { top: number; bottom: number; sides:
   executive: { top: 0.80, bottom: 0.80, sides: 0.80 },
 }
 import { db } from '../db'
-import { profile, jobs, jobBullets, skills, projects, projectBullets, templateVariantItems, templateVariants, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisBulletOverrides } from '../db/schema'
+import { profile, jobs, jobBullets, skills, skillCategories, projects, projectBullets, templateVariantItems, templateVariants, education, volunteer, awards, publications, languages, interests, referenceEntries, analysisBulletOverrides } from '../db/schema'
 import { eq, asc, desc } from 'drizzle-orm'
 import { applyOverrides } from '../../shared/overrides'
 import { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
@@ -53,7 +53,14 @@ interface BuilderData {
 export async function getBuilderDataForVariant(variantId: number, analysisId?: number): Promise<BuilderData> {
   const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
   const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
-  const allSkills = await db.select().from(skills)
+  const allSkills = await db.select({
+    id: skills.id,
+    name: skills.name,
+    tags: skills.tags,
+    categoryId: skills.categoryId,
+    categoryName: skillCategories.name,
+    excluded: skills.id, // placeholder — excluded computed below
+  }).from(skills).leftJoin(skillCategories, eq(skills.categoryId, skillCategories.id))
   const allProjects = await db.select().from(projects).orderBy(asc(projects.sortOrder))
   const allProjectBullets = await db.select().from(projectBullets).orderBy(asc(projectBullets.sortOrder))
   const allEducation = await db.select().from(education)
@@ -127,7 +134,9 @@ export async function getBuilderDataForVariant(variantId: number, analysisId?: n
   const skillsWithExcluded: BuilderSkill[] = allSkills.map((skill) => ({
     id: skill.id,
     name: skill.name,
-    tags: JSON.parse(skill.tags) as string[],
+    tags: JSON.parse(skill.tags as string) as string[],
+    categoryId: skill.categoryId ?? null,
+    categoryName: skill.categoryName ?? null,
     excluded: excludedSkillIds.has(skill.id),
   }))
 

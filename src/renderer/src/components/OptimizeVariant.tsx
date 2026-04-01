@@ -8,6 +8,7 @@ interface Gap {
   skill: string
   severity: 'critical' | 'moderate'
   reason?: string
+  category?: string
 }
 
 interface RewriteSuggestion {
@@ -109,6 +110,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   // ── Data state
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null)
   const [bulletIdMap, setBulletIdMap] = useState<Map<string, number>>(new Map())
+  const [bulletJobMap, setBulletJobMap] = useState<Map<number, string>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -148,19 +150,22 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
           const builderData = await window.api.templates.getBuilderData(data.variantId)
           if (builderData && !('error' in builderData)) {
             const map = new Map<string, number>()
-            const bd = builderData as { jobs?: Array<{ bullets?: BuilderBullet[] }>; }
+            const jobMap = new Map<number, string>()
+            const bd = builderData as { jobs?: Array<{ company?: string; role?: string; bullets?: BuilderBullet[] }>; }
             if (Array.isArray(bd.jobs)) {
               for (const job of bd.jobs) {
                 if (Array.isArray(job.bullets)) {
                   for (const b of job.bullets) {
                     if (!b.excluded) {
                       map.set(b.text, b.id)
+                      jobMap.set(b.id, `${job.company ?? ''}${job.role ? ' — ' + job.role : ''}`)
                     }
                   }
                 }
               }
             }
             setBulletIdMap(map)
+            setBulletJobMap(jobMap)
 
             // Derive skill suggestions: gap skills not included in variant
             const gapSkills = data.gapSkills ?? []
@@ -225,6 +230,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
         skill: g.skill,
         severity: g.severity,
         reason: g.reason,
+        category: g.category,
       }))
     )
   }, [analysis?.id])
@@ -678,7 +684,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
                         <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', fontWeight: 500 }}>
-                          {analysis.company} · Bullet {i + 1}
+                          {(bulletId != null && bulletJobMap.get(bulletId)) || analysis.company} · Bullet {i + 1}
                         </span>
                         <span
                           style={{
@@ -738,7 +744,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                           fontWeight: 500,
                         }}
                       >
-                        {analysis.company} · Bullet {i + 1}
+                        {(bulletId != null && bulletJobMap.get(bulletId)) || analysis.company} · Bullet {i + 1}
                       </span>
                       <span
                         style={{

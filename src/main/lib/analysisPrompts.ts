@@ -37,6 +37,7 @@ Scoring guidelines:
 Gap analysis guidelines:
 - severity "critical": Required skill or qualification that is completely absent from the resume
 - severity "moderate": Preferred skill that is missing, or a required skill that is present but underrepresented
+- category: Suggest a skill category for each gap (e.g., "Programming Languages", "Cloud & DevOps", "Frameworks", "Tools", "Soft Skills"). Use categories that match the resume's existing skill groupings when possible.
 
 Rewrite suggestion guidelines (CRITICAL):
 - NEVER fabricate experience, accomplishments, or skills the candidate does not have

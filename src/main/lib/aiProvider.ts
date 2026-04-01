@@ -30,6 +30,7 @@ export const ResumeScorerSchema = z.object({
       skill: z.string(),
       severity: z.enum(['critical', 'moderate']),
       reason: z.string().optional(),
+      category: z.string().optional(),
     })
   ),
   rewrite_suggestions: z.array(
