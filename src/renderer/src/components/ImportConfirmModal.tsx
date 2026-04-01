@@ -6,6 +6,7 @@ interface ImportConfirmModalProps {
   onConfirm: () => void
   onCancel: () => void
   loading: boolean
+  mode?: 'replace' | 'append'
 }
 
 const sectionLabels: Record<string, string> = {
@@ -27,6 +28,7 @@ function ImportConfirmModal({
   onConfirm,
   onCancel,
   loading,
+  mode = 'replace',
 }: ImportConfirmModalProps): React.JSX.Element {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent): void => {
@@ -59,14 +61,16 @@ function ImportConfirmModal({
         style={{ maxWidth: '420px', width: '100%', padding: '24px' }}
       >
         <h2 className="text-lg font-semibold text-zinc-100" style={{ marginBottom: '16px' }}>
-          Import resume.json
+          {mode === 'append' ? 'Import from PDF' : 'Import resume.json'}
         </h2>
 
         <div
-          className="bg-amber-950/50 border border-amber-800/50 rounded-md text-amber-300 text-sm"
+          className={`${mode === 'append' ? 'bg-blue-950/50 border-blue-800/50 text-blue-300' : 'bg-amber-950/50 border-amber-800/50 text-amber-300'} border rounded-md text-sm`}
           style={{ padding: '10px 14px', marginBottom: '16px' }}
         >
-          This will replace all existing data
+          {mode === 'append'
+            ? 'New entries will be added alongside your existing data'
+            : 'This will replace all existing data'}
         </div>
 
         <div style={{ marginBottom: '20px' }}>
@@ -100,9 +104,9 @@ function ImportConfirmModal({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-50"
+            className={`px-4 py-1.5 ${mode === 'append' ? 'bg-blue-600 hover:bg-blue-500' : 'bg-red-600 hover:bg-red-500'} text-white text-sm font-medium rounded-md transition-colors disabled:opacity-50`}
           >
-            {loading ? 'Importing...' : 'Replace All Data'}
+            {loading ? 'Importing...' : mode === 'append' ? 'Import Data' : 'Replace All Data'}
           </button>
         </div>
       </div>

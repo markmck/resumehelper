@@ -100,6 +100,8 @@ function ExperienceTab(): React.JSX.Element {
   const { showToast } = useToast()
   const [importData, setImportData] = useState<ImportData | null>(null)
   const [importLoading, setImportLoading] = useState(false)
+  const [pdfExtracting, setPdfExtracting] = useState(false)
+  const [importMode, setImportMode] = useState<'replace' | 'append'>('replace')
   const [refreshKey, setRefreshKey] = useState(0)
 
   const handleImportClick = async (): Promise<void> => {
@@ -109,6 +111,7 @@ function ExperienceTab(): React.JSX.Element {
       showToast(result.error)
       return
     }
+    setImportMode('replace')
     setImportData({
       counts: result.counts as Record<string, number>,
       data: result.data,
@@ -116,11 +119,37 @@ function ExperienceTab(): React.JSX.Element {
     })
   }
 
+  const handleImportPdfClick = async (): Promise<void> => {
+    setPdfExtracting(true)
+    try {
+      const result = await window.api.import_.parsePdf()
+      if (result.canceled) return
+      if (result.error) {
+        showToast(result.error)
+        return
+      }
+      setImportMode('append')
+      setImportData({
+        counts: result.counts as Record<string, number>,
+        data: result.data,
+        hasProfile: !!(result.counts as Record<string, number>).hasProfile,
+      })
+    } catch (err) {
+      showToast('PDF import failed: ' + (err as Error).message)
+    } finally {
+      setPdfExtracting(false)
+    }
+  }
+
   const handleImportConfirm = async (): Promise<void> => {
     if (!importData) return
     setImportLoading(true)
     try {
-      await window.api.import_.confirmReplace(importData.data)
+      if (importMode === 'append') {
+        await window.api.import_.confirmAppend(importData.data)
+      } else {
+        await window.api.import_.confirmReplace(importData.data)
+      }
       showToast(`Imported: ${formatCounts(importData.counts)}`)
       setImportData(null)
       setRefreshKey((prev) => prev + 1)
@@ -156,6 +185,27 @@ function ExperienceTab(): React.JSX.Element {
               }}
             >
               Import JSON
+            </button>
+            <button
+              onClick={handleImportPdfClick}
+              disabled={pdfExtracting}
+              style={{
+                backgroundColor: 'transparent',
+                border: '1px solid var(--color-border-default)',
+                color: 'var(--color-text-secondary)',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--font-size-base)',
+                cursor: pdfExtracting ? 'wait' : 'pointer',
+                height: 36,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                fontFamily: 'var(--font-sans)',
+                opacity: pdfExtracting ? 0.6 : 1,
+              }}
+            >
+              {pdfExtracting ? 'Extracting...' : 'Import PDF'}
             </button>
           </div>
         </div>
@@ -215,6 +265,7 @@ function ExperienceTab(): React.JSX.Element {
           onConfirm={handleImportConfirm}
           onCancel={() => setImportData(null)}
           loading={importLoading}
+          mode={importMode}
         />
       )}
     </div>
