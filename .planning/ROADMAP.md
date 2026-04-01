@@ -68,8 +68,12 @@ Plans:
 
 ### Phase 24: Job Posting URL Scraping
 **Goal:** Scrape job posting content from a URL instead of requiring manual paste — fetch and extract job description, company, and role from job board links (LinkedIn, Indeed, etc.)
-**Requirements:** TBD
-**Plans:** 0 plans
+**Requirements:** [URL-01, URL-02, URL-03, URL-04, URL-05, URL-06, URL-07]
+**Plans:** 2 plans
+
+Plans:
+- [ ] 24-01-PLAN.md — Prompt builder, IPC handler (net.fetch + HTML strip + AI extraction), preload bindings
+- [ ] 24-02-PLAN.md — Activate URL tab in NewAnalysisForm with fetch flow, loading/error states
 
 ## Progress
 
@@ -79,7 +83,7 @@ Plans:
 | 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
 | 13-16 | v2.1 | 12/12 | Complete | 2026-03-26 |
 | 17-21 | v2.2 | 13/13 | Complete | 2026-04-01 |
-| 22-24 | v2.3 | 0/5 | Active | - |
+| 22-24 | v2.3 | 0/7 | Active | - |
 
 ## Future (v3.0+)
 

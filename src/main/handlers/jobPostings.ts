@@ -1,7 +1,33 @@
-import { ipcMain } from 'electron'
+import { ipcMain, net, safeStorage } from 'electron'
 import { db, sqlite } from '../db'
 import { jobPostings, analysisResults, templateVariants } from '../db/schema'
 import { eq, desc } from 'drizzle-orm'
+import { generateObject } from 'ai'
+import { z } from 'zod'
+import { getModel } from '../lib/aiProvider'
+import { buildJobPostingUrlPrompt } from '../lib/jobPostingUrlPrompt'
+
+const JobUrlExtractionSchema = z.object({
+  isJobPosting: z.boolean(),
+  jobTitle: z.string(),
+  company: z.string(),
+  jobDescriptionText: z.string(),
+})
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
 
 export function registerJobPostingHandlers(): void {
   // Returns all job postings with their latest analysis result (if any)
@@ -228,6 +254,83 @@ export function registerJobPostingHandlers(): void {
     } catch (err) {
       console.error('jobPostings:updateAnalysisStatus error', err)
       return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // Fetches a job posting URL, strips HTML, and extracts structured job data via AI
+  ipcMain.handle('jobPostings:fetchUrl', async (_event, url: string) => {
+    // 1. AI config check first (mirrors import:parseResumePdf pattern)
+    const aiRow = sqlite.prepare(
+      'SELECT provider, model, api_key as apiKey FROM ai_settings WHERE id=1'
+    ).get() as { provider: string; model: string; apiKey: string } | undefined
+    if (!aiRow?.apiKey?.length) {
+      return { error: 'AI provider not configured. Set up your API key in Settings.' }
+    }
+
+    // 2. Validate URL
+    try {
+      new URL(url)
+    } catch {
+      return { error: 'Please enter a valid URL (e.g., https://jobs.example.com/...)' }
+    }
+
+    // 3. Fetch with 15s timeout + browser User-Agent
+    let html: string
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 15000)
+    try {
+      const response = await net.fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+        },
+      })
+      clearTimeout(timer)
+      if (!response.ok) {
+        return { error: `Could not fetch page (HTTP ${response.status})` }
+      }
+      html = await response.text()
+    } catch (err) {
+      clearTimeout(timer)
+      if (err instanceof Error && err.name === 'AbortError') {
+        return { error: 'Request timed out. The page took too long to respond.' }
+      }
+      return { error: `Network error: ${err instanceof Error ? err.message : String(err)}` }
+    }
+
+    // 4. Strip HTML, truncate to 15k chars
+    const plainText = stripHtml(html).slice(0, 15000)
+
+    // 5. Decrypt API key and call AI extraction
+    const apiKey = safeStorage.decryptString(Buffer.from(aiRow.apiKey, 'base64'))
+    const modelInstance = getModel(aiRow.provider, aiRow.model, apiKey)
+    const { system, prompt } = buildJobPostingUrlPrompt(plainText)
+
+    let extracted: z.infer<typeof JobUrlExtractionSchema>
+    try {
+      const result = await generateObject({
+        model: modelInstance as Parameters<typeof generateObject>[0]['model'],
+        schema: JobUrlExtractionSchema,
+        system,
+        prompt,
+        temperature: 0,
+      })
+      extracted = result.object
+    } catch (err) {
+      return { error: `AI extraction failed: ${err instanceof Error ? err.message : String(err)}` }
+    }
+
+    // 6. Validate extracted content
+    if (!extracted.isJobPosting || extracted.jobDescriptionText.trim().length < 50) {
+      return { error: 'Could not extract job posting from this page. The page may require JavaScript or login. Try copying and pasting the job text instead.' }
+    }
+
+    return {
+      jobTitle: extracted.jobTitle,
+      company: extracted.company,
+      jobDescriptionText: extracted.jobDescriptionText,
     }
   })
 }

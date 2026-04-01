@@ -67,6 +67,16 @@ Requirements for milestone v2.3 Job Hunt Accelerator.
 - [x] **PDF-07**: ImportConfirmModal supports append mode with blue styling, "Import Data" button, additive messaging
 - [x] **PDF-08**: ExperienceTab has "Import PDF" button alongside "Import JSON" with loading indicator during AI extraction
 
+### Job Posting URL Scraping
+
+- [ ] **URL-01**: IPC handler `jobPostings:fetchUrl` fetches HTML via Electron `net.fetch()` with browser User-Agent and 15s AbortController timeout
+- [ ] **URL-02**: HTML stripped to plain text via regex (script/style removal, tag stripping, entity decoding), truncated to 15k chars before AI
+- [ ] **URL-03**: AI extraction via `generateObject` with Zod schema returning isJobPosting, jobTitle, company, jobDescriptionText
+- [ ] **URL-04**: Prompt builder in dedicated `jobPostingUrlPrompt.ts` file for job posting URL content extraction
+- [ ] **URL-05**: Preload binding `fetchUrl` on jobPostings object with TypeScript type declarations in index.d.ts
+- [ ] **URL-06**: URL tab activated in NewAnalysisForm (no longer disabled/"Coming soon") with URL input, Fetch button, loading/error/warning states
+- [ ] **URL-07**: Successful fetch auto-populates rawText, company, role fields; short content warning shown for brief extractions
+
 ## Future Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -94,7 +104,6 @@ Explicitly excluded. Documented to prevent scope creep.
 | AI-generated resume text from scratch | AI suggests rewording only — never fabricates experience |
 | Mobile app | Desktop-first via Electron |
 | Cover letter generation | Separate concern |
-| Job board integration/scraping | Manual entry |
 | Runtime theme installation | Bundle curated templates only |
 | Configurable DB location | Future milestone |
 
@@ -139,12 +148,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PDF-06 | Phase 23 | Planned |
 | PDF-07 | Phase 23 | Planned |
 | PDF-08 | Phase 23 | Planned |
+| URL-01 | Phase 24 | Planned |
+| URL-02 | Phase 24 | Planned |
+| URL-03 | Phase 24 | Planned |
+| URL-04 | Phase 24 | Planned |
+| URL-05 | Phase 24 | Planned |
+| URL-06 | Phase 24 | Planned |
+| URL-07 | Phase 24 | Planned |
 
 **Coverage:**
 - v2.2 requirements: 20 total — 20 complete
-- v2.3 requirements: 15 total — 7 complete
+- v2.3 requirements: 22 total — 15 complete
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-26*
-*Last updated: 2026-04-01 — v2.3 PDF import requirements added for Phase 23*
+*Last updated: 2026-04-01 — v2.3 URL scraping requirements added for Phase 24*
