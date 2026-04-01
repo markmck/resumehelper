@@ -69,11 +69,11 @@ Requirements for milestone v2.3 Job Hunt Accelerator.
 
 ### Job Posting URL Scraping
 
-- [ ] **URL-01**: IPC handler `jobPostings:fetchUrl` fetches HTML via Electron `net.fetch()` with browser User-Agent and 15s AbortController timeout
-- [ ] **URL-02**: HTML stripped to plain text via regex (script/style removal, tag stripping, entity decoding), truncated to 15k chars before AI
-- [ ] **URL-03**: AI extraction via `generateObject` with Zod schema returning isJobPosting, jobTitle, company, jobDescriptionText
-- [ ] **URL-04**: Prompt builder in dedicated `jobPostingUrlPrompt.ts` file for job posting URL content extraction
-- [ ] **URL-05**: Preload binding `fetchUrl` on jobPostings object with TypeScript type declarations in index.d.ts
+- [x] **URL-01**: IPC handler `jobPostings:fetchUrl` fetches HTML via Electron `net.fetch()` with browser User-Agent and 15s AbortController timeout
+- [x] **URL-02**: HTML stripped to plain text via regex (script/style removal, tag stripping, entity decoding), truncated to 15k chars before AI
+- [x] **URL-03**: AI extraction via `generateObject` with Zod schema returning isJobPosting, jobTitle, company, jobDescriptionText
+- [x] **URL-04**: Prompt builder in dedicated `jobPostingUrlPrompt.ts` file for job posting URL content extraction
+- [x] **URL-05**: Preload binding `fetchUrl` on jobPostings object with TypeScript type declarations in index.d.ts
 - [ ] **URL-06**: URL tab activated in NewAnalysisForm (no longer disabled/"Coming soon") with URL input, Fetch button, loading/error/warning states
 - [ ] **URL-07**: Successful fetch auto-populates rawText, company, role fields; short content warning shown for brief extractions
 

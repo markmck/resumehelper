@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Job Hunt Accelerator
 status: executing
-stopped_at: "Checkpoint: Task 2 human-verify in 23-02-PLAN.md"
-last_updated: "2026-04-01T17:55:52.377Z"
+stopped_at: Completed 24-01-PLAN.md
+last_updated: "2026-04-01T23:41:38.614Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
   percent: 0
 ---
 
@@ -21,11 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 23 — import-resume-from-existing-pdf
+**Current focus:** Phase 24 — job-posting-url-scraping
 
 ## Current Position
 
-Phase: 23 (import-resume-from-existing-pdf) — EXECUTING
+Phase: 24 (job-posting-url-scraping) — EXECUTING
 Plan: 2 of 2
 Status: Ready to execute
 Last activity: 2026-04-01
@@ -65,6 +65,7 @@ Progress: ░░░░░░░░░░ 0%
 | Phase 22-ats-score-threshold P03 | 8min | 1 tasks | 3 files |
 | Phase 23-import-resume-from-existing-pdf P01 | 2min | 2 tasks | 5 files |
 | Phase 23 P02 | 3min | 1 tasks | 2 files |
+| Phase 24-job-posting-url-scraping P01 | 6min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,8 @@ Key v2.2 decisions from research:
 - [Phase 23-01]: confirmAppend is INSERT-only with no DELETE statements — append semantics preserve existing data
 - [Phase 23-01]: AI config check happens before file dialog in parseResumePdf to avoid dialog-then-fail UX
 - [Phase 23]: ImportConfirmModal mode prop defaults to 'replace' for full backward compatibility with existing JSON import flow
+- [Phase 24-01]: generateObject (not generateText) for URL extraction mirrors callJobParser pattern and provides type-safe auto-retry
+- [Phase 24-01]: isJobPosting boolean in Zod schema catches JS-rendered pages, auth walls, CAPTCHA without site-specific logic
 
 ### Pending Todos
 
@@ -120,6 +123,6 @@ None — v2.2 roadmap defined, ready to plan Phase 17.
 
 ## Session Continuity
 
-Last session: 2026-04-01T17:55:44.144Z
-Stopped at: Checkpoint: Task 2 human-verify in 23-02-PLAN.md
+Last session: 2026-04-01T23:41:38.612Z
+Stopped at: Completed 24-01-PLAN.md
 Resume file: None
