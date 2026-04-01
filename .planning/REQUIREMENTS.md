@@ -58,12 +58,12 @@ Requirements for milestone v2.3 Job Hunt Accelerator.
 
 ### PDF Resume Import
 
-- [ ] **PDF-01**: pdf-parse installed as dependency for PDF text extraction in main process
-- [ ] **PDF-02**: Zod ResumeJsonSchema matching full ResumeJson interface (all 11 sections) for structured AI output
-- [ ] **PDF-03**: AI-powered extraction via callResumeExtractor using existing getModel/generateObject infrastructure
-- [ ] **PDF-04**: parseResumePdf IPC handler: file dialog -> PDF extraction -> AI call -> return counts + data
-- [ ] **PDF-05**: confirmAppend IPC handler: INSERT-only transaction, no DELETE statements, additive import
-- [ ] **PDF-06**: Preload bindings (parsePdf, confirmAppend) with TypeScript types in index.d.ts
+- [x] **PDF-01**: pdf-parse installed as dependency for PDF text extraction in main process
+- [x] **PDF-02**: Zod ResumeJsonSchema matching full ResumeJson interface (all 11 sections) for structured AI output
+- [x] **PDF-03**: AI-powered extraction via callResumeExtractor using existing getModel/generateObject infrastructure
+- [x] **PDF-04**: parseResumePdf IPC handler: file dialog -> PDF extraction -> AI call -> return counts + data
+- [x] **PDF-05**: confirmAppend IPC handler: INSERT-only transaction, no DELETE statements, additive import
+- [x] **PDF-06**: Preload bindings (parsePdf, confirmAppend) with TypeScript types in index.d.ts
 - [ ] **PDF-07**: ImportConfirmModal supports append mode with blue styling, "Import Data" button, additive messaging
 - [ ] **PDF-08**: ExperienceTab has "Import PDF" button alongside "Import JSON" with loading indicator during AI extraction
 
