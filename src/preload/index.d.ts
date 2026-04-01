@@ -574,6 +574,11 @@ export interface Api {
     delete: (id: number) => Promise<void>
     getAnalysis: (id: number) => Promise<Record<string, unknown> | null>
     updateAnalysisStatus: (analysisId: number, status: string) => Promise<void>
+    fetchUrl: (url: string) => Promise<{
+      jobTitle: string
+      company: string
+      jobDescriptionText: string
+    } | { error: string }>
   }
 }
 

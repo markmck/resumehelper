@@ -275,6 +275,7 @@ const api = {
     getAnalysis: (id: number) => ipcRenderer.invoke('jobPostings:getAnalysis', id),
     updateAnalysisStatus: (analysisId: number, status: string) =>
       ipcRenderer.invoke('jobPostings:updateAnalysisStatus', analysisId, status),
+    fetchUrl: (url: string) => ipcRenderer.invoke('jobPostings:fetchUrl', url),
   },
 }
 
