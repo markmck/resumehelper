@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from './Toast'
 import VariantPreview from './VariantPreview'
+import { getScoreColor } from '../lib/scoreColor'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -73,12 +74,6 @@ interface OptimizeVariantProps {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-function getScoreColor(score: number): string {
-  if (score >= 80) return 'var(--color-success)'
-  if (score >= 50) return 'var(--color-warning)'
-  return 'var(--color-danger)'
-}
-
 function deriveOverallScore(subscores: {
   keyword_score: number
   skills_score: number
@@ -92,9 +87,9 @@ function deriveOverallScore(subscores: {
   return Math.round(kw * 0.35 + sk * 0.35 + ex * 0.2 + at * 0.1)
 }
 
-function getScoreLabel(score: number): string {
-  if (score >= 80) return 'Strong match'
-  if (score >= 50) return 'Good match'
+function getScoreLabel(score: number, threshold: number): string {
+  if (score >= threshold) return 'Strong match'
+  if (score >= threshold - 15) return 'Good match'
   return 'Needs work'
 }
 
@@ -119,6 +114,9 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   const [stagedSkills, setStagedSkills] = useState<StagedSkill[]>([])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
+  // ── Threshold state
+  const [threshold, setThreshold] = useState(80)
+
   // ── Overrides state (for orphaned override detection)
   const [overrides, setOverrides] = useState<Array<{ bulletId: number; isOrphaned?: boolean }>>([])
 
@@ -126,6 +124,26 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0)
 
   const { showToast } = useToast()
+
+  // ── Threshold debounced save
+  const saveThresholdRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleThresholdChange = useCallback((value: number) => {
+    setThreshold(value)
+    if (saveThresholdRef.current) clearTimeout(saveThresholdRef.current)
+    saveThresholdRef.current = setTimeout(() => {
+      if (analysis?.variantId != null) {
+        window.api.templates.setThreshold(analysis.variantId, value)
+      }
+    }, 300)
+  }, [analysis?.variantId])
+
+  // ── Cleanup threshold debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveThresholdRef.current) clearTimeout(saveThresholdRef.current)
+    }
+  }, [])
 
   // ── Load on mount
   useEffect(() => {
@@ -144,6 +162,11 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
         // Initialize suggestion states
         const suggs = data.suggestions ?? []
         setSuggStates(suggs.map((s) => ({ state: 'pending', finalText: s.suggested_text })))
+
+        // Load threshold from DB
+        if (data.variantId != null) {
+          window.api.templates.getThreshold(data.variantId).then((t) => setThreshold(t))
+        }
 
         // Load builder data for bullet ID map
         if (data.variantId != null) {
@@ -280,20 +303,6 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
 
   const pendingCount = suggStates.filter((s) => s.state === 'pending').length
   const pendingSkillCount = stagedSkills.filter((s) => s.state === 'pending').length
-
-  // Sum of point impacts for remaining pending suggestions
-  const ptsAvailable = useMemo(() => {
-    if (!analysis) return 0
-    const suggs = analysis.suggestions ?? []
-    let total = 0
-    for (let i = 0; i < suggStates.length; i++) {
-      if (suggStates[i].state === 'pending' && suggs[i]) {
-        const kwc = suggs[i].target_keywords.length
-        total += kwc >= 3 ? 4 : kwc === 2 ? 3 : 2
-      }
-    }
-    return total
-  }, [analysis, suggStates])
 
   // Resolved missing keywords (accepted suggestions targeting them)
   const resolvedKeywords = useMemo(() => {
@@ -476,7 +485,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   // SVG ring
   const CIRCUMFERENCE = 314 // 2 * pi * 50
   const strokeOffset = CIRCUMFERENCE - (CIRCUMFERENCE * computedScore) / 100
-  const ringColor = getScoreColor(computedScore)
+  const ringColor = getScoreColor(computedScore, threshold)
 
   return (
     <div
@@ -1210,6 +1219,19 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                 transform="rotate(-90 60 60)"
                 style={{ transition: 'stroke-dashoffset 0.6s ease, stroke 0.3s ease' }}
               />
+              {/* Target threshold tick */}
+              <circle
+                cx={60}
+                cy={60}
+                r={50}
+                fill="none"
+                stroke="var(--color-accent)"
+                strokeWidth={3}
+                strokeDasharray="6 308"
+                strokeDashoffset={CIRCUMFERENCE - (CIRCUMFERENCE * threshold) / 100}
+                transform="rotate(-90 60 60)"
+                style={{ opacity: 0.7 }}
+              />
               {/* Score number */}
               <text
                 x={60}
@@ -1234,38 +1256,100 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                 textAlign: 'center',
               }}
             >
-              {getScoreLabel(computedScore)}
+              {getScoreLabel(computedScore, threshold)}
             </p>
-            {ptsAvailable > 0 && (
+            {scoreDelta > 0 && (
               <p
                 style={{
                   fontSize: 'var(--font-size-xs)',
-                  color: 'var(--color-text-tertiary)',
+                  fontWeight: 400,
+                  color: 'var(--color-success)',
                   margin: 0,
                   textAlign: 'center',
                 }}
               >
-                {ptsAvailable} pts available
+                +{scoreDelta} pts from accepted rewrites
               </p>
             )}
-
-            {/* Score delta badge */}
-            {scoreDelta > 0 && (
-              <div
-                style={{
-                  marginTop: 'var(--space-2)',
-                  padding: '3px 10px',
-                  backgroundColor: 'rgba(34,197,94,0.12)',
-                  color: 'var(--color-success)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: 'var(--font-size-xs)',
-                  fontWeight: 600,
-                }}
-              >
-                +{scoreDelta} points from accepted changes
-              </div>
-            )}
           </div>
+
+          {/* Threshold slider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 16px' }}>
+            <span style={{
+              fontSize: 'var(--font-size-xs)',
+              fontWeight: 400,
+              color: 'var(--color-text-secondary)',
+              minWidth: 80,
+            }}>
+              Target score
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={threshold}
+              onChange={(e) => handleThresholdChange(parseInt(e.target.value))}
+              style={{ flex: 1, accentColor: 'var(--color-accent)', cursor: 'pointer', height: 28 }}
+            />
+            <span style={{
+              fontSize: 'var(--font-size-xs)',
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+              minWidth: 24,
+              textAlign: 'right',
+            }}>
+              {threshold}
+            </span>
+          </div>
+
+          {/* Below-target callout */}
+          {computedScore < threshold && (() => {
+            const pendingRewrites = suggStates.filter(s => s.state === 'pending').length
+            const remainingKeywords = analysis?.keywordMisses
+              ? analysis.keywordMisses.filter(kw => !resolvedKeywords.has(kw.toLowerCase())).length
+              : 0
+            const pendingSkills = stagedSkills.filter(s => s.state === 'pending').length
+            const hasItems = pendingRewrites > 0 || remainingKeywords > 0 || pendingSkills > 0
+            if (!hasItems) return null
+            return (
+              <div style={{
+                background: 'var(--color-bg-raised)',
+                border: '1px solid var(--color-warning-bg)',
+                borderLeft: '2px solid var(--color-warning)',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 16px',
+                marginBottom: 'var(--space-4)',
+              }}>
+                <p style={{
+                  fontSize: 'var(--font-size-base)',
+                  fontWeight: 600,
+                  color: 'var(--color-text-primary)',
+                  margin: 0,
+                }}>
+                  Below target &mdash; here&apos;s how to close the gap:
+                </p>
+                <ul style={{
+                  margin: '8px 0 0 0',
+                  padding: '0 0 0 20px',
+                  fontSize: 'var(--font-size-base)',
+                  fontWeight: 400,
+                  color: 'var(--color-text-secondary)',
+                  listStyle: 'disc',
+                }}>
+                  {pendingRewrites > 0 && (
+                    <li>{pendingRewrites} unaccepted rewrite{pendingRewrites !== 1 ? 's' : ''}</li>
+                  )}
+                  {remainingKeywords > 0 && (
+                    <li>{remainingKeywords} missing keyword{remainingKeywords !== 1 ? 's' : ''}</li>
+                  )}
+                  {pendingSkills > 0 && (
+                    <li>{pendingSkills} skill suggestion{pendingSkills !== 1 ? 's' : ''}</li>
+                  )}
+                </ul>
+              </div>
+            )
+          })()}
 
           {/* Score breakdown rows */}
           {sb && (
