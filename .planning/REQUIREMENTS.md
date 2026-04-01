@@ -50,10 +50,10 @@ Requirements for milestone v2.3 Job Hunt Accelerator.
 
 - [x] **ATS-01**: score_threshold integer column on templateVariants with default 80, persisted in DB
 - [x] **ATS-02**: IPC handlers (get/set) for reading and writing a variant's score threshold
-- [ ] **ATS-03**: Threshold slider (0-100, step 5) on OptimizeVariant with debounced auto-save
+- [x] **ATS-03**: Threshold slider (0-100, step 5) on OptimizeVariant with debounced auto-save
 - [x] **ATS-04**: Score ring and label on OptimizeVariant use threshold-relative color bands (green at/above, yellow within 15, red below)
-- [ ] **ATS-05**: Score display shows "72 (+6)" format with target arc tick on SVG ring
-- [ ] **ATS-06**: Below-target callout on OptimizeVariant listing pending rewrites, missing keywords, skill suggestions — updates live
+- [x] **ATS-05**: Score display shows "72 (+6)" format with target arc tick on SVG ring
+- [x] **ATS-06**: Below-target callout on OptimizeVariant listing pending rewrites, missing keywords, skill suggestions — updates live
 - [ ] **ATS-07**: Soft warning in SubmissionLogForm when score < threshold — informational only, non-blocking
 
 ## Future Requirements
