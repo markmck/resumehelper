@@ -7,6 +7,7 @@
 - ✅ **v2.0 AI Analysis Integration** - Phases 8-12 (shipped 2026-03-24)
 - ✅ **v2.1 Resume Templates** - Phases 13-16 (shipped 2026-03-26)
 - ✅ **v2.2 Three Layer Data** - Phases 17-21 (shipped 2026-04-01)
+- **v2.3 Job Hunt Accelerator** - Phases 22-25
 
 ## Phases
 
@@ -44,6 +45,28 @@ Phases 17-21 covered: Three-layer data model (base → variant → analysis over
 
 </details>
 
+### v2.3 Job Hunt Accelerator (Phases 22-25)
+
+### Phase 22: ATS Score Threshold Setting
+**Goal:** Let users set a minimum match score target so they can focus tailoring effort on high-match postings
+**Requirements:** TBD
+**Plans:** 0 plans
+
+### Phase 23: Answer Bank for Application Questions
+**Goal:** Leverage the structured experience DB as an answer bank beyond resumes — feed interview prep, LinkedIn summaries, or common application form answers from existing bullet data
+**Requirements:** TBD
+**Plans:** 0 plans
+
+### Phase 24: Import Resume from Existing PDF
+**Goal:** Allow users to import their experience data from an existing PDF resume, parsing jobs, bullets, skills, and education into the structured DB
+**Requirements:** TBD
+**Plans:** 0 plans
+
+### Phase 25: Job Posting URL Scraping
+**Goal:** Scrape job posting content from a URL instead of requiring manual paste — fetch and extract job description, company, and role from job board links (LinkedIn, Indeed, etc.)
+**Requirements:** TBD
+**Plans:** 0 plans
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -52,37 +75,8 @@ Phases 17-21 covered: Three-layer data model (base → variant → analysis over
 | 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
 | 13-16 | v2.1 | 12/12 | Complete | 2026-03-26 |
 | 17-21 | v2.2 | 13/13 | Complete | 2026-04-01 |
+| 22-25 | v2.3 | 0/0 | Active | - |
 
 ## Backlog
 
-### Phase 999.1: ATS Score Threshold Setting (BACKLOG)
-**Goal:** Let users set a minimum match score target so they can focus tailoring effort on high-match postings
-**Requirements:** TBD
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (promote with /gsd:review-backlog when ready)
-
-### Phase 999.2: Answer Bank for Application Questions (BACKLOG)
-**Goal:** Leverage the structured experience DB as an answer bank beyond resumes — feed interview prep, LinkedIn summaries, or common application form answers from existing bullet data
-**Requirements:** TBD
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (promote with /gsd:review-backlog when ready)
-
-### Phase 999.3: Import Resume from Existing PDF (BACKLOG)
-**Goal:** Allow users to import their experience data from an existing PDF resume, parsing jobs, bullets, skills, and education into the structured DB
-**Requirements:** TBD
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (promote with /gsd:review-backlog when ready)
-
-### Phase 999.4: Job Posting URL Scraping (BACKLOG)
-**Goal:** Scrape job posting content from a URL instead of requiring manual paste — fetch and extract job description, company, and role from job board links (LinkedIn, Indeed, etc.)
-**Requirements:** TBD
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (promote with /gsd:review-backlog when ready)
+(Empty — all items promoted to v2.3)
