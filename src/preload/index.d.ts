@@ -547,6 +547,8 @@ export interface Api {
       data?: unknown
     }>
     confirmReplace: (data: unknown) => Promise<{ success: boolean }>
+    parsePdf: () => Promise<{ canceled: boolean; error?: string; counts?: Record<string, number>; data?: unknown }>
+    confirmAppend: (data: unknown) => Promise<{ success: boolean }>
   }
   settings: {
     getAi: () => Promise<{ provider: string; model: string; hasKey: boolean }>

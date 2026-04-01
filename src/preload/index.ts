@@ -236,6 +236,8 @@ const api = {
   import_: {
     parse: () => ipcRenderer.invoke('import:parseResumeJson'),
     confirmReplace: (data: unknown) => ipcRenderer.invoke('import:confirmReplace', data),
+    parsePdf: () => ipcRenderer.invoke('import:parseResumePdf'),
+    confirmAppend: (data: unknown) => ipcRenderer.invoke('import:confirmAppend', data),
   },
   settings: {
     getAi: () => ipcRenderer.invoke('settings:getAi'),

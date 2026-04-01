@@ -1,6 +1,8 @@
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, safeStorage } from 'electron'
 import { promises as fs } from 'fs'
 import { sqlite } from '../db'
+import pdfParse from 'pdf-parse'
+import { callResumeExtractor } from '../lib/aiProvider'
 
 interface ResumeJson {
   basics?: {
@@ -274,6 +276,174 @@ export function registerImportHandlers(): void {
     })
 
     doImport()
+    return { success: true }
+  })
+
+  ipcMain.handle('import:parseResumePdf', async () => {
+    // 1. Check AI is configured before showing file dialog
+    const aiRow = sqlite.prepare('SELECT provider, model, apiKey FROM ai_settings WHERE id=1').get() as { provider: string; model: string; apiKey: string } | undefined
+    if (!aiRow || !aiRow.apiKey || aiRow.apiKey.length === 0) {
+      return { canceled: false, error: 'AI provider not configured. Set up your API key in Settings.' }
+    }
+
+    // 2. Open file dialog for PDF
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Import PDF Resume',
+      filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+      properties: ['openFile'],
+    })
+    if (canceled || filePaths.length === 0) return { canceled: true }
+
+    // 3. Read file buffer
+    let buffer: Buffer
+    try {
+      buffer = await fs.readFile(filePaths[0])
+    } catch {
+      return { canceled: false, error: 'Could not read file' }
+    }
+
+    // 4. Extract text with pdf-parse (check for image-only PDFs)
+    let pdfText: string
+    try {
+      const parsed = await pdfParse(buffer)
+      pdfText = parsed.text
+      if (pdfText.trim().length < 100) {
+        return { canceled: false, error: 'This PDF appears to be a scanned image and cannot be parsed automatically.' }
+      }
+    } catch {
+      return { canceled: false, error: 'Could not extract text from PDF' }
+    }
+
+    // 5. AI extraction — decrypt API key, call generateObject
+    const apiKey = safeStorage.decryptString(Buffer.from(aiRow.apiKey, 'base64'))
+    let data: ResumeJson
+    try {
+      data = await callResumeExtractor(pdfText, apiKey, aiRow.provider, aiRow.model) as ResumeJson
+    } catch (err) {
+      return { canceled: false, error: `AI extraction failed: ${err instanceof Error ? err.message : String(err)}` }
+    }
+
+    // 6. Compute counts (same as parseResumeJson)
+    const counts = {
+      jobs: (data.work ?? []).length,
+      skills: (data.skills ?? []).reduce((sum, s) => sum + (s.keywords ?? []).length, 0),
+      projects: (data.projects ?? []).length,
+      education: (data.education ?? []).length,
+      volunteer: (data.volunteer ?? []).length,
+      awards: (data.awards ?? []).length,
+      publications: (data.publications ?? []).length,
+      languages: (data.languages ?? []).length,
+      interests: (data.interests ?? []).length,
+      references: (data.references ?? []).length,
+      hasProfile: data.basics ? 1 : 0,
+    }
+
+    return { canceled: false, counts, data }
+  })
+
+  ipcMain.handle('import:confirmAppend', (_event, parsed: ResumeJson) => {
+    const doAppend = sqlite.transaction(() => {
+      // NO DELETE statements — additive only (append semantics)
+
+      // Profile: update empty fields only (preserves existing user data)
+      if (parsed.basics) {
+        sqlite.prepare(
+          `UPDATE profile SET
+            name = CASE WHEN name = '' THEN ? ELSE name END,
+            email = CASE WHEN email = '' THEN ? ELSE email END,
+            phone = CASE WHEN phone = '' THEN ? ELSE phone END,
+            location = CASE WHEN location = '' THEN ? ELSE location END,
+            linkedin = CASE WHEN linkedin = '' THEN ? ELSE linkedin END
+          WHERE id = 1`
+        ).run(
+          parsed.basics.name ?? '',
+          parsed.basics.email ?? '',
+          parsed.basics.phone ?? '',
+          parsed.basics.location?.city ?? '',
+          parsed.basics.profiles?.[0]?.url ?? '',
+        )
+      }
+
+      // INSERT work -> jobs + job_bullets
+      for (const work of parsed.work ?? []) {
+        const jobResult = sqlite
+          .prepare('INSERT INTO jobs (company, role, start_date, end_date) VALUES (?, ?, ?, ?)')
+          .run(work.name ?? '', work.position ?? '', truncDate(work.startDate) ?? '', truncDate(work.endDate))
+        const jobId = jobResult.lastInsertRowid
+        for (let i = 0; i < (work.highlights ?? []).length; i++) {
+          sqlite.prepare('INSERT INTO job_bullets (job_id, text, sort_order) VALUES (?, ?, ?)').run(jobId, work.highlights![i], i)
+        }
+      }
+
+      // INSERT skills — resume.json name is category, keywords are individual skills
+      for (const skillGroup of parsed.skills ?? []) {
+        const tag = skillGroup.name ?? ''
+        for (const keyword of skillGroup.keywords ?? []) {
+          sqlite.prepare('INSERT INTO skills (name, tags) VALUES (?, ?)').run(keyword, JSON.stringify(tag ? [tag] : []))
+        }
+      }
+
+      // INSERT projects + project_bullets
+      for (let pi = 0; pi < (parsed.projects ?? []).length; pi++) {
+        const project = parsed.projects![pi]
+        const projectResult = sqlite.prepare('INSERT INTO projects (name, sort_order) VALUES (?, ?)').run(project.name ?? '', pi)
+        const projectId = projectResult.lastInsertRowid
+        for (let i = 0; i < (project.highlights ?? []).length; i++) {
+          sqlite
+            .prepare('INSERT INTO project_bullets (project_id, text, sort_order) VALUES (?, ?, ?)')
+            .run(projectId, project.highlights![i], i)
+        }
+      }
+
+      // INSERT education
+      for (const edu of parsed.education ?? []) {
+        sqlite
+          .prepare('INSERT INTO education (institution, area, study_type, start_date, end_date, score, courses) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(
+            edu.institution ?? '', edu.area ?? '', edu.studyType ?? '', truncDate(edu.startDate) ?? '', truncDate(edu.endDate), edu.score ?? '', JSON.stringify(edu.courses ?? [])
+          )
+      }
+
+      // INSERT volunteer
+      for (const vol of parsed.volunteer ?? []) {
+        sqlite
+          .prepare('INSERT INTO volunteer (organization, position, start_date, end_date, summary, highlights) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(
+            vol.organization ?? '', vol.position ?? '', truncDate(vol.startDate) ?? '', truncDate(vol.endDate), vol.summary ?? '', JSON.stringify(vol.highlights ?? [])
+          )
+      }
+
+      // INSERT awards
+      for (const award of parsed.awards ?? []) {
+        sqlite
+          .prepare('INSERT INTO awards (title, date, awarder, summary) VALUES (?, ?, ?, ?)')
+          .run(award.title ?? '', truncDate(award.date), award.awarder ?? '', award.summary ?? '')
+      }
+
+      // INSERT publications
+      for (const pub of parsed.publications ?? []) {
+        sqlite
+          .prepare('INSERT INTO publications (name, publisher, release_date, url, summary) VALUES (?, ?, ?, ?, ?)')
+          .run(pub.name ?? '', pub.publisher ?? '', truncDate(pub.releaseDate), pub.url ?? '', pub.summary ?? '')
+      }
+
+      // INSERT languages
+      for (const lang of parsed.languages ?? []) {
+        sqlite.prepare('INSERT INTO languages (language, fluency) VALUES (?, ?)').run(lang.language ?? '', lang.fluency ?? '')
+      }
+
+      // INSERT interests
+      for (const interest of parsed.interests ?? []) {
+        sqlite.prepare('INSERT INTO interests (name, keywords) VALUES (?, ?)').run(interest.name ?? '', JSON.stringify(interest.keywords ?? []))
+      }
+
+      // INSERT references
+      for (const ref of parsed.references ?? []) {
+        sqlite.prepare('INSERT INTO "references" (name, "reference") VALUES (?, ?)').run(ref.name ?? '', ref.reference ?? '')
+      }
+    })
+
+    doAppend()
     return { success: true }
   })
 }
