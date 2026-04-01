@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getScoreColor, getScoreBg } from '../lib/scoreColor'
 
 interface Gap {
   skill: string
@@ -57,19 +58,6 @@ interface Props {
   onLogSubmission?: (analysisId: number) => void
   onViewSubmission?: (submissionId: number) => void
 }
-
-function getScoreColor(score: number): string {
-  if (score >= 80) return 'var(--color-success)'
-  if (score >= 50) return 'var(--color-warning)'
-  return 'var(--color-danger)'
-}
-
-function getScoreBg(score: number): string {
-  if (score >= 80) return 'var(--color-success-bg)'
-  if (score >= 50) return 'var(--color-warning-bg)'
-  return 'var(--color-danger-bg)'
-}
-
 
 function formatDate(d: Date | string): string {
   const date = d instanceof Date ? d : new Date(d)
