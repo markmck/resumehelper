@@ -64,8 +64,8 @@ Requirements for milestone v2.3 Job Hunt Accelerator.
 - [x] **PDF-04**: parseResumePdf IPC handler: file dialog -> PDF extraction -> AI call -> return counts + data
 - [x] **PDF-05**: confirmAppend IPC handler: INSERT-only transaction, no DELETE statements, additive import
 - [x] **PDF-06**: Preload bindings (parsePdf, confirmAppend) with TypeScript types in index.d.ts
-- [ ] **PDF-07**: ImportConfirmModal supports append mode with blue styling, "Import Data" button, additive messaging
-- [ ] **PDF-08**: ExperienceTab has "Import PDF" button alongside "Import JSON" with loading indicator during AI extraction
+- [x] **PDF-07**: ImportConfirmModal supports append mode with blue styling, "Import Data" button, additive messaging
+- [x] **PDF-08**: ExperienceTab has "Import PDF" button alongside "Import JSON" with loading indicator during AI extraction
 
 ## Future Requirements
 

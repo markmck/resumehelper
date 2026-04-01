@@ -60,11 +60,11 @@ Plans:
 ### Phase 23: Import Resume from Existing PDF
 **Goal:** Allow users to import their experience data from an existing PDF resume, parsing jobs, bullets, skills, and education into the structured DB
 **Requirements:** [PDF-01, PDF-02, PDF-03, PDF-04, PDF-05, PDF-06, PDF-07, PDF-08]
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 23-01-PLAN.md — Install pdf-parse, Zod schema, AI extraction prompt, IPC handlers, preload bindings
-- [ ] 23-02-PLAN.md — ImportConfirmModal append mode, ExperienceTab PDF import button + flow
+- [x] 23-02-PLAN.md — ImportConfirmModal append mode, ExperienceTab PDF import button + flow
 
 ### Phase 24: Job Posting URL Scraping
 **Goal:** Scrape job posting content from a URL instead of requiring manual paste — fetch and extract job description, company, and role from job board links (LinkedIn, Indeed, etc.)
