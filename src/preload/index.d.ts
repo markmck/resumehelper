@@ -31,6 +31,7 @@ export interface TemplateVariant {
   name: string
   layoutTemplate: string
   createdAt: Date
+  scoreThreshold?: number
 }
 
 export interface BuilderBullet {
@@ -312,6 +313,8 @@ export interface Api {
       itemId: number,
       excluded: boolean,
     ) => Promise<void>
+    setThreshold: (id: number, threshold: number) => Promise<void>
+    getThreshold: (id: number) => Promise<number>
   }
   submissions: {
     list: () => Promise<Submission[]>

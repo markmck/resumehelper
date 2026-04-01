@@ -540,4 +540,20 @@ export function registerTemplateHandlers(): void {
       }
     },
   )
+
+  ipcMain.handle('templates:setThreshold', async (_, variantId: number, threshold: number) => {
+    await db
+      .update(templateVariants)
+      .set({ scoreThreshold: threshold })
+      .where(eq(templateVariants.id, variantId))
+  })
+
+  ipcMain.handle('templates:getThreshold', async (_, variantId: number) => {
+    const row = db
+      .select({ scoreThreshold: templateVariants.scoreThreshold })
+      .from(templateVariants)
+      .where(eq(templateVariants.id, variantId))
+      .get()
+    return row?.scoreThreshold ?? 80
+  })
 }

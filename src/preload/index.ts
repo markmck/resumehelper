@@ -45,6 +45,10 @@ const api = {
       itemId: number,
       excluded: boolean,
     ) => ipcRenderer.invoke('templates:setItemExcluded', variantId, itemType, itemId, excluded),
+    setThreshold: (id: number, threshold: number) =>
+      ipcRenderer.invoke('templates:setThreshold', id, threshold),
+    getThreshold: (id: number) =>
+      ipcRenderer.invoke('templates:getThreshold', id),
   },
   submissions: {
     list: () => ipcRenderer.invoke('submissions:list'),
