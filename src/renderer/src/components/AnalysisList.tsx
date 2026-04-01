@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getScoreColor, getScoreBg } from '../lib/scoreColor'
 
 interface AnalysisRow {
   id: number          // job_postings.id
@@ -22,18 +23,6 @@ interface Props {
   onReanalyze: (jobPostingId: number, variantId: number) => void
   onOptimize: (analysisId: number) => void
   onLogSubmission?: (analysisId: number) => void
-}
-
-function getScoreColor(score: number): string {
-  if (score >= 80) return 'var(--color-success)'
-  if (score >= 50) return 'var(--color-warning)'
-  return 'var(--color-danger)'
-}
-
-function getScoreBgColor(score: number): string {
-  if (score >= 80) return 'var(--color-success-bg)'
-  if (score >= 50) return 'var(--color-warning-bg)'
-  return 'var(--color-danger-bg)'
 }
 
 function getStatusBadgeStyle(status: string): React.CSSProperties {
@@ -697,7 +686,7 @@ interface RowProps {
 function AnalysisTableRow({ row, onViewResult, onReanalyze, onOptimize, onLogSubmission, onContextMenu }: RowProps): React.JSX.Element {
   const [hovered, setHovered] = useState(false)
   const scoreColor = getScoreColor(row.matchScore)
-  const scoreBg = getScoreBgColor(row.matchScore)
+  const scoreBg = getScoreBg(row.matchScore)
   const hits = row.keywordHitsCount ?? 0
   const misses = row.keywordMissesCount ?? 0
   const totalKeywords = hits + misses

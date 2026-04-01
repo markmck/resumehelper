@@ -54,7 +54,7 @@ Requirements for milestone v2.3 Job Hunt Accelerator.
 - [x] **ATS-04**: Score ring and label on OptimizeVariant use threshold-relative color bands (green at/above, yellow within 15, red below)
 - [x] **ATS-05**: Score display shows "72 (+6)" format with target arc tick on SVG ring
 - [x] **ATS-06**: Below-target callout on OptimizeVariant listing pending rewrites, missing keywords, skill suggestions — updates live
-- [ ] **ATS-07**: Soft warning in SubmissionLogForm when score < threshold — informational only, non-blocking
+- [x] **ATS-07**: Soft warning in SubmissionLogForm when score < threshold — informational only, non-blocking
 
 ## Future Requirements
 

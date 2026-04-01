@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { TemplateVariant } from '../../../preload/index.d'
+import { getScoreColor } from '../lib/scoreColor'
 
 interface LinkedAnalysis {
   id: number
@@ -28,12 +29,6 @@ function formatRelativeDate(d: Date | string): string {
   if (diffDays < 7) return `${diffDays} days ago`
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function getScoreColor(score: number): string {
-  if (score >= 80) return 'var(--color-success)'
-  if (score >= 50) return 'var(--color-warning)'
-  return 'var(--color-danger)'
 }
 
 const STATUS_OPTIONS = [
@@ -80,6 +75,7 @@ function SubmissionLogForm({ linkedAnalysisId, onSaved, onBack }: Props): React.
   const [variantId, setVariantId] = useState<number | ''>('')
   const [submittedAt, setSubmittedAt] = useState(todayString())
   const [linkedAnalysis, setLinkedAnalysis] = useState<LinkedAnalysis | null>(null)
+  const [threshold, setThreshold] = useState<number | null>(null)
   const [variants, setVariants] = useState<TemplateVariant[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -96,6 +92,9 @@ function SubmissionLogForm({ linkedAnalysisId, onSaved, onBack }: Props): React.
           setCompany(data.company)
           setRole(data.role)
           setVariantId(data.variantId)
+          if (data.variantId != null) {
+            window.api.templates.getThreshold(data.variantId).then((t) => setThreshold(t))
+          }
         }
       }).catch((e: unknown) => {
         setLoadError(e instanceof Error ? e.message : 'Failed to load analysis')
@@ -227,6 +226,34 @@ function SubmissionLogForm({ linkedAnalysisId, onSaved, onBack }: Props): React.
               >
                 Unlink
               </button>
+            </div>
+          )}
+
+          {/* Below-target warning */}
+          {linkedAnalysis && threshold != null && linkedAnalysis.score < threshold && (
+            <div style={{
+              background: 'var(--color-warning-bg)',
+              border: '1px solid rgba(245,158,11,0.25)',
+              borderRadius: 'var(--radius-md)',
+              padding: '12px 16px',
+              marginBottom: 'var(--space-4)',
+            }}>
+              <p style={{
+                fontSize: 'var(--font-size-base)',
+                fontWeight: 600,
+                color: 'var(--color-warning)',
+                margin: 0,
+              }}>
+                Below target ({linkedAnalysis.score}/{threshold})
+              </p>
+              <p style={{
+                fontSize: 'var(--font-size-base)',
+                fontWeight: 400,
+                color: 'var(--color-text-secondary)',
+                margin: '4px 0 0 0',
+              }}>
+                This variant&apos;s match score is below your target. You can still submit.
+              </p>
             </div>
           )}
 
