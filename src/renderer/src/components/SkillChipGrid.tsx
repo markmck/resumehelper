@@ -12,7 +12,8 @@ import {
   useDroppable,
   useDraggable,
 } from '@dnd-kit/core'
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface Skill {
   id: number
@@ -294,6 +295,10 @@ interface CategoryBlockProps {
   onConfirmDeleteCategory: (id: number) => void
   onCancelDeleteCategory: () => void
   skillCount: number
+  dragHandleListeners?: ReturnType<typeof useSortable>['listeners']
+  dragHandleAttributes?: ReturnType<typeof useSortable>['attributes']
+  sortableStyle?: React.CSSProperties
+  sortableRef?: (node: HTMLElement | null) => void
 }
 
 function CategoryBlock({
@@ -314,9 +319,17 @@ function CategoryBlock({
   onConfirmDeleteCategory,
   onCancelDeleteCategory,
   skillCount,
+  dragHandleListeners,
+  dragHandleAttributes,
+  sortableStyle,
+  sortableRef,
 }: CategoryBlockProps): React.JSX.Element {
   const droppableId = isUncategorized ? 'category-uncategorized' : `category-${category.id}`
-  const { setNodeRef, isOver } = useDroppable({ id: droppableId })
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: droppableId })
+
+  const setCombinedRef = (node: HTMLElement | null): void => {
+    if (sortableRef) sortableRef(node)
+  }
 
   const [renameHovered, setRenameHovered] = useState(false)
   const [deleteHovered, setDeleteHovered] = useState(false)
@@ -340,12 +353,14 @@ function CategoryBlock({
 
   return (
     <div
+      ref={setCombinedRef}
       style={{
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
         borderRadius: 'var(--radius-lg)',
         padding: 'var(--space-4)',
         marginBottom: 'var(--space-3)',
+        ...sortableStyle,
       }}
     >
       {/* Category header */}
@@ -358,14 +373,17 @@ function CategoryBlock({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          {/* Drag handle — visual only */}
+          {/* Drag handle for category reorder */}
           {!isUncategorized && (
             <span
+              {...(dragHandleListeners ?? {})}
+              {...(dragHandleAttributes ?? {})}
               style={{
                 color: 'var(--color-text-muted)',
                 fontSize: '12px',
                 cursor: 'grab',
                 userSelect: 'none',
+                touchAction: 'none',
               }}
             >
               ⋮⋮
@@ -460,7 +478,7 @@ function CategoryBlock({
 
       {/* Chip grid (droppable) */}
       <div
-        ref={setNodeRef}
+        ref={setDroppableRef}
         style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -485,6 +503,28 @@ function CategoryBlock({
         />
       </div>
     </div>
+  )
+}
+
+// ─── SortableCategoryBlock ────────────────────────────────────────────────────
+
+function SortableCategoryBlock(props: Omit<CategoryBlockProps, 'dragHandleListeners' | 'dragHandleAttributes' | 'sortableStyle' | 'sortableRef'>): React.JSX.Element {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `category-sort-${props.category.id}`,
+  })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+  return (
+    <CategoryBlock
+      {...props}
+      dragHandleListeners={listeners}
+      dragHandleAttributes={attributes}
+      sortableStyle={style}
+      sortableRef={setNodeRef}
+    />
   )
 }
 
@@ -604,6 +644,32 @@ function SkillChipGrid(): React.JSX.Element {
     setActiveId(null)
 
     if (!over) return
+
+    // Handle category reorder
+    const activeStr = String(active.id)
+    const overStr = String(over.id)
+    if (activeStr.startsWith('category-sort-') && overStr.startsWith('category-sort-')) {
+      const fromId = parseInt(activeStr.replace('category-sort-', ''), 10)
+      const toId = parseInt(overStr.replace('category-sort-', ''), 10)
+      if (fromId === toId) return
+
+      const oldIndex = categories.findIndex((c) => c.id === fromId)
+      const newIndex = categories.findIndex((c) => c.id === toId)
+      if (oldIndex === -1 || newIndex === -1) return
+
+      // Reorder optimistically
+      const reordered = [...categories]
+      const [moved] = reordered.splice(oldIndex, 1)
+      reordered.splice(newIndex, 0, moved)
+      setCategories(reordered)
+
+      // Persist new sortOrder values
+      for (let i = 0; i < reordered.length; i++) {
+        reordered[i] = { ...reordered[i], sortOrder: i }
+        window.api.skills.categories.update(reordered[i].id, { sortOrder: i })
+      }
+      return
+    }
 
     const skillId = active.id as number
     const skill = skills.find((s) => s.id === skillId)
@@ -825,32 +891,37 @@ function SkillChipGrid(): React.JSX.Element {
           </div>
         ) : (
           <>
-            {/* Category blocks */}
-            {categories.map((category) => {
-              const catSkills = groups.get(category.id) ?? []
-              return (
-                <CategoryBlock
-                  key={category.id}
-                  category={category}
-                  skills={catSkills}
-                  isUncategorized={false}
-                  editingCategoryId={editingCategoryId}
-                  addingInCategoryId={addingInCategoryId as number | null}
-                  confirmDeleteCategoryId={confirmDeleteCategoryId}
-                  onStartEditCategory={(id) => setEditingCategoryId(id)}
-                  onStopEditCategory={() => setEditingCategoryId(null)}
-                  onRenameCategory={handleRenameCategory}
-                  onStartAddInCategory={(id) => setAddingInCategoryId(id)}
-                  onAddSkill={handleAddSkill}
-                  onCancelAdd={() => setAddingInCategoryId(null)}
-                  onDeleteSkill={handleDeleteSkill}
-                  onStartDeleteCategory={(id) => setConfirmDeleteCategoryId(id)}
-                  onConfirmDeleteCategory={handleConfirmDeleteCategory}
-                  onCancelDeleteCategory={() => setConfirmDeleteCategoryId(null)}
-                  skillCount={catSkills.length}
-                />
-              )
-            })}
+            {/* Category blocks — sortable for reordering */}
+            <SortableContext
+              items={categories.map((c) => `category-sort-${c.id}`)}
+              strategy={verticalListSortingStrategy}
+            >
+              {categories.map((category) => {
+                const catSkills = groups.get(category.id) ?? []
+                return (
+                  <SortableCategoryBlock
+                    key={category.id}
+                    category={category}
+                    skills={catSkills}
+                    isUncategorized={false}
+                    editingCategoryId={editingCategoryId}
+                    addingInCategoryId={addingInCategoryId as number | null}
+                    confirmDeleteCategoryId={confirmDeleteCategoryId}
+                    onStartEditCategory={(id) => setEditingCategoryId(id)}
+                    onStopEditCategory={() => setEditingCategoryId(null)}
+                    onRenameCategory={handleRenameCategory}
+                    onStartAddInCategory={(id) => setAddingInCategoryId(id)}
+                    onAddSkill={handleAddSkill}
+                    onCancelAdd={() => setAddingInCategoryId(null)}
+                    onDeleteSkill={handleDeleteSkill}
+                    onStartDeleteCategory={(id) => setConfirmDeleteCategoryId(id)}
+                    onConfirmDeleteCategory={handleConfirmDeleteCategory}
+                    onCancelDeleteCategory={() => setConfirmDeleteCategoryId(null)}
+                    skillCount={catSkills.length}
+                  />
+                )
+              })}
+            </SortableContext>
 
             {/* Uncategorized group — only if any uncategorized skills exist */}
             {uncategorizedSkills.length > 0 && (
