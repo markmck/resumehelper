@@ -50,12 +50,12 @@ Phases 17-21 covered: Three-layer data model (base → variant → analysis over
 ### Phase 22: ATS Score Threshold Setting
 **Goal:** Let users set a minimum match score target so they can focus tailoring effort on high-match postings
 **Requirements:** [ATS-01, ATS-02, ATS-03, ATS-04, ATS-05, ATS-06, ATS-07]
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [x] 22-01-PLAN.md — Schema migration, IPC handlers, preload bindings, shared scoreColor utility
 - [ ] 22-02-PLAN.md — OptimizeVariant threshold slider, target arc, score display, below-target callout
-- [ ] 22-03-PLAN.md — SubmissionLogForm warning banner, AnalysisList/AnalysisResults color import migration
+- [x] 22-03-PLAN.md — SubmissionLogForm warning banner, AnalysisList/AnalysisResults color import migration
 
 ### Phase 23: Answer Bank for Application Questions
 **Goal:** Leverage the structured experience DB as an answer bank beyond resumes — feed interview prep, LinkedIn summaries, or common application form answers from existing bullet data
