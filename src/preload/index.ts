@@ -56,6 +56,10 @@ const api = {
     getOptions: (variantId: number) => ipcRenderer.invoke('templates:getOptions', variantId),
     setOptions: (variantId: number, options: object) =>
       ipcRenderer.invoke('templates:setOptions', variantId, options),
+    setThreshold: (id: number, threshold: number) =>
+      ipcRenderer.invoke('templates:setThreshold', id, threshold),
+    getThreshold: (id: number) =>
+      ipcRenderer.invoke('templates:getThreshold', id),
   },
   submissions: {
     list: () => ipcRenderer.invoke('submissions:list'),

@@ -51,7 +51,8 @@ function ensureSchema(): void {
       \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
       \`name\` text NOT NULL,
       \`layout_template\` text DEFAULT 'traditional' NOT NULL,
-      \`created_at\` integer NOT NULL DEFAULT (unixepoch())
+      \`created_at\` integer NOT NULL DEFAULT (unixepoch()),
+      \`score_threshold\` integer NOT NULL DEFAULT 80
     );
 
     CREATE TABLE IF NOT EXISTS \`template_variant_items\` (
@@ -256,6 +257,7 @@ function ensureSchema(): void {
     'ALTER TABLE `job_bullets` ADD COLUMN `updated_at` integer',
     'ALTER TABLE `template_variants` ADD COLUMN `updated_at` integer',
     'ALTER TABLE `skills` ADD COLUMN `category_id` integer REFERENCES `skill_categories`(`id`) ON DELETE set null',
+    'ALTER TABLE `template_variants` ADD COLUMN `score_threshold` integer NOT NULL DEFAULT 80',
   ]
   for (const sql of alterStatements) {
     try { sqlite.exec(sql) } catch { /* column already exists */ }

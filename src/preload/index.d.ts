@@ -48,6 +48,7 @@ export interface TemplateVariant {
   layoutTemplate: string
   templateOptions?: TemplateOptions | null
   createdAt: Date
+  scoreThreshold?: number
   updatedAt?: Date
 }
 
@@ -360,6 +361,8 @@ export interface Api {
     ) => Promise<void>
     getOptions: (variantId: number) => Promise<TemplateOptions | null>
     setOptions: (variantId: number, options: TemplateOptions) => Promise<void>
+    setThreshold: (id: number, threshold: number) => Promise<void>
+    getThreshold: (id: number) => Promise<number>
   }
   submissions: {
     list: () => Promise<Submission[]>

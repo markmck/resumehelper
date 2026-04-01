@@ -43,6 +43,7 @@ export const templateVariants = sqliteTable('template_variants', {
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
+  scoreThreshold: integer('score_threshold').notNull().default(80),
   updatedAt: integer('updated_at', { mode: 'timestamp' }),
 })
 
