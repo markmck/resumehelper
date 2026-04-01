@@ -56,6 +56,17 @@ Requirements for milestone v2.3 Job Hunt Accelerator.
 - [x] **ATS-06**: Below-target callout on OptimizeVariant listing pending rewrites, missing keywords, skill suggestions — updates live
 - [x] **ATS-07**: Soft warning in SubmissionLogForm when score < threshold — informational only, non-blocking
 
+### PDF Resume Import
+
+- [ ] **PDF-01**: pdf-parse installed as dependency for PDF text extraction in main process
+- [ ] **PDF-02**: Zod ResumeJsonSchema matching full ResumeJson interface (all 11 sections) for structured AI output
+- [ ] **PDF-03**: AI-powered extraction via callResumeExtractor using existing getModel/generateObject infrastructure
+- [ ] **PDF-04**: parseResumePdf IPC handler: file dialog -> PDF extraction -> AI call -> return counts + data
+- [ ] **PDF-05**: confirmAppend IPC handler: INSERT-only transaction, no DELETE statements, additive import
+- [ ] **PDF-06**: Preload bindings (parsePdf, confirmAppend) with TypeScript types in index.d.ts
+- [ ] **PDF-07**: ImportConfirmModal supports append mode with blue styling, "Import Data" button, additive messaging
+- [ ] **PDF-08**: ExperienceTab has "Import PDF" button alongside "Import JSON" with loading indicator during AI extraction
+
 ## Future Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -120,12 +131,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ATS-05 | Phase 22 | Planned |
 | ATS-06 | Phase 22 | Planned |
 | ATS-07 | Phase 22 | Planned |
+| PDF-01 | Phase 23 | Planned |
+| PDF-02 | Phase 23 | Planned |
+| PDF-03 | Phase 23 | Planned |
+| PDF-04 | Phase 23 | Planned |
+| PDF-05 | Phase 23 | Planned |
+| PDF-06 | Phase 23 | Planned |
+| PDF-07 | Phase 23 | Planned |
+| PDF-08 | Phase 23 | Planned |
 
 **Coverage:**
 - v2.2 requirements: 20 total — 20 complete
-- v2.3 requirements: 7 total — 0 complete
+- v2.3 requirements: 15 total — 7 complete
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-26*
-*Last updated: 2026-04-01 — v2.3 ATS requirements added for Phase 22*
+*Last updated: 2026-04-01 — v2.3 PDF import requirements added for Phase 23*

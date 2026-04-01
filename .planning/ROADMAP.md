@@ -7,7 +7,7 @@
 - ✅ **v2.0 AI Analysis Integration** - Phases 8-12 (shipped 2026-03-24)
 - ✅ **v2.1 Resume Templates** - Phases 13-16 (shipped 2026-03-26)
 - ✅ **v2.2 Three Layer Data** - Phases 17-21 (shipped 2026-04-01)
-- **v2.3 Job Hunt Accelerator** - Phases 22-25
+- **v2.3 Job Hunt Accelerator** - Phases 22-24
 
 ## Phases
 
@@ -50,24 +50,23 @@ Phases 17-21 covered: Three-layer data model (base → variant → analysis over
 ### Phase 22: ATS Score Threshold Setting
 **Goal:** Let users set a minimum match score target so they can focus tailoring effort on high-match postings
 **Requirements:** [ATS-01, ATS-02, ATS-03, ATS-04, ATS-05, ATS-06, ATS-07]
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 22-01-PLAN.md — Schema migration, IPC handlers, preload bindings, shared scoreColor utility
 - [ ] 22-02-PLAN.md — OptimizeVariant threshold slider, target arc, score display, below-target callout
 - [x] 22-03-PLAN.md — SubmissionLogForm warning banner, AnalysisList/AnalysisResults color import migration
 
-### Phase 23: Answer Bank for Application Questions
-**Goal:** Leverage the structured experience DB as an answer bank beyond resumes — feed interview prep, LinkedIn summaries, or common application form answers from existing bullet data
-**Requirements:** TBD
-**Plans:** 0 plans
-
-### Phase 24: Import Resume from Existing PDF
+### Phase 23: Import Resume from Existing PDF
 **Goal:** Allow users to import their experience data from an existing PDF resume, parsing jobs, bullets, skills, and education into the structured DB
-**Requirements:** TBD
-**Plans:** 0 plans
+**Requirements:** [PDF-01, PDF-02, PDF-03, PDF-04, PDF-05, PDF-06, PDF-07, PDF-08]
+**Plans:** 2 plans
 
-### Phase 25: Job Posting URL Scraping
+Plans:
+- [ ] 23-01-PLAN.md — Install pdf-parse, Zod schema, AI extraction prompt, IPC handlers, preload bindings
+- [ ] 23-02-PLAN.md — ImportConfirmModal append mode, ExperienceTab PDF import button + flow
+
+### Phase 24: Job Posting URL Scraping
 **Goal:** Scrape job posting content from a URL instead of requiring manual paste — fetch and extract job description, company, and role from job board links (LinkedIn, Indeed, etc.)
 **Requirements:** TBD
 **Plans:** 0 plans
@@ -80,7 +79,11 @@ Plans:
 | 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
 | 13-16 | v2.1 | 12/12 | Complete | 2026-03-26 |
 | 17-21 | v2.2 | 13/13 | Complete | 2026-04-01 |
-| 22-25 | v2.3 | 0/3 | Active | - |
+| 22-24 | v2.3 | 0/5 | Active | - |
+
+## Future (v3.0+)
+
+- **Answer Bank for Application Questions** — Leverage the structured experience DB as an answer bank beyond resumes — feed interview prep, LinkedIn summaries, or common application form answers from existing bullet data
 
 ## Backlog
 
