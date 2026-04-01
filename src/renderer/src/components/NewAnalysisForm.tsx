@@ -37,6 +37,10 @@ function NewAnalysisForm({ onBack, onStartAnalysis }: Props): React.JSX.Element 
   const [submitting, setSubmitting] = useState(false)
   const [buttonLabel, setButtonLabel] = useState('Run analysis')
   const [errorText, setErrorText] = useState('')
+  const [urlInput, setUrlInput] = useState('')
+  const [urlFetching, setUrlFetching] = useState(false)
+  const [urlError, setUrlError] = useState('')
+  const [urlWarning, setUrlWarning] = useState('')
 
   useEffect(() => {
     window.api.templates
@@ -85,6 +89,34 @@ function NewAnalysisForm({ onBack, onStartAnalysis }: Props): React.JSX.Element 
     } catch {
       // silently ignore draft save errors
       onBack()
+    }
+  }
+
+  async function handleFetchUrl(): Promise<void> {
+    if (!urlInput.trim() || urlFetching) return
+    setUrlFetching(true)
+    setUrlError('')
+    setUrlWarning('')
+    try {
+      const result = await window.api.jobPostings.fetchUrl(urlInput.trim())
+      if ('error' in result) {
+        setUrlError(result.error)
+        return
+      }
+      // Auto-populate form fields per D-09
+      setRawText(result.jobDescriptionText)
+      if (!company && result.company) setCompany(result.company)
+      if (!role && result.jobTitle) setRole(result.jobTitle)
+      // Switch to paste tab so user sees populated textarea
+      setActiveTab('paste')
+      // Short content warning per D-06
+      if (result.jobDescriptionText.length < 300) {
+        setUrlWarning('The extracted content looks short. Review the job description below before running analysis.')
+      }
+    } catch (err) {
+      setUrlError(err instanceof Error ? err.message : 'An unexpected error occurred')
+    } finally {
+      setUrlFetching(false)
     }
   }
 
@@ -202,35 +234,23 @@ function NewAnalysisForm({ onBack, onStartAnalysis }: Props): React.JSX.Element 
             Paste text
           </button>
           <button
-            disabled
-            title="Coming soon"
+            onClick={() => setActiveTab('url')}
             style={{
               padding: '8px 16px',
               fontSize: 'var(--font-size-sm)',
-              color: 'var(--color-text-muted)',
-              cursor: 'not-allowed',
+              color: activeTab === 'url' ? 'var(--color-text)' : 'var(--color-text-muted)',
+              cursor: 'pointer',
               borderTop: 'none',
               borderLeft: 'none',
               borderRight: 'none',
-              borderBottom: '2px solid transparent',
+              borderBottom: activeTab === 'url' ? '2px solid var(--color-accent)' : '2px solid transparent',
               marginBottom: -1,
               background: 'none',
-              opacity: 0.5,
+              fontWeight: activeTab === 'url' ? 500 : 400,
               fontFamily: 'var(--font-sans)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 'var(--space-2)',
             }}
           >
             From URL
-            <span
-              style={{
-                fontSize: 'var(--font-size-xs)',
-                color: 'var(--color-text-muted)',
-              }}
-            >
-              (Coming soon)
-            </span>
           </button>
         </div>
 
@@ -287,6 +307,94 @@ function NewAnalysisForm({ onBack, onStartAnalysis }: Props): React.JSX.Element 
             >
               {charCount.toLocaleString()} characters
             </div>
+            {urlWarning && (
+              <div style={{
+                padding: '8px 12px',
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-warning, #b45309)',
+                background: 'var(--color-warning-bg, rgba(245,158,11,0.1))',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-warning, #b45309)',
+                marginTop: 'var(--space-2)',
+              }}>
+                {urlWarning}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* URL fetch panel */}
+        {activeTab === 'url' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+              <input
+                type="url"
+                value={urlInput}
+                onChange={(e) => { setUrlInput(e.target.value); setUrlError(''); setUrlWarning('') }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleFetchUrl() }}
+                placeholder="https://jobs.example.com/posting/12345"
+                disabled={urlFetching}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  fontSize: 'var(--font-size-sm)',
+                  fontFamily: 'var(--font-sans)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--color-bg)',
+                  color: 'var(--color-text)',
+                }}
+              />
+              <button
+                onClick={handleFetchUrl}
+                disabled={!urlInput.trim() || urlFetching}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: 'var(--font-size-sm)',
+                  fontFamily: 'var(--font-sans)',
+                  background: urlFetching ? 'var(--color-bg-muted)' : 'var(--color-accent)',
+                  color: urlFetching ? 'var(--color-text-muted)' : '#fff',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: !urlInput.trim() || urlFetching ? 'not-allowed' : 'pointer',
+                  whiteSpace: 'nowrap',
+                  opacity: !urlInput.trim() || urlFetching ? 0.6 : 1,
+                }}
+              >
+                {urlFetching ? 'Fetching...' : 'Fetch'}
+              </button>
+            </div>
+            {urlError && (
+              <div style={{
+                padding: '8px 12px',
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-danger)',
+                background: 'var(--color-danger-bg, rgba(220,38,38,0.1))',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-danger)',
+              }}>
+                {urlError}
+              </div>
+            )}
+            {urlWarning && (
+              <div style={{
+                padding: '8px 12px',
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-warning, #b45309)',
+                background: 'var(--color-warning-bg, rgba(245,158,11,0.1))',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-warning, #b45309)',
+              }}>
+                {urlWarning}
+              </div>
+            )}
+            <p style={{
+              fontSize: 'var(--font-size-xs)',
+              color: 'var(--color-text-muted)',
+              margin: 0,
+            }}>
+              Paste a job posting URL from any job board or company career page. The content will be fetched and extracted automatically.
+            </p>
           </div>
         )}
       </div>
