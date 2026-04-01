@@ -74,8 +74,8 @@ Requirements for milestone v2.3 Job Hunt Accelerator.
 - [x] **URL-03**: AI extraction via `generateObject` with Zod schema returning isJobPosting, jobTitle, company, jobDescriptionText
 - [x] **URL-04**: Prompt builder in dedicated `jobPostingUrlPrompt.ts` file for job posting URL content extraction
 - [x] **URL-05**: Preload binding `fetchUrl` on jobPostings object with TypeScript type declarations in index.d.ts
-- [ ] **URL-06**: URL tab activated in NewAnalysisForm (no longer disabled/"Coming soon") with URL input, Fetch button, loading/error/warning states
-- [ ] **URL-07**: Successful fetch auto-populates rawText, company, role fields; short content warning shown for brief extractions
+- [x] **URL-06**: URL tab activated in NewAnalysisForm (no longer disabled/"Coming soon") with URL input, Fetch button, loading/error/warning states
+- [x] **URL-07**: Successful fetch auto-populates rawText, company, role fields; short content warning shown for brief extractions
 
 ## Future Requirements
 
