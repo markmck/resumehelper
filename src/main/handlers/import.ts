@@ -1,7 +1,7 @@
 import { ipcMain, dialog, safeStorage } from 'electron'
 import { promises as fs } from 'fs'
 import { sqlite } from '../db'
-import pdfParse from 'pdf-parse'
+import { PDFParse } from 'pdf-parse'
 import { callResumeExtractor } from '../lib/aiProvider'
 
 interface ResumeJson {
@@ -281,7 +281,7 @@ export function registerImportHandlers(): void {
 
   ipcMain.handle('import:parseResumePdf', async () => {
     // 1. Check AI is configured before showing file dialog
-    const aiRow = sqlite.prepare('SELECT provider, model, apiKey FROM ai_settings WHERE id=1').get() as { provider: string; model: string; apiKey: string } | undefined
+    const aiRow = sqlite.prepare('SELECT provider, model, api_key as apiKey FROM ai_settings WHERE id=1').get() as { provider: string; model: string; apiKey: string } | undefined
     if (!aiRow || !aiRow.apiKey || aiRow.apiKey.length === 0) {
       return { canceled: false, error: 'AI provider not configured. Set up your API key in Settings.' }
     }
@@ -302,19 +302,21 @@ export function registerImportHandlers(): void {
       return { canceled: false, error: 'Could not read file' }
     }
 
-    // 4. Extract text with pdf-parse (check for image-only PDFs)
+    // 4. Extract text with pdf-parse v2 (check for image-only PDFs)
     let pdfText: string
     try {
-      const parsed = await pdfParse(buffer)
-      pdfText = parsed.text
+      const parser = new PDFParse({ data: new Uint8Array(buffer) })
+      const result = await parser.getText()
+      pdfText = result.text
       if (pdfText.trim().length < 100) {
         return { canceled: false, error: 'This PDF appears to be a scanned image and cannot be parsed automatically.' }
       }
+      await parser.destroy()
     } catch {
       return { canceled: false, error: 'Could not extract text from PDF' }
     }
 
-    // 5. AI extraction — decrypt API key, call generateObject
+    // 5. AI extraction — decrypt API key, call generateText + JSON parse
     const apiKey = safeStorage.decryptString(Buffer.from(aiRow.apiKey, 'base64'))
     let data: ResumeJson
     try {
@@ -335,7 +337,7 @@ export function registerImportHandlers(): void {
       languages: (data.languages ?? []).length,
       interests: (data.interests ?? []).length,
       references: (data.references ?? []).length,
-      hasProfile: data.basics ? 1 : 0,
+      hasProfile: data.basics?.name ? 1 : 0,
     }
 
     return { canceled: false, counts, data }
@@ -356,11 +358,11 @@ export function registerImportHandlers(): void {
             linkedin = CASE WHEN linkedin = '' THEN ? ELSE linkedin END
           WHERE id = 1`
         ).run(
-          parsed.basics.name ?? '',
-          parsed.basics.email ?? '',
-          parsed.basics.phone ?? '',
-          parsed.basics.location?.city ?? '',
-          parsed.basics.profiles?.[0]?.url ?? '',
+          parsed.basics?.name ?? '',
+          parsed.basics?.email ?? '',
+          parsed.basics?.phone ?? '',
+          (parsed.basics as Record<string, string>)?.city ?? '',
+          (parsed.basics as Record<string, string>)?.url ?? '',
         )
       }
 

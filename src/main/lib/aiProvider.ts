@@ -1,4 +1,4 @@
-import { generateObject } from 'ai'
+import { generateObject, generateText } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { z } from 'zod'
@@ -45,69 +45,69 @@ export const ResumeScorerSchema = z.object({
 
 export const ResumeJsonSchema = z.object({
   basics: z.object({
-    name: z.string().optional(),
-    email: z.string().optional(),
-    phone: z.string().optional(),
-    location: z.object({ city: z.string().optional() }).optional(),
-    profiles: z.array(z.object({ url: z.string().optional() })).optional(),
-  }).optional(),
+    name: z.string(),
+    email: z.string(),
+    phone: z.string(),
+    city: z.string(),
+    url: z.string(),
+  }),
   work: z.array(z.object({
-    name: z.string().optional(),
-    position: z.string().optional(),
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
-    highlights: z.array(z.string()).optional(),
-  })).optional(),
+    name: z.string(),
+    position: z.string(),
+    startDate: z.string(),
+    endDate: z.string(),
+    highlights: z.array(z.string()),
+  })),
   skills: z.array(z.object({
-    name: z.string().optional(),
-    keywords: z.array(z.string()).optional(),
-  })).optional(),
+    name: z.string(),
+    keywords: z.array(z.string()),
+  })),
   projects: z.array(z.object({
-    name: z.string().optional(),
-    highlights: z.array(z.string()).optional(),
-  })).optional(),
+    name: z.string(),
+    highlights: z.array(z.string()),
+  })),
   education: z.array(z.object({
-    institution: z.string().optional(),
-    area: z.string().optional(),
-    studyType: z.string().optional(),
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
-    score: z.string().optional(),
-    courses: z.array(z.string()).optional(),
-  })).optional(),
+    institution: z.string(),
+    area: z.string(),
+    studyType: z.string(),
+    startDate: z.string(),
+    endDate: z.string(),
+    score: z.string(),
+    courses: z.array(z.string()),
+  })),
   volunteer: z.array(z.object({
-    organization: z.string().optional(),
-    position: z.string().optional(),
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
-    summary: z.string().optional(),
-    highlights: z.array(z.string()).optional(),
-  })).optional(),
+    organization: z.string(),
+    position: z.string(),
+    startDate: z.string(),
+    endDate: z.string(),
+    summary: z.string(),
+    highlights: z.array(z.string()),
+  })),
   awards: z.array(z.object({
-    title: z.string().optional(),
-    date: z.string().optional(),
-    awarder: z.string().optional(),
-    summary: z.string().optional(),
-  })).optional(),
+    title: z.string(),
+    date: z.string(),
+    awarder: z.string(),
+    summary: z.string(),
+  })),
   publications: z.array(z.object({
-    name: z.string().optional(),
-    publisher: z.string().optional(),
-    releaseDate: z.string().optional(),
-    url: z.string().optional(),
-    summary: z.string().optional(),
-  })).optional(),
+    name: z.string(),
+    publisher: z.string(),
+    releaseDate: z.string(),
+    url: z.string(),
+    summary: z.string(),
+  })),
   languages: z.array(z.object({
-    language: z.string().optional(),
-    fluency: z.string().optional(),
-  })).optional(),
+    language: z.string(),
+    fluency: z.string(),
+  })),
   interests: z.array(z.object({
-    name: z.string().optional(),
-    keywords: z.array(z.string()).optional(),
-  })).optional(),
+    name: z.string(),
+    keywords: z.array(z.string()),
+  })),
   references: z.array(z.object({
-    name: z.string().optional(),
-    reference: z.string().optional(),
-  })).optional(),
+    name: z.string(),
+    reference: z.string(),
+  })),
 })
 
 // ─── Exported Types ──────────────────────────────────────────────────────────
@@ -191,15 +191,20 @@ export async function callResumeExtractor(
   const { system, prompt } = buildPdfResumeParserPrompt(pdfText)
   const modelInstance = getModel(provider, model, apiKey)
 
-  const result = await generateObject({
-    model: modelInstance as Parameters<typeof generateObject>[0]['model'],
-    schema: ResumeJsonSchema,
+  const result = await generateText({
+    model: modelInstance as Parameters<typeof generateText>[0]['model'],
     system,
     prompt,
     temperature: 0,
   })
 
-  return result.object
+  // Extract JSON from response (may be wrapped in ```json ... ```)
+  let jsonText = result.text.trim()
+  const fenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (fenceMatch) jsonText = fenceMatch[1].trim()
+
+  const parsed = ResumeJsonSchema.parse(JSON.parse(jsonText))
+  return parsed
 }
 
 // ─── Score Derivation ─────────────────────────────────────────────────────────
