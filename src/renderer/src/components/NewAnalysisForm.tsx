@@ -94,6 +94,17 @@ function NewAnalysisForm({ onBack, onStartAnalysis }: Props): React.JSX.Element 
 
   async function handleFetchUrl(): Promise<void> {
     if (!urlInput.trim() || urlFetching) return
+    // Client-side URL validation — prevent bad URLs from hitting AI
+    try {
+      const parsed = new URL(urlInput.trim())
+      if (!/^https?:$/.test(parsed.protocol)) {
+        setUrlError('Please enter a URL starting with http:// or https://')
+        return
+      }
+    } catch {
+      setUrlError('Please enter a valid URL (e.g. https://example.com/job-posting)')
+      return
+    }
     setUrlFetching(true)
     setUrlError('')
     setUrlWarning('')
