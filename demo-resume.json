@@ -1,0 +1,117 @@
+{
+  "basics": {
+    "name": "Alex Rivera",
+    "email": "alex.rivera@email.com",
+    "phone": "(555) 867-5309",
+    "location": { "city": "Austin, TX" },
+    "profiles": [{ "url": "https://linkedin.com/in/alexrivera" }]
+  },
+  "work": [
+    {
+      "name": "Cloudforge Technologies",
+      "position": "Senior Full-Stack Engineer",
+      "startDate": "2022-03",
+      "endDate": "",
+      "highlights": [
+        "Architected and shipped a real-time analytics dashboard processing 2M+ events/day using React, Node.js, and PostgreSQL, reducing client reporting latency from 4 hours to under 30 seconds",
+        "Led migration from monolithic Express app to microservices architecture, improving deployment frequency from monthly to daily with zero-downtime releases",
+        "Designed and implemented a role-based access control system serving 15K+ users across 200 tenant organizations with row-level security in PostgreSQL",
+        "Mentored 4 junior engineers through structured code reviews and pair programming, resulting in 2 promotions within 18 months",
+        "Built CI/CD pipeline with GitHub Actions, Docker, and AWS ECS that cut build times by 60% and eliminated manual deployment steps",
+        "Introduced OpenTelemetry-based observability stack (Grafana, Loki, Tempo) that reduced mean time to resolution from 3 hours to 25 minutes"
+      ]
+    },
+    {
+      "name": "Nexus Digital Solutions",
+      "position": "Software Engineer",
+      "startDate": "2019-06",
+      "endDate": "2022-02",
+      "highlights": [
+        "Developed a customer-facing portal with React and TypeScript serving 50K monthly active users, achieving 99.7% uptime over 2 years",
+        "Built RESTful API layer with Express and Prisma ORM, implementing pagination, filtering, and full-text search across 30+ endpoints",
+        "Created automated data pipeline ingesting CSV/XML feeds from 12 partner integrations, processing 500K records daily with error recovery and audit logging",
+        "Reduced page load times by 45% through code splitting, lazy loading, and CDN optimization using Webpack and CloudFront",
+        "Collaborated with UX team to redesign the onboarding flow, increasing trial-to-paid conversion by 22% over 3 months"
+      ]
+    },
+    {
+      "name": "BrightPath Consulting",
+      "position": "Junior Developer",
+      "startDate": "2017-08",
+      "endDate": "2019-05",
+      "highlights": [
+        "Built internal tools for project tracking and time reporting using React and Firebase, adopted by 80+ consultants across 3 offices",
+        "Developed responsive landing pages and marketing sites for 15+ client engagements using HTML, CSS, JavaScript, and WordPress",
+        "Wrote Python scripts to automate monthly reporting workflows, saving the operations team approximately 20 hours per month",
+        "Participated in Agile ceremonies and contributed to sprint planning, daily standups, and retrospectives across 4 concurrent projects"
+      ]
+    }
+  ],
+  "skills": [
+    { "name": "Languages", "keywords": ["TypeScript", "JavaScript", "Python", "SQL", "Go", "HTML/CSS"] },
+    { "name": "Frontend", "keywords": ["React", "Next.js", "Tailwind CSS", "Redux", "Vite", "Storybook"] },
+    { "name": "Backend", "keywords": ["Node.js", "Express", "PostgreSQL", "Redis", "GraphQL", "Prisma"] },
+    { "name": "Cloud & DevOps", "keywords": ["AWS", "Docker", "Kubernetes", "GitHub Actions", "Terraform", "CloudFront"] },
+    { "name": "Tools & Practices", "keywords": ["Git", "Agile/Scrum", "CI/CD", "OpenTelemetry", "Grafana", "Figma"] }
+  ],
+  "projects": [
+    {
+      "name": "OpenBoard — Real-time Kanban App",
+      "highlights": [
+        "Built a collaborative Kanban board with WebSocket-based real-time sync, supporting 50+ concurrent users per board",
+        "Implemented drag-and-drop with optimistic UI updates and conflict resolution for simultaneous edits",
+        "Tech stack: React, Socket.io, Express, PostgreSQL, deployed on Railway"
+      ]
+    },
+    {
+      "name": "PulseCheck — Team Health Survey Tool",
+      "highlights": [
+        "Designed and shipped anonymous team health surveys with trend visualization and manager dashboards",
+        "Built with Next.js, Prisma, and Chart.js — used internally at Nexus Digital for 6 quarterly cycles"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "institution": "University of Texas at Austin",
+      "area": "Computer Science",
+      "studyType": "Bachelor of Science",
+      "startDate": "2013-08",
+      "endDate": "2017-05",
+      "score": "3.7",
+      "courses": ["Data Structures", "Operating Systems", "Database Systems", "Software Engineering", "Computer Networks"]
+    }
+  ],
+  "volunteer": [
+    {
+      "organization": "Code Austin",
+      "position": "Workshop Instructor",
+      "startDate": "2020-01",
+      "endDate": "",
+      "summary": "Teach introductory web development workshops for career changers",
+      "highlights": ["Led 12 workshops reaching 200+ students", "Developed curriculum for HTML/CSS/JS fundamentals"]
+    }
+  ],
+  "awards": [
+    {
+      "title": "Cloudforge Innovator Award",
+      "date": "2023-09",
+      "awarder": "Cloudforge Technologies",
+      "summary": "Recognized for the analytics dashboard project that became the company's flagship product demo"
+    }
+  ],
+  "publications": [],
+  "languages": [
+    { "language": "English", "fluency": "Native" },
+    { "language": "Spanish", "fluency": "Conversational" }
+  ],
+  "interests": [
+    { "name": "Open Source", "keywords": ["React ecosystem", "Developer tooling", "Documentation"] }
+  ],
+  "references": [
+    {
+      "name": "Jordan Chen, Engineering Manager at Cloudforge Technologies",
+      "reference": "Alex is one of the most versatile engineers I've worked with. They can go from designing a system architecture whiteboard session to shipping production code in the same afternoon."
+    }
+  ]
+}
