@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.3
-milestone_name: Job Hunt Accelerator
-status: verifying
-stopped_at: "Checkpoint: 24-02 Task 2 human-verify"
-last_updated: "2026-04-02T01:04:32.915Z"
-last_activity: 2026-04-02
+milestone: v2.4
+milestone_name: Polish & Reliability
+status: executing
+stopped_at: "Phase 25-01 at checkpoint:human-verify — installer built, awaiting verification"
+last_updated: "2026-04-03T23:05:32.066Z"
+last_activity: 2026-04-03 -- Phase 25 execution started
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
+  total_phases: 5
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
   percent: 0
 ---
 
@@ -18,99 +18,51 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-26)
+See: .planning/PROJECT.md (updated 2026-04-03)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 24 — job-posting-url-scraping
+**Current focus:** Phase 25 — windows-installer
 
 ## Current Position
 
-Phase: 24
-Plan: Not started
-Status: Checkpoint — awaiting human verification
-Last activity: 2026-04-02
+Phase: 25 (windows-installer) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 25
+Last activity: 2026-04-03 -- Phase 25 execution started
 
-Progress: ░░░░░░░░░░ 0%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 26 (v2.0: 14, v2.1: 12)
-- v2.1 average duration: ~8 min/plan
-- v2.1 total execution time: ~1.5 hours
+- Total plans completed: 0
+- Average duration: —
+- Total execution time: —
 
-**By Phase (v2.1):**
+**By Phase:**
 
-| Phase | Plans | Duration | Tasks | Files |
-|-------|-------|----------|-------|-------|
-| 13-pipeline-foundation | 3 | ~65 min | 9 tasks | 24 files |
-| 14-templates-complete | 3 | ~7 min | 7 tasks | 9 files |
-| 15-controls-page-break-overlay | 3 | ~22 min | 6 tasks | 17 files |
-| 16-cleanup | 3 | ~23 min | 6 tasks | 15 files |
-| Phase 17-schema-override-ipc-foundation P01 | 10 | 2 tasks | 7 files |
-| Phase 17-schema-override-ipc-foundation P02 | 6 | 2 tasks | 2 files |
-| Phase 18-three-layer-model-wiring P01 | 3 | 2 tasks | 6 files |
-| Phase 18-three-layer-model-wiring P03 | 5 | 1 tasks | 1 files |
-| Phase 18 P02 | 311 | 2 tasks | 2 files |
-| Phase 18 P04 | 5 | 1 tasks | 1 files |
-| Phase 19-analysis-submission-flow P01 | 8min | 2 tasks | 9 files |
-| Phase 19-analysis-submission-flow P02 | 8min | 2 tasks | 4 files |
-| Phase 20-skills-chip-grid P01 | 2 | 2 tasks | 7 files |
-| Phase 20-skills-chip-grid P03 | 5min | 2 tasks | 5 files |
-| Phase 20-skills-chip-grid P02 | 3min | 2 tasks | 2 files |
-| Phase 21-variant-ux-cleanup P01 | 1min | 2 tasks | 3 files |
-| Phase 21-variant-ux-cleanup P02 | 2 | 2 tasks | 3 files |
-| Phase 22 P01 | 2 | 2 tasks | 6 files |
-| Phase 22-ats-score-threshold P03 | 8min | 1 tasks | 3 files |
-| Phase 23-import-resume-from-existing-pdf P01 | 2min | 2 tasks | 5 files |
-| Phase 23 P02 | 3min | 1 tasks | 2 files |
-| Phase 24-job-posting-url-scraping P01 | 6min | 2 tasks | 4 files |
-| Phase 24-job-posting-url-scraping P02 | 4min | 1 tasks | 1 files |
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
+
+**Recent Trend:**
+
+- Last 5 plans: —
+- Trend: —
+
+*Updated after each plan completion*
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.MD Key Decisions table.
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
 
-Key v2.2 decisions from research:
-
-- Use separate `analysis_bullet_overrides` table (not JSON column on analysisResults) — FK cascades, indexed lookups
-- Use `@dnd-kit` for chip grid drag (not HTML5 DnD) — Electron/Windows pointer-event compatibility
-- Phase 17 (schema) must precede Phase 18 (accept path rewire) atomically — Pitfall 35/36
-- [Phase 17-schema-override-ipc-foundation]: No Drizzle uniqueIndex for analysis_bullet_overrides composite key; raw SQL UNIQUE constraint is authoritative
-- [Phase 17-schema-override-ipc-foundation]: BulletOverride/SkillAddition duplicated in index.d.ts (declaration) and src/shared/overrides.ts (runtime) per project pattern
-- [Phase 17-schema-override-ipc-foundation]: acceptSuggestion writes ONLY to analysis_bullet_overrides via upsert on UNIQUE(analysis_id, bullet_id)
-- [Phase 17-schema-override-ipc-foundation]: dismissSuggestion is a hard delete (no soft delete) from analysis_bullet_overrides
-- [Phase 17-schema-override-ipc-foundation]: getOverrides is a dedicated IPC channel returning BulletOverride[], not bundled into getAnalysis
-- [Phase 18-01]: Cast Drizzle .all() result to source union type — Drizzle infers text for enum-like columns, not literal union
-- [Phase 18-01]: select-then-insert for ensureSkillAdditions — analysis_skill_additions has no UNIQUE(analysisId, skillName) constraint
-- [Phase 18-three-layer-model-wiring]: buildSnapshotForVariant uses applyOverrides from shared/overrides for bullet merge; sentinel id: -1 for analysis-added skills safe in frozen JSON snapshot
-- [Phase 18]: dismiss (pending->dismissed) calls no IPC; only revert (accepted->pending) calls ai:dismissSuggestion
-- [Phase 18]: [Phase 18-02]: batch save (handleSave, canSave, confirmation dialog) removed entirely from OptimizeVariant; per-click IPC is the persistence model
-- [Phase 18]: VariantPreview rendered in 400px height container inside OptimizeVariant right pane scroll column with analysisId for override-merged preview
-- [Phase 19-01]: Staleness computed on-demand in getAnalysis via analysisEpoch integer comparison — no stored isStale column
-- [Phase 19-01]: ai:getOverrides uses raw SQL LEFT JOIN to detect orphaned overrides, returning isOrphaned: boolean
-- [Phase 19-02]: localRole/localCompany state mirrors prevent flash-back-to-old-value on inline edit blur
-- [Phase 20-01]: skillCategories CREATE TABLE placed before skills in ensureSchema() to satisfy FK ordering
-- [Phase 20-01]: Handler registration belongs in handlers/index.ts, not main/index.ts — centralized registerAllHandlers() pattern
-- [Phase 20-03]: All four grouping surfaces use categoryName ?? 'Other' — skills without a category fall into 'Other' group gracefully
-- [Phase 20-02]: Remove CollapsibleSection wrapper for Skills — SkillChipGrid has own panel with border/padding per UI-SPEC
-- [Phase 20-02]: Remove skillCount/skillBadge state from ExperienceTab — SkillChipGrid renders own count badge internally
-- [Phase 21-variant-ux-cleanup]: handleJobToggle does full getBuilderData refresh (not optimistic) because job toggle cascades bullets server-side
-- [Phase 21-variant-ux-cleanup]: updatedAt is optional on TemplateVariant since pre-Phase-19 variants may not have it in DB
-- [Phase 21-variant-ux-cleanup]: Submit button uses disabled={!onLogSubmission} guard — enabled only when parent provides the callback
-- [Phase 21-variant-ux-cleanup]: onLogSubmission threaded through RowProps/AnalysisTableRow keeping row component self-contained
-- [Phase 22]: scoreThreshold optional on TemplateVariant interface; lib/ directory created fresh in renderer/src
-- [Phase 22-ats-score-threshold]: Warning banner uses linkedAnalysis.score (DB matchScore) not live computedScore — SubmissionLogForm has no access to OptimizeVariant acceptance state
-- [Phase 22-ats-score-threshold]: SubmissionLogForm threshold warning is informational only — submit button never disabled by threshold comparison
-- [Phase 23-01]: confirmAppend is INSERT-only with no DELETE statements — append semantics preserve existing data
-- [Phase 23-01]: AI config check happens before file dialog in parseResumePdf to avoid dialog-then-fail UX
-- [Phase 23]: ImportConfirmModal mode prop defaults to 'replace' for full backward compatibility with existing JSON import flow
-- [Phase 24-01]: generateObject (not generateText) for URL extraction mirrors callJobParser pattern and provides type-safe auto-retry
-- [Phase 24-01]: isJobPosting boolean in Zod schema catches JS-rendered pages, auth walls, CAPTCHA without site-specific logic
-- [Phase 24]: After successful URL fetch, auto-switch to paste tab so user sees populated content and can review before running analysis
+- (v2.3): generateObject for PDF/URL extraction — type-safe auto-retry on malformed JSON
+- (v2.3): isJobPosting guard in URL extraction — catches JS-rendered/auth-walled pages without site-specific logic
+- [Phase 25]: appId dev.resumehelper.app used in both electron-builder.yml and setAppUserModelId — NSIS wizard mode, no desktop shortcut, no publish section
 
 ### Pending Todos
 
@@ -121,10 +73,11 @@ Key v2.2 decisions from research:
 
 ### Blockers/Concerns
 
-None — v2.2 roadmap defined, ready to plan Phase 17.
+- Phase 28 (AI Integration Tests): Verify `ai/test` mock class name for AI SDK v6 before writing mock provider tests. Run: `node -e "const t = require('ai/test'); console.log(Object.keys(t))"`. Zod schema tests can proceed without this.
+- Phase 25: `build/icon.ico` must be created before installer is considered complete. Multi-resolution ICO (16/32/48/256px) required.
 
 ## Session Continuity
 
-Last session: 2026-04-01T23:45:00Z
-Stopped at: Checkpoint: 24-02 Task 2 human-verify
+Last session: 2026-04-03T23:05:28.019Z
+Stopped at: Phase 25-01 at checkpoint:human-verify — installer built, awaiting verification
 Resume file: None

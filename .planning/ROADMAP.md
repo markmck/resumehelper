@@ -7,7 +7,8 @@
 - ✅ **v2.0 AI Analysis Integration** - Phases 8-12 (shipped 2026-03-24)
 - ✅ **v2.1 Resume Templates** - Phases 13-16 (shipped 2026-03-26)
 - ✅ **v2.2 Three Layer Data** - Phases 17-21 (shipped 2026-04-01)
-- **v2.3 Job Hunt Accelerator** - Phases 22-24
+- ✅ **v2.3 Job Hunt Accelerator** - Phases 22-24 (shipped 2026-04-03)
+- 🚧 **v2.4 Polish & Reliability** - Phases 25-29 (in progress)
 
 ## Phases
 
@@ -45,35 +46,75 @@ Phases 17-21 covered: Three-layer data model (base → variant → analysis over
 
 </details>
 
-### v2.3 Job Hunt Accelerator (Phases 22-25)
+<details>
+<summary>✅ v2.3 Job Hunt Accelerator (Phases 22-24) - SHIPPED 2026-04-03</summary>
 
-### Phase 22: ATS Score Threshold Setting
-**Goal:** Let users set a minimum match score target so they can focus tailoring effort on high-match postings
-**Requirements:** [ATS-01, ATS-02, ATS-03, ATS-04, ATS-05, ATS-06, ATS-07]
-**Plans:** 3/3 plans complete
+Phases 22-24 covered: ATS score threshold with slider/target arc/color bands, PDF resume import with AI extraction and append mode, job posting URL scraping with auto-populate of text/company/role fields.
 
+3 phases, 7 plans, 22 requirements. Full details in `.planning/milestones/v2.3-ROADMAP.md`.
+
+</details>
+
+### 🚧 v2.4 Polish & Reliability (In Progress)
+
+**Milestone Goal:** Make the app installable via a proper Windows NSIS installer and establish test coverage across the core data layer, AI integration, and export pipeline.
+
+## Phase Details
+
+### Phase 25: Windows Installer
+**Goal**: Users can install ResumeHelper on Windows via a professional setup wizard with correct metadata and no broken auto-update plumbing
+**Depends on**: Phase 24
+**Requirements**: INST-01, INST-02, INST-03
+**Success Criteria** (what must be TRUE):
+  1. Running the .exe launches a wizard where the user can choose install directory and confirm installation
+  2. After install, ResumeHelper appears in Start Menu and Add/Remove Programs with correct product name and version
+  3. Uninstalling via Add/Remove Programs fully removes the app without leftover artifacts
+  4. The app launches successfully after installer completes (runAfterFinish works)
+  5. `electron-builder.yml` contains no dead asarUnpack entries for removed jsonresume theme packages
+**Plans:** 1/1 plans complete
 Plans:
-- [x] 22-01-PLAN.md — Schema migration, IPC handlers, preload bindings, shared scoreColor utility
-- [ ] 22-02-PLAN.md — OptimizeVariant threshold slider, target arc, score display, below-target callout
-- [x] 22-03-PLAN.md — SubmissionLogForm warning banner, AnalysisList/AnalysisResults color import migration
+- [x] 25-01-PLAN.md — Apply installer config/metadata corrections and build verified installer
 
-### Phase 23: Import Resume from Existing PDF
-**Goal:** Allow users to import their experience data from an existing PDF resume, parsing jobs, bullets, skills, and education into the structured DB
-**Requirements:** [PDF-01, PDF-02, PDF-03, PDF-04, PDF-05, PDF-06, PDF-07, PDF-08]
-**Plans:** 2/2 plans complete
+### Phase 26: Test Infrastructure
+**Goal**: The Vitest test runner is configured and operational with an Electron module mock and in-memory SQLite helper that all subsequent test phases can depend on
+**Depends on**: Phase 25
+**Requirements**: TEST-01, TEST-02
+**Success Criteria** (what must be TRUE):
+  1. Running `npm test` exits with zero failures (no test files produce errors)
+  2. Running `npm run test:coverage` generates a coverage report without crashing
+  3. The `electron` module resolves to a static mock in test context — no import errors for any file that imports from `electron`
+  4. `createTestDb()` returns an in-memory Drizzle instance with the full schema applied, ready for use in any test file
+**Plans**: TBD
 
-Plans:
-- [x] 23-01-PLAN.md — Install pdf-parse, Zod schema, AI extraction prompt, IPC handlers, preload bindings
-- [x] 23-02-PLAN.md — ImportConfirmModal append mode, ExperienceTab PDF import button + flow
+### Phase 27: Data Layer Tests
+**Goal**: The three-layer merge logic and core IPC handler business logic have verified test coverage against real in-memory SQLite behavior
+**Depends on**: Phase 26
+**Requirements**: DATA-01, DATA-02, DATA-03
+**Success Criteria** (what must be TRUE):
+  1. `applyOverrides()` tests pass for base-only, variant-only, and full three-layer merge scenarios
+  2. IPC handler tests for experience, variants, and submissions pass against an in-memory SQLite DB with seeded data
+  3. Handler business logic that required extraction (e.g., from `handlers/templates.ts`, `handlers/ai.ts`) is exported as named pure functions and covered by unit tests
+**Plans**: TBD
 
-### Phase 24: Job Posting URL Scraping
-**Goal:** Scrape job posting content from a URL instead of requiring manual paste — fetch and extract job description, company, and role from job board links (LinkedIn, Indeed, etc.)
-**Requirements:** [URL-01, URL-02, URL-03, URL-04, URL-05, URL-06, URL-07]
-**Plans:** 2/2 plans complete
+### Phase 28: AI Integration Tests
+**Goal**: Zod schemas for all AI flows validate correctly and score derivation produces verified weighted results, with AI provider calls mocked for deterministic testing
+**Depends on**: Phase 26
+**Requirements**: AI-01, AI-02, AI-03
+**Success Criteria** (what must be TRUE):
+  1. `JobParserSchema`, `ResumeScorerSchema`, and `ResumeJsonSchema` each have tests for valid parse and rejection of invalid input
+  2. `deriveOverallScore()` tests cover correct weighted output, edge cases (0-100 clamping), and all weighted fields
+  3. `callJobParser()` and related AI provider functions have tests that use a mock LLM provider and never call a real API
+**Plans**: TBD
 
-Plans:
-- [x] 24-01-PLAN.md — Prompt builder, IPC handler (net.fetch + HTML strip + AI extraction), preload bindings
-- [ ] 24-02-PLAN.md — Activate URL tab in NewAnalysisForm with fetch flow, loading/error states
+### Phase 29: Export Pipeline Tests
+**Goal**: DOCX generation, submission snapshot shape, and template component rendering each have verified test coverage
+**Depends on**: Phase 26
+**Requirements**: EXPORT-01, EXPORT-02, EXPORT-03
+**Success Criteria** (what must be TRUE):
+  1. DOCX generation tests assert correct paragraph structure, heading styles, and per-template font names for at least one template
+  2. Submission snapshot tests confirm that profile, content, and templateOptions are all present and correctly shaped in a frozen snapshot
+  3. Template component render tests (via jsdom) confirm expected HTML structure is produced for at least one template without crashing on minimal props
+**Plans**: TBD
 
 ## Progress
 
@@ -83,7 +124,12 @@ Plans:
 | 8-12 | v2.0 | 14/14 | Complete | 2026-03-24 |
 | 13-16 | v2.1 | 12/12 | Complete | 2026-03-26 |
 | 17-21 | v2.2 | 13/13 | Complete | 2026-04-01 |
-| 22-24 | v2.3 | 0/7 | Active | - |
+| 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
+| 25. Windows Installer | v2.4 | 1/1 | Complete   | 2026-04-03 |
+| 26. Test Infrastructure | v2.4 | 0/? | Not started | - |
+| 27. Data Layer Tests | v2.4 | 0/? | Not started | - |
+| 28. AI Integration Tests | v2.4 | 0/? | Not started | - |
+| 29. Export Pipeline Tests | v2.4 | 0/? | Not started | - |
 
 ## Future (v3.0+)
 
@@ -91,4 +137,4 @@ Plans:
 
 ## Backlog
 
-(Empty — all items promoted to v2.3)
+(Empty — all items promoted to v2.4)
