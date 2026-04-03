@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: resumehelper
+appId: dev.resumehelper.app
+productName: ResumeHelper
 directories:
   buildResources: build
 files:
@@ -17,16 +17,16 @@ extraResources:
 asarUnpack:
   - resources/**
   - node_modules/better-sqlite3/**
-  - node_modules/jsonresume-theme-even/**
-  - node_modules/@jsonresume/jsonresume-theme-class/**
-  - node_modules/jsonresume-theme-elegant/**
 win:
   executableName: resumehelper
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
+  oneClick: false
+  createDesktopShortcut: false
+  createStartMenuShortcut: true
+  runAfterFinish: true
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
@@ -47,6 +47,3 @@ linux:
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates

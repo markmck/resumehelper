@@ -1,8 +1,421 @@
 # Stack Research
 
 **Domain:** Desktop resume management app — PDF/DOCX export, resume templating, AI-assisted job matching
-**Researched:** 2026-03-13 (v1.0), updated 2026-03-14 (v1.1 additions), updated 2026-03-23 (v2.0 AI analysis additions), updated 2026-03-25 (v2.1 template rendering additions), updated 2026-03-26 (v2.2 three-layer data model + skills chip UI)
-**Confidence:** HIGH for v2.2 section — all claims backed by existing installed packages, official dnd-kit docs, and Drizzle ORM docs. No new dependencies required.
+**Researched:** 2026-03-13 (v1.0), updated 2026-03-14 (v1.1 additions), updated 2026-03-23 (v2.0 AI analysis additions), updated 2026-03-25 (v2.1 template rendering additions), updated 2026-03-26 (v2.2 three-layer data model + skills chip UI), updated 2026-04-03 (v2.4 Windows installer + test suites)
+**Confidence:** HIGH for v2.4 installer section (electron-builder config read directly). MEDIUM for test framework section (Vitest/Electron interaction patterns from community sources, ai/test mock API shape needs in-project verification).
+
+---
+
+## v2.4 Additions — Windows Installer (NSIS) and Test Suites
+
+These additions cover: finishing the NSIS installer configuration (already partially set up), adding Vitest for unit/integration tests across the data layer, export pipeline, and AI integration, and establishing mocking patterns for Electron IPC, the database, and the AI SDK. The base app stack is unchanged — no new production dependencies.
+
+---
+
+### Windows Installer — electron-builder NSIS (Already Installed, Needs Configuration)
+
+**electron-builder** is already in `devDependencies` at `^26.0.12` and `electron-builder.yml` already has a partial `nsis:` section. The v2.4 work is configuration completion, not new installation.
+
+**Current state of `electron-builder.yml` NSIS block:**
+
+```yaml
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+```
+
+**What is missing for a complete installer:**
+
+1. **`appId`** — currently set to `com.electron.app` (generic default). Must change to a stable reverse-domain ID (e.g., `com.resumehelper.app`) before shipping. Changing `appId` after users install will break uninstallation and auto-update.
+
+2. **`productName`** — currently `resumehelper` (no spaces). Should be `ResumeHelper` (display name) to match the Start Menu shortcut label.
+
+3. **`win.icon`** — not configured. NSIS requires a `.ico` file. Must add `build/icon.ico`.
+
+4. **Installer mode** — `nsis.oneClick` defaults to `true` (silent install, no wizard). For a user-facing installer with explicit install location and Start Menu shortcut options, set `oneClick: false` and `allowToChangeInstallationDirectory: true`.
+
+5. **`createStartMenuShortcut`** — not explicitly set. Defaults to `true`, but adding it explicitly documents intent.
+
+6. **`menuCategory`** — optional. Groups the Start Menu shortcut under a named submenu (e.g., `ResumeHelper`). Avoids cluttering the top-level Start Menu.
+
+**Recommended complete NSIS configuration:**
+
+```yaml
+appId: com.resumehelper.app
+productName: ResumeHelper
+
+win:
+  executableName: ResumeHelper
+  icon: build/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  menuCategory: ResumeHelper
+```
+
+**`oneClick: false` tradeoff:** Adds an install wizard with a directory picker and confirmation steps. Slightly more user interaction on install, but gives users explicit control over install location. The default `oneClick: true` installs silently without prompting — appropriate for consumer auto-update apps, but less appropriate for a developer tool where users may want to choose install location.
+
+**`asarUnpack` entries to keep:** The existing `asarUnpack` config correctly lists `better-sqlite3` (native module, must be outside ASAR). These entries are correct and should not change.
+
+**`npmRebuild: false`:** Already set. Correct — electron-builder should not attempt to rebuild native modules during build. The `postinstall` script runs `electron-builder install-app-deps` which handles the rebuild separately.
+
+**Build command:** `npm run build:win` already exists in `package.json` scripts and calls `electron-builder --win`. No new script needed.
+
+**Confidence: HIGH** — electron-builder NSIS docs at electron.build/nsis.html. `appId` uniqueness requirement and `oneClick: false` wizard behavior are documented. Current `electron-builder.yml` read directly from the project.
+
+---
+
+### Test Framework — Vitest
+
+**Problem:** The project has zero test coverage. The v2.4 milestone requires test suites for: the three-layer data merge logic, IPC handler contracts, export pipeline (PDF/DOCX), and AI integration (generateObject calls).
+
+**Recommended: `vitest ^3.2` (do NOT jump to v4 yet)**
+
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| `vitest` | `^3.2` | Test runner, assertion library, mock framework | Vite-native — uses the same `electron.vite.config.ts` transforms and resolvers as the app. No separate Babel/Jest config. `vi.mock()` is the established approach for mocking the `electron` module. Vitest 4.x (current latest as of April 2026) requires Vite 8; the project is on electron-vite 5 (Vite 7.x). Pin to 3.x to avoid Vite version conflict. |
+| `@vitest/coverage-v8` | `^3.2` | Coverage reporting | Ships with Vitest; no separate Istanbul setup. V8 provider gives line/branch/function coverage with minimal overhead. |
+
+**Why NOT Jest:**
+Jest requires a separate Babel or `ts-jest` transform pipeline. Vitest uses the same Vite transforms already configured for the project. For an electron-vite project with TypeScript + React, Vitest is zero-config relative to Jest. Vitest's `vi.mock()` API is Jest-compatible — migration cost is near zero if the team already knows Jest.
+
+**Why NOT Vitest 4.x:**
+Vitest 4.x requires Vite 8. electron-vite 5 is built on Vite 7. Mixing Vite 7 (electron-vite's peer dep) with Vite 8 (Vitest 4's peer dep) causes build errors. Pin to `^3.2` until electron-vite releases a version that supports Vite 8.
+
+**Configuration:** Vitest requires a separate config or test project block for the main process (Node environment) vs. renderer tests (jsdom environment). In an electron-vite project, the cleanest approach is a standalone `vitest.config.ts` at project root:
+
+```typescript
+// vitest.config.ts
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  test: {
+    projects: [
+      {
+        // Main process tests — Node.js environment, can import 'electron' mock
+        name: 'main',
+        test: {
+          environment: 'node',
+          include: ['src/main/**/*.test.ts'],
+          setupFiles: ['src/test/setup-main.ts'],
+        },
+      },
+      {
+        // Renderer tests — jsdom environment for React component tests
+        name: 'renderer',
+        plugins: [react()],
+        test: {
+          environment: 'jsdom',
+          include: ['src/renderer/**/*.test.tsx'],
+          setupFiles: ['src/test/setup-renderer.ts'],
+        },
+      },
+    ],
+  },
+})
+```
+
+**Confidence: HIGH** — Vitest 3.2 is stable (released early 2025). Vite compatibility constraint verified against electron-vite peer dependency. `vi.mock()` for electron module confirmed working in vitest issues #4166 and #425.
+
+---
+
+### DOM Test Environment — jsdom
+
+**Recommended: `jsdom` (install as devDep, configure in vitest config)**
+
+Vitest supports jsdom via `environment: 'jsdom'` — install `jsdom` as a dev dependency. No separate `@jest-environment-jsdom` needed.
+
+**Why NOT happy-dom:** happy-dom is 2-4x faster but has incomplete DOM API coverage. The project uses CSS custom properties (`var(--color-text-primary)`, etc.) extensively in React components. jsdom has better CSS property support. For a relatively small test suite (not thousands of component tests), the speed difference is immaterial. Choose correctness over speed.
+
+**Confidence: MEDIUM** — jsdom vs happy-dom comparison from vitest discussion #1607 (official repo). CSS property coverage gap from community reports.
+
+---
+
+### React Component Testing — @testing-library/react
+
+**Add:** `@testing-library/react ^16.3`, `@testing-library/dom ^10.4`, `@testing-library/user-event ^14.5`
+
+React 19 requires `@testing-library/react` 16.1.0+. Starting from v16, `@testing-library/dom` is a required peer dependency (install it explicitly).
+
+**Note on known React 19 issues:** There are reported rendering issues where suspended components stay on fallback with `@testing-library/react` 16 + React 19. These affect tests with `Suspense`. The project's renderer components do not use `Suspense` (data flows via IPC callbacks into React state). This class of issue is unlikely to affect this project.
+
+**Why `@testing-library/user-event`:** Preferred over `fireEvent` for simulating realistic user interactions (typing, clicking). `fireEvent` dispatches raw DOM events; `userEvent` simulates full user behavior including focus, blur, and keyboard sequences.
+
+**Confidence: MEDIUM** — React 19 compatibility confirmed for v16.1.0+ from testing-library release notes. Known issues documented in testing-library/react-testing-library issue #1397. Suspended component issue unlikely to affect this project.
+
+---
+
+### Electron Module Mocking — `vi.mock('electron', ...)`
+
+**Problem:** The main process IPC handlers import from `electron` (`ipcMain`, `safeStorage`, `app`, `BrowserWindow`, `net`). Running these tests in Node.js with Vitest — not inside the actual Electron process — means `electron` is not available as a module.
+
+**Recommended: `vi.mock('electron', ...)` in test setup file — no additional library**
+
+Vitest's built-in `vi.mock()` handles this:
+
+```typescript
+// src/test/setup-main.ts — runs before all main process tests
+import { vi } from 'vitest'
+
+vi.mock('electron', () => ({
+  ipcMain: {
+    handle: vi.fn(),
+    on: vi.fn(),
+    removeHandler: vi.fn(),
+  },
+  app: {
+    getPath: vi.fn().mockReturnValue('/tmp/test-userData'),
+    isReady: vi.fn().mockReturnValue(true),
+  },
+  safeStorage: {
+    encryptString: vi.fn((s: string) => Buffer.from(s)),
+    decryptString: vi.fn((b: Buffer) => b.toString()),
+    isEncryptionAvailable: vi.fn().mockReturnValue(true),
+  },
+  BrowserWindow: vi.fn(),
+  net: {
+    fetch: vi.fn(),
+  },
+}))
+```
+
+**Why NOT `electron-mock-ipc`:** The `h3poteto/electron-mock-ipc` library (last published 2022, ~100 weekly downloads) implements a full IPC channel simulation. This is useful for end-to-end IPC tests but is overkill for handler unit tests. For handler unit tests, the handler function receives direct arguments — no IPC dispatch is needed. Call the handler function directly, mock its dependencies with `vi.fn()`.
+
+**Handler testing pattern — extract business logic into pure functions:**
+
+```typescript
+// src/main/handlers/jobs.ts
+// Extract the logic from the ipcMain.handle callback into a testable function
+export async function getJobsHandler(db: Database): Promise<Job[]> {
+  return db.select().from(jobs).all()
+}
+
+// Register in IPC (thin wrapper only)
+ipcMain.handle('jobs:getAll', () => getJobsHandler(db))
+
+// test
+import { getJobsHandler } from '../handlers/jobs'
+import { createTestDb } from '../test/helpers'
+
+test('getJobsHandler returns all jobs', async () => {
+  const { db } = createTestDb()
+  // insert seed data...
+  const result = await getJobsHandler(db)
+  expect(result).toHaveLength(2)
+})
+```
+
+This pattern avoids IPC dispatch complexity entirely. The `ipcMain.handle(...)` registration call itself does not need testing; only the handler function's behavior does.
+
+**Confidence: HIGH** — `vi.mock()` hoisting behavior confirmed in vitest docs. The mock function pattern is standard Vitest. Electron module shape from official Electron API docs.
+
+---
+
+### Database Testing — In-Memory better-sqlite3
+
+**Problem:** Handler tests that exercise DB operations need a real SQLite database to be meaningful. Using a mock for every query defeats the purpose.
+
+**Recommended: `better-sqlite3` in-memory database (`:memory:`) with schema setup helper — no new library**
+
+`better-sqlite3` already supports in-memory databases via `new Database(':memory:')`. The project's schema uses `CREATE TABLE IF NOT EXISTS` which is already idempotent. Tests create a fresh in-memory database in `beforeEach`, run schema setup, seed data, and tear down — no files on disk, no cleanup.
+
+```typescript
+// src/test/helpers/db.ts
+import Database from 'better-sqlite3'
+import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { setupSchema } from '../../main/db/index'  // the function that runs CREATE TABLE IF NOT EXISTS
+
+export function createTestDb() {
+  const sqlite = new Database(':memory:')
+  const db = drizzle(sqlite)
+  setupSchema(sqlite)  // run all CREATE TABLE IF NOT EXISTS statements
+  return { db, sqlite }
+}
+```
+
+**Compatibility note:** Running `better-sqlite3` in Vitest requires that tests run in Node.js (not via ELECTRON_RUN_AS_NODE). The `main` test project uses `environment: 'node'` — tests run in Vitest's worker pool (Node.js process). The `better-sqlite3` prebuilt binaries for Node.js work here without recompilation because Vitest's test runner uses the system Node.js binary, not Electron's modified binary. Only the packaged Electron build needs the Electron-compiled native module.
+
+**No additional library needed** — `better-sqlite3` is already installed.
+
+**Confidence: HIGH** — `Database(':memory:')` is documented in better-sqlite3's official API. In-memory database pattern for tests is standard SQLite practice. The Vitest/Node vs. Electron binary distinction confirmed in vitest discussion #2142.
+
+---
+
+### AI Integration Testing — `ai/test` Mock Providers
+
+**Problem:** Tests for AI integration (job analysis handler, bullet suggestion handler, PDF/URL extraction handler) must not call real LLM APIs. Tests must be deterministic, fast, and free.
+
+**Recommended: `ai/test` mock helpers (built into the already-installed `ai` package)**
+
+The `ai` package (already installed at `^6.0.136`) includes a `ai/test` subpath export with mock language model providers:
+
+```typescript
+import { MockLanguageModelV1 } from 'ai/test'
+import { generateObject } from 'ai'
+
+test('analyzeJob returns structured result', async () => {
+  const mockModel = new MockLanguageModelV1({
+    doGenerate: async () => ({
+      rawCall: { rawPrompt: null, rawSettings: {} },
+      finishReason: 'stop',
+      usage: { promptTokens: 10, completionTokens: 20 },
+      text: JSON.stringify({
+        matchScore: 85,
+        keywordHits: ['TypeScript', 'React'],
+        gaps: ['Kubernetes'],
+        bulletSuggestions: [],
+      }),
+    }),
+  })
+
+  const result = await generateObject({
+    model: mockModel,
+    schema: AnalysisSchema,
+    prompt: 'test',
+  })
+
+  expect(result.object.matchScore).toBe(85)
+})
+```
+
+**Why this approach over `vi.mock('ai')`:** Mocking the entire `ai` module with `vi.mock` would stub out `generateObject` entirely, testing only that the function was called — not that the handler correctly interprets the model's output, handles schema validation errors, or properly constructs the prompt. Using `MockLanguageModelV1` tests the full pipeline from model call through Zod validation to handler return value.
+
+**`mockValues` helper:** The `ai/test` module also exports `mockValues(...)` for sequential calls — useful for testing retry behavior or multi-call handlers (e.g., the PDF import handler calls `generateObject` once for profile extraction, once for work history).
+
+**IMPORTANT — verify the exact class name before implementing:** The class name `MockLanguageModelV1` is documented in AI SDK v3.4 release notes. The installed version is `ai ^6.0.136`. Run this to see what `ai/test` actually exports in the installed version:
+
+```
+node -e "const t = require('ai/test'); console.log(Object.keys(t))"
+```
+
+Adjust import names based on actual exports. Do not assume the v3.4 class names apply to v6.
+
+**Confidence: MEDIUM** — The `ai/test` export and mock provider pattern are documented at ai-sdk.dev/docs/ai-sdk-core/testing. The exact class name for AI SDK v6 was not directly verified — flag for in-project confirmation before implementation.
+
+---
+
+### Export Pipeline Testing — Snapshot + Buffer Assertions
+
+**Problem:** Testing that PDF and DOCX generation produces correct output without actually running Electron's `printToPDF` (which requires a BrowserWindow and Chromium).
+
+**Recommended approach: split testing strategy**
+
+| What to Test | Approach | Library |
+|---|---|---|
+| DOCX content correctness | Generate DOCX buffer in Node.js, unzip the `.docx` and assert XML content | `docx` (existing) + `jszip` (new dev dep) |
+| Three-layer merge correctness | Unit test `applyOverrides()` directly with mock data | No library — pure TypeScript |
+| Snapshot data assembly | Unit test the function that assembles `ResumeSnapshot` from DB data | In-memory DB + direct function call |
+| PDF control flow | Mock `webContents.printToPDF` and assert it was called with correct params | `vi.mock('electron', ...)` (existing mock setup) |
+
+**DOCX inspection approach:**
+
+```typescript
+import { Packer } from 'docx'
+import { buildDocx } from '../../main/lib/buildDocx'
+import JSZip from 'jszip'
+
+test('DOCX contains expected role text', async () => {
+  const buffer = await Packer.toBuffer(buildDocx(mockResumeData, 'classic'))
+  const zip = await JSZip.loadAsync(buffer)
+  const wordDoc = await zip.files['word/document.xml'].async('text')
+  expect(wordDoc).toContain('Senior Software Engineer')
+})
+```
+
+**New library required: `jszip ^3.10` (dev dependency only)**
+
+`jszip` is used only in tests to inspect DOCX output (DOCX is a ZIP archive). It is a dev dependency only.
+
+**Alternative: skip DOCX unzip testing.** If DOCX inspection adds more complexity than value, test only the pure TypeScript functions (merge logic, data assembly) and skip binary output inspection. The PDF mock approach is sufficient for validating the export handler's control flow without binary inspection.
+
+**Confidence: MEDIUM** — `Packer.toBuffer()` running in Node.js (no Electron) is confirmed by the `docx` library's architecture (it is a pure Node.js library). JSZip used to inspect DOCX output is a known pattern for ZIP-based file formats.
+
+---
+
+## v2.4 Installation
+
+```bash
+# Test framework + coverage
+npm install -D vitest@^3.2 @vitest/coverage-v8@^3.2
+
+# DOM environment for renderer tests
+npm install -D jsdom
+
+# React component testing
+npm install -D @testing-library/react @testing-library/dom @testing-library/user-event
+
+# DOCX binary inspection (tests only)
+npm install -D jszip
+
+# No new production dependencies.
+#
+# electron-builder is already installed (^26.0.12).
+# NSIS installer needs electron-builder.yml config changes only — no new packages.
+# AI mock helpers are in the existing 'ai' package (ai/test subpath) — no separate install.
+# better-sqlite3 in-memory DB uses the already-installed package.
+# Electron module mock uses vi.mock() built into Vitest.
+```
+
+---
+
+## v2.4 What NOT to Add
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `vitest` v4.x | Requires Vite 8; electron-vite 5 uses Vite 7 — version conflict breaks build | `vitest ^3.2` |
+| `jest` | Requires separate Babel/ts-jest pipeline; duplicates Vitest for no benefit in a Vite project | `vitest` (Vite-native, zero extra config) |
+| `electron-mock-ipc` | Last published 2022, low activity. Full IPC dispatch simulation is overkill for handler unit tests | `vi.mock('electron', ...)` + direct function calls |
+| `happy-dom` | Faster but incomplete CSS custom property support — project relies on CSS vars extensively | `jsdom` (more complete) |
+| `@playwright/test` with Electron | E2E testing the full packaged app requires building the app for each test run — slow feedback loop. Valuable but a separate concern from unit/integration tests | `vitest` for unit/integration; defer E2E to a future milestone |
+| `spectron` | Officially deprecated and archived by the Electron team in 2022 | Playwright (if E2E is ever needed) or Vitest (for unit/integration) |
+| `nock` | HTTP interceptor for Node.js — intercepts the `http`/`https` module. The project uses `net.fetch` (Electron's custom fetch, not Node's `http` module). `nock` does not intercept `net.fetch` | `vi.mock('electron', ...)` to mock `net.fetch` |
+| `msw` (Mock Service Worker) | Designed for browser-context fetch interception via service workers. The AI SDK calls and URL scraping run in the Electron main process (Node.js context). MSW's service worker does not operate in Node.js | `vi.mock('electron', ...)` for `net.fetch`; `MockLanguageModelV1` from `ai/test` for AI calls |
+| `supertest` | HTTP integration test library for Express-style servers. There is no HTTP server in this app — all communication is IPC | Direct handler function calls |
+| `@testing-library/jest-dom` | Jest-specific DOM matchers (`toBeInTheDocument`, etc.). Vitest includes compatible matchers natively | Vitest built-in matchers |
+| Squirrel installer target | Creates auto-update infrastructure complexity. NSIS is simpler, doesn't require a release server, and is already configured | NSIS (already configured in electron-builder.yml) |
+| Inno Setup | An alternative Windows installer. electron-builder's NSIS target is already configured and is the Electron community standard | NSIS via electron-builder |
+
+---
+
+## v2.4 Version Compatibility
+
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| `vitest ^3.2` | electron-vite 5 (Vite 7.x), TypeScript 5.x, Node.js 18+ | Do NOT use vitest 4.x — requires Vite 8, conflicts with electron-vite 5's Vite 7 peer dep |
+| `@vitest/coverage-v8 ^3.2` | `vitest ^3.2` | Must match vitest major.minor version exactly |
+| `jsdom` (latest ~25.x) | `vitest ^3.2` | Built-in support via `environment: 'jsdom'` in vitest config; install jsdom as devDep |
+| `@testing-library/react ^16.3` | React 19.2.x | React 19 requires RTL v16.1.0+. Versions below 16.1.0 throw peer dependency errors with React 19 |
+| `@testing-library/dom ^10.4` | `@testing-library/react ^16` | Required explicit peer dep starting from RTL v16 |
+| `@testing-library/user-event ^14.5` | `@testing-library/dom ^10` | Realistic user interaction simulation; stable v14.x API |
+| `jszip ^3.10` | Node.js 18+ | Pure Node.js — works in Vitest's Node environment for DOCX inspection |
+| `better-sqlite3 ^12.8` (existing) | Node.js (system binary, not Electron binary) | In-memory `:memory:` database works in Vitest's Node.js worker context without recompilation |
+| `ai/test` (subpath of `ai ^6.0.136`) | `ai ^6.0.136` | Mock providers bundled with `ai` package — no separate install; verify exported class names in installed version |
+| `electron-builder ^26.0.12` (existing) | Electron 39 | NSIS target confirmed working. No upgrade needed for v2.4 requirements |
+
+---
+
+## v2.4 Sources
+
+- electron.build/nsis.html — NSIS configuration options, `oneClick`, `allowToChangeInstallationDirectory`, `menuCategory` (MEDIUM confidence — official docs, accessed via WebSearch; not directly fetched)
+- electron.build/configuration.html — `appId`, `productName` global fields (MEDIUM confidence — official docs)
+- github.com/vitest-dev/vitest/releases — Vitest 3.2 and 4.x release history; v4 requires Vite 8 confirmed (HIGH confidence — official repo)
+- github.com/vitest-dev/vitest/issues/4166 — `vi.mock('electron')` works; `vi.doMock` fails (MEDIUM confidence — issue thread)
+- github.com/vitest-dev/vitest/discussions/2142 — better-sqlite3 native module in Vitest Node.js context (MEDIUM confidence — community discussion)
+- ai-sdk.dev/docs/ai-sdk-core/testing — `ai/test` mock providers, mock language model helpers (MEDIUM confidence — mentioned in WebSearch results, not directly fetched; verify exported names in installed package)
+- github.com/testing-library/react-testing-library/releases — v16.1.0+ required for React 19 (HIGH confidence — official repo)
+- pkgpulse.com/blog/happy-dom-vs-jsdom-2026 — jsdom vs happy-dom CSS coverage comparison (LOW confidence — blog post, single source)
+- WebSearch result: vitest latest npm version is 4.1.2 as of April 2026 (HIGH confidence — npm registry search)
+
+---
 
 ---
 
@@ -901,6 +1314,12 @@ A ~60–80 line component using React state + IPC query. The autocomplete behavi
 ## Full Updated Installation
 
 ```bash
+# v2.4 — Test framework + NSIS config
+npm install -D vitest@^3.2 @vitest/coverage-v8@^3.2 jsdom
+npm install -D @testing-library/react @testing-library/dom @testing-library/user-event
+npm install -D jszip
+# + update electron-builder.yml (no new npm packages for installer)
+
 # v2.2 — No new npm packages. Schema migrations + component refactor only.
 
 # v2.1 — Template rendering additions
@@ -947,6 +1366,15 @@ npm install ai @ai-sdk/anthropic @ai-sdk/openai zod
 | JSON diff/patch library (`fast-json-patch`, `immer`) | Not needed — overrides are per-row, not JSON diffs | Separate `analysisOverrides` table rows |
 | `drizzle-zod` | Auto-schema generation adds build step for no benefit; manual Zod is established pattern | Manual Zod schemas (existing pattern) |
 | Regex/NLP for job metadata extraction | Brittle — job posting formats vary too much | LLM extraction via `generateObject` |
+| `vitest` v4.x | Requires Vite 8; conflicts with electron-vite 5 (Vite 7) | `vitest ^3.2` |
+| `jest` | Requires separate Babel/ts-jest pipeline; redundant in a Vite project | `vitest` (Vite-native) |
+| `electron-mock-ipc` | Abandoned 2022; overkill for handler unit tests | `vi.mock('electron', ...)` + direct calls |
+| `happy-dom` | Incomplete CSS custom property support | `jsdom` |
+| `nock` | Intercepts Node.js `http` module — does not intercept Electron's `net.fetch` | `vi.mock('electron', ...)` |
+| `msw` | Browser service worker — does not operate in Node.js main process | `vi.mock` + `MockLanguageModelV1` |
+| `@playwright/test` with Electron (now) | Full E2E needs app build per run — slow loop for unit/integration work | `vitest` for unit/integration; defer E2E |
+| `spectron` | Deprecated and archived by Electron team in 2022 | Playwright (if E2E needed later) |
+| Squirrel installer target | More complex auto-update infrastructure; NSIS already configured | NSIS via electron-builder |
 
 ---
 
@@ -954,6 +1382,16 @@ npm install ai @ai-sdk/anthropic @ai-sdk/openai zod
 
 | Package | Compatible With | Notes |
 |---------|-----------------|-------|
+| `vitest ^3.2` | electron-vite 5 (Vite 7.x), TypeScript 5.x | Do NOT use v4.x — requires Vite 8, conflicts with electron-vite 5 |
+| `@vitest/coverage-v8 ^3.2` | `vitest ^3.2` | Must match vitest major.minor |
+| `jsdom` (latest) | `vitest ^3.2` | Install as devDep; set `environment: 'jsdom'` in vitest config |
+| `@testing-library/react ^16.3` | React 19.2.x | React 19 requires RTL v16.1.0+ |
+| `@testing-library/dom ^10.4` | `@testing-library/react ^16` | Required peer dep starting RTL v16 |
+| `@testing-library/user-event ^14.5` | `@testing-library/dom ^10` | Stable v14.x API |
+| `jszip ^3.10` | Node.js 18+ | Pure Node.js; works in Vitest Node environment |
+| `better-sqlite3 ^12.8` (existing) | Node.js (system binary) | In-memory `:memory:` works without Electron recompile in tests |
+| `ai/test` subpath | `ai ^6.0.136` | Built into existing `ai` package — verify exported class names |
+| `electron-builder ^26.0.12` (existing) | Electron 39 | NSIS confirmed working; no upgrade needed |
 | react-colorful@5.6.1 | React 19.2.x | Hooks only; peer dep >=16.8.0; no deprecated APIs |
 | `ai` ^6.0.135 | Node.js 18+, TypeScript 5.x | Electron 39 runs Node.js 22 — fully compatible. |
 | `@ai-sdk/anthropic` ^3.0.63 | `ai` ^6.x | Must match `ai` major version. |
@@ -972,6 +1410,15 @@ npm install ai @ai-sdk/anthropic @ai-sdk/openai zod
 ---
 
 ## Sources
+
+**v2.4:**
+- electron.build/nsis.html — NSIS configuration options (MEDIUM confidence — official docs, not directly fetched)
+- github.com/vitest-dev/vitest/releases — Vitest 3.2 stable, v4.x requires Vite 8 (HIGH confidence — official repo)
+- github.com/vitest-dev/vitest/issues/4166 — `vi.mock('electron')` works, `vi.doMock` fails (MEDIUM confidence)
+- github.com/vitest-dev/vitest/discussions/2142 — better-sqlite3 in Vitest Node.js context (MEDIUM confidence)
+- ai-sdk.dev/docs/ai-sdk-core/testing — `ai/test` mock providers (MEDIUM confidence — WebSearch confirmed, not directly fetched; verify class names in installed package)
+- github.com/testing-library/react-testing-library/releases — RTL v16.1.0+ for React 19 (HIGH confidence)
+- npmjs.com/package/vitest — v4.1.2 latest as of April 2026; v3.x is current stable (HIGH confidence)
 
 **v2.2:**
 - docs.dndkit.com/presets/sortable — sortable strategies including `rectSortingStrategy` (HIGH confidence — official docs)
@@ -1000,5 +1447,5 @@ npm install ai @ai-sdk/anthropic @ai-sdk/openai zod
 
 ---
 
-*Stack research for: ResumeHelper — v1.0 export + v1.1 resume.json import/themes + v2.0 AI analysis + v2.1 template rendering + v2.2 three-layer data model*
-*Researched: 2026-03-13 (v1.0), 2026-03-14 (v1.1), 2026-03-23 (v2.0), 2026-03-25 (v2.1), 2026-03-26 (v2.2)*
+*Stack research for: ResumeHelper — v1.0 export + v1.1 resume.json import/themes + v2.0 AI analysis + v2.1 template rendering + v2.2 three-layer data model + v2.4 Windows installer + test suites*
+*Researched: 2026-03-13 (v1.0), 2026-03-14 (v1.1), 2026-03-23 (v2.0), 2026-03-25 (v2.1), 2026-03-26 (v2.2), 2026-04-03 (v2.4)*

@@ -1,8 +1,8 @@
 # Pitfalls Research
 
 **Domain:** Resume management desktop app (Electron + SQLite + AI matching + PDF/DOCX export)
-**Researched:** 2026-03-14 (v1.1 update — appended to v1.0 findings) / 2026-03-23 (v2.0 update — AI integration, LLM API, UI redesign) / 2026-03-25 (v2.1 update — HTML/CSS templates, printToPDF, DOCX, ATS compliance) / 2026-03-26 (v2.2 update — three-layer data model, analysis overrides, skills redesign, drag-and-drop)
-**Confidence:** HIGH for schema/migration and IPC patterns (code verified); MEDIUM for resume.json theme integration (official docs reviewed, no live Electron integration examples found); MEDIUM for LLM integration patterns (official docs + community sources); HIGH for Electron security (official docs + CVE research); HIGH for printToPDF pitfalls (Electron GitHub issue tracker reviewed, codebase audited); MEDIUM for ATS parsing (community sources + 2025/2026 ATS research, behavior varies by ATS vendor); HIGH for three-layer model migration pitfalls (codebase audited); HIGH for skills tag migration pitfalls (codebase audited); MEDIUM for dnd-kit in Electron (official docs + Electron issue tracker)
+**Researched:** 2026-03-14 (v1.1 update — appended to v1.0 findings) / 2026-03-23 (v2.0 update — AI integration, LLM API, UI redesign) / 2026-03-25 (v2.1 update — HTML/CSS templates, printToPDF, DOCX, ATS compliance) / 2026-03-26 (v2.2 update — three-layer data model, analysis overrides, skills redesign, drag-and-drop) / 2026-04-03 (v2.4 update — Windows NSIS installer, test suites for data layer, export pipeline, AI integration)
+**Confidence:** HIGH for schema/migration and IPC patterns (code verified); MEDIUM for resume.json theme integration (official docs reviewed, no live Electron integration examples found); MEDIUM for LLM integration patterns (official docs + community sources); HIGH for Electron security (official docs + CVE research); HIGH for printToPDF pitfalls (Electron GitHub issue tracker reviewed, codebase audited); MEDIUM for ATS parsing (community sources + 2025/2026 ATS research, behavior varies by ATS vendor); HIGH for three-layer model migration pitfalls (codebase audited); HIGH for skills tag migration pitfalls (codebase audited); MEDIUM for dnd-kit in Electron (official docs + Electron issue tracker); HIGH for Windows installer pitfalls (electron-builder docs + GitHub issue tracker reviewed); HIGH for native module packaging pitfalls (code verified + issue tracker); MEDIUM for Electron IPC testing patterns (vitest docs + community sources); HIGH for Vercel AI SDK testing (official docs reviewed)
 
 ---
 
@@ -1060,8 +1060,289 @@ Use `CREATE TABLE IF NOT EXISTS` for all new tables (the IF NOT EXISTS guard han
 **Phase to address:**
 Three-layer data model phase -- schema additions step. Add a startup table-existence assertion as a diagnostic gate.
 
+---
+
+## v2.4 Pitfalls — Windows Installer (NSIS), Test Suites (Data Layer, Export Pipeline, AI Integration)
+
+The following pitfalls are specific to the v2.4 feature set: Windows NSIS installer via electron-builder, and adding comprehensive test suites to the existing codebase. The app has 85+ source files, a three-layer data model, IPC-based AI calls using Vercel AI SDK, and a printToPDF-based export pipeline. Adding tests and a production installer to this system has well-documented failure modes.
+
+---
+
+### Pitfall 43: NSIS Installer Produces SmartScreen "Unknown Publisher" Warning — Users Reject It
+
+**What goes wrong:**
+The installer builds and runs but Windows Defender SmartScreen shows a warning: "Windows protected your PC — Microsoft Defender SmartScreen prevented an unrecognized app from starting." Many users dismiss the app at this point rather than clicking "Run anyway." Enterprise machines with strict SmartScreen policies may completely block the install. For a job search tool being distributed to potential employers or colleagues, an unsigned installer undermines trust.
+
+**Why it happens:**
+Windows SmartScreen evaluates a "reputation score" based on code signing and download prevalence. An unsigned NSIS installer has zero reputation and always triggers the warning on first run. Even if the user clicks through, the warning appears on every machine that installs the app until the installer accumulates enough legitimate installs.
+
+**How to avoid:**
+For a personal-use tool distributed via direct download, the pragmatic minimum is to document the SmartScreen behavior in the README with a clear "Run anyway" screenshot. Do not attempt to suppress the warning through registry hacks — they don't work for other users' machines. For wider distribution, code signing is required. Options in order of cost: (1) Azure Trusted Signing (Microsoft's cloud-based EV alternative, ~$10/month, gets rid of SmartScreen warnings immediately), (2) Standard OV certificate (~$100-300/year, warnings appear for first N installs, then reputation builds), (3) EV certificate (hardware token required, eliminates warnings but cannot be used in CI without additional setup). For a personal job-search app, documenting the SmartScreen bypass is acceptable for v2.4.
+
+**Warning signs:**
+- No `win.certificateFile` or `win.signingHashAlgorithms` configuration in electron-builder.yml
+- No README section explaining the SmartScreen behavior to users
+- Users report app blocked or not installed after receiving the installer
+
+**Phase to address:**
+Windows installer phase. Make a deliberate decision about signing before building the installer, not after users report the warning.
+
+---
+
+### Pitfall 44: `appId` Mismatch Corrupts userData Path Between Dev and Production
+
+**What goes wrong:**
+The current `electron-builder.yml` has `appId: com.electron.app` (a placeholder) and `productName: resumehelper`. The main process sets `electronApp.setAppUserModelId('com.electron')` (from the template). When the NSIS installer runs on a user's machine, the userData path becomes `C:\Users\<user>\AppData\Roaming\com.electron.app`. If the appId is later changed to something meaningful (e.g., `com.markm.resumehelper`), the userData path changes on the user's next install — all their data (SQLite database, encrypted API keys) appears to vanish because the app is looking in a new location.
+
+**Why it happens:**
+The electron-vite template ships with placeholder appId and productName values. Developers focus on features and defer "config cleanup." The appId is not just a display string — on Windows it controls the AUMID (Application User Model ID) which determines the userData path, the taskbar grouping, and Windows notification identity. Once users have data at a path derived from the old appId, changing it is a breaking migration.
+
+**How to avoid:**
+Set a permanent, meaningful `appId` before the first public installer build. Do not use the template placeholder. The pattern is reverse-domain notation: `com.markm.resumehelper` or `io.resumehelper.app`. Then call `electronApp.setAppUserModelId('com.markm.resumehelper')` in the main process (matching the appId exactly). This must never change after release — if it must change, write a startup migration that copies the old userData folder to the new path. Test: build the installer, install it, confirm `app.getPath('userData')` returns `AppData\Roaming\resumehelper` (controlled by productName) not `AppData\Roaming\com.electron.app`.
+
+**Warning signs:**
+- `appId` in `electron-builder.yml` is still `com.electron.app` (the template placeholder)
+- `setAppUserModelId()` in `main/index.ts` is called with `'com.electron'` (the template value, not the actual appId)
+- No test confirms `app.getPath('userData')` returns the expected path in the packaged build
+
+**Phase to address:**
+Windows installer phase, as the very first step before building any installer artifact.
+
+---
+
+### Pitfall 45: Drizzle Migration Files Not Accessible in the Packaged App's extraResources Path
+
+**What goes wrong:**
+The `electron-builder.yml` currently includes `extraResources: [{ from: drizzle, to: drizzle }]`. This copies the `drizzle/` folder to `resources/drizzle/` inside the packaged app. The main process migration call uses a path like `join(__dirname, '../../resources/drizzle')` to find migration files. In development, this resolves correctly. In the packaged NSIS installer, `process.resourcesPath` is the correct reference point — but if the migration path is constructed using `__dirname` instead of `process.resourcesPath`, it resolves to a path inside the ASAR bundle where the `drizzle/` folder was not placed. Migrations never run; the database schema stays at v1.0 indefinitely.
+
+**Why it happens:**
+`__dirname` inside a packaged Electron main process refers to the app.asar file contents, not the outer `resources/` directory. The `extraResources` folder is at `process.resourcesPath + '/drizzle'`, not inside the ASAR. Developers who test only in development never encounter the path mismatch because in dev mode, `__dirname` resolves to the source tree where the `drizzle/` folder is also present.
+
+**How to avoid:**
+In the database initialization code, resolve the migration path as:
+```typescript
+const migrationsFolder = app.isPackaged
+  ? join(process.resourcesPath, 'drizzle')
+  : join(__dirname, '../../drizzle')
+```
+Test the packaged binary explicitly: build with `npm run build:win`, install, confirm on first launch that the database gets all expected tables (not just the ones created by `ensureSchema()` before the migration runner).
+
+**Warning signs:**
+- Migration path uses `__dirname` with no `app.isPackaged` conditional
+- No test confirms migration files are found at runtime in the packaged build
+- Fresh installs after packaging only have tables created by `ensureSchema()`, not by Drizzle migrations
+
+**Phase to address:**
+Windows installer phase. The migration path must be verified as a blocking step — failing to migrate means the packaged app ships with a broken schema for any user who already has a database from an earlier version.
+
+---
+
+### Pitfall 46: Testing IPC Handlers Requires Mocking the Entire `electron` Module — Partial Mocks Fail
+
+**What goes wrong:**
+The data layer tests need to test IPC handler functions (e.g., `registerJobHandlers`, `registerAiHandlers`) directly. The handler files import from `electron`: `import { ipcMain, safeStorage } from 'electron'`. When vitest runs these tests in a Node.js environment (not in Electron), `electron` is not installed as a regular module — it's a built-in Electron module that only exists inside an Electron process. The import fails with `Cannot find module 'electron'` or resolves to an empty object, causing handlers to crash on registration.
+
+**Why it happens:**
+The handler functions are tightly coupled to Electron globals. `ipcMain.handle(...)` is called at module load time (inside `registerXxxHandlers()`). The test cannot isolate the database query logic from the IPC registration without mocking `electron` entirely. Developers who try to partially mock only `ipcMain` while leaving `safeStorage` unmocked hit failures on the `safeStorage.isEncryptionAvailable()` call, which requires the Electron app to be fully initialized.
+
+**How to avoid:**
+Create a `__mocks__/electron.ts` (or use `vi.mock('electron', ...)`) that provides stub implementations for all used Electron APIs:
+
+```typescript
+// In vitest setup or __mocks__/electron.ts
+vi.mock('electron', () => ({
+  ipcMain: { handle: vi.fn() },
+  safeStorage: {
+    isEncryptionAvailable: vi.fn(() => true),
+    encryptString: vi.fn((s: string) => Buffer.from(s)),
+    decryptString: vi.fn((b: Buffer) => b.toString()),
+  },
+  app: { getPath: vi.fn(() => ':memory:') },
+  dialog: { showOpenDialog: vi.fn(), showSaveDialog: vi.fn() },
+  BrowserWindow: vi.fn(),
+  shell: { openExternal: vi.fn() },
+}))
+```
+
+Test the pure database logic (Drizzle queries, merge functions) separately from the IPC registration. The merge logic in `shared/overrides.ts` and the query logic in `handlers/*.ts` can be extracted into testable pure functions that take a `db` instance as a parameter rather than importing from the module-level singleton. This separation makes IPC handlers thin wrappers (testable via integration tests) and the query logic testable as pure functions.
+
+**Warning signs:**
+- Tests import handler files directly and hit "Cannot find module 'electron'" errors
+- `vi.mock('electron')` is used but only mocks `ipcMain`, leaving `safeStorage` or `BrowserWindow` unmocked
+- No `vitest.config.ts` entry sets up the electron mock globally for all test files
+- Handler functions are not separable from their IPC registration (business logic mixed with `ipcMain.handle` call)
+
+**Phase to address:**
+Data layer test suite phase — the mock setup must be established before any handler tests are written. It is the foundational scaffolding for the entire test suite.
+
+---
+
+### Pitfall 47: Three-Layer Merge Tests That Use Real SQLite Produce Non-Deterministic Results
+
+**What goes wrong:**
+Tests for `applyOverrides()` (in `shared/overrides.ts`) and `getBuilderDataForVariant()` create real SQLite databases using `better-sqlite3`. Each test inserts jobs, bullets, variants, and override rows, calls the merge function, and asserts on the result. Tests pass in isolation but fail when run together because:
+1. The in-memory database is shared between test files (module-level singleton pattern in `db/index.ts`)
+2. Rows from one test bleed into another's query results
+3. Integer auto-increment IDs are not reset between tests, causing ID collisions
+
+**Why it happens:**
+The existing `db/index.ts` creates a module-level `better-sqlite3` database instance. When vitest runs multiple test files in the same worker, they share the same module cache and therefore the same database instance. Tests that insert data without cleanup leave residual rows for subsequent tests.
+
+**How to avoid:**
+For unit tests of the merge logic and data layer, use SQLite in-memory databases (`:memory:`) that are created fresh per test file or per test:
+
+```typescript
+// In test setup
+import Database from 'better-sqlite3'
+import { drizzle } from 'drizzle-orm/better-sqlite3'
+
+function createTestDb() {
+  const sqlite = new Database(':memory:')
+  const db = drizzle(sqlite, { schema })
+  // Run ensureSchema() to create tables
+  ensureSchemaOnDb(sqlite)
+  return { db, sqlite }
+}
+```
+
+The `applyOverrides()` function in `shared/overrides.ts` is already a pure function — it takes arrays of data, not a database connection — so its tests need no database at all. Test it with plain TypeScript objects. For `getBuilderDataForVariant()`, pass the db instance as a parameter rather than importing from the module singleton.
+
+**Warning signs:**
+- Tests share the module-level `db` instance from `src/main/db/index.ts`
+- Test order matters — running tests in a different order produces different results
+- No `beforeEach` that creates a fresh database instance per test
+- `applyOverrides()` is tested with real database rows when it could be tested with plain objects
+
+**Phase to address:**
+Data layer test suite phase. Establish the in-memory database pattern before writing any test that touches the database.
+
+---
+
+### Pitfall 48: Testing `printToPDF` Export Pipeline Requires a Running Electron Process — Cannot Be Unit-Tested
+
+**What goes wrong:**
+The export test suite attempts to call `getBuilderDataForVariant()` and then invoke the PDF export path to verify that the export produces a valid buffer. The test imports `export.ts` which imports `BrowserWindow` from electron, `ipcMain`, and constructs a hidden window. In vitest (running in Node.js), `BrowserWindow` is not available, `printToPDF` cannot be called, and the test crashes immediately.
+
+**Why it happens:**
+The PDF export pipeline is tightly coupled to `BrowserWindow` and `webContents.printToPDF()` — APIs that only exist inside a running Electron process. They cannot be polyfilled or mocked at a meaningful level without essentially reimplementing a browser engine. Developers who try to test the entire PDF path end up either needing a full Electron test harness (Playwright/Spectron) or writing tests that don't actually validate the PDF output.
+
+**How to avoid:**
+Split the export pipeline into two testable layers:
+1. **Data assembly layer** (unit-testable): `getBuilderDataForVariant()` → merges DB data → returns `BuilderData` object. Test this with in-memory SQLite. Assert that the returned data structure has the right jobs, bullets, overrides applied, and excluded items removed.
+2. **Render-to-PDF layer** (integration/e2e only): `buildPrintHtml(builderData)` → `BrowserWindow.loadURL()` → `printToPDF()`. This layer can only be tested in a live Electron process. For v2.4, document it as "verified by manual smoke test after each build." Future milestone: add Playwright E2E test that exercises the export button end-to-end.
+
+The DOCX export (`export:docx` handler) is more testable because the `docx` library produces a `Buffer` without needing a browser. Test DOCX by: building `BuilderData` from in-memory SQLite, calling the DOCX builder function directly, and asserting the output buffer is non-empty and parseable.
+
+**Warning signs:**
+- Test file imports `BrowserWindow` from electron and tries to call `printToPDF()`
+- Export tests only pass when run inside an Electron process (not in regular vitest)
+- No separation between "build the data" and "render to PDF" in the export handler
+- DOCX export is also treated as untestable when it actually can be unit-tested without a browser
+
+**Phase to address:**
+Export pipeline test suite phase. Refactor `getBuilderDataForVariant()` into a standalone function that accepts a db parameter (if not already) before writing any export tests.
+
+---
+
+### Pitfall 49: Mocking Vercel AI SDK `generateObject` Requires the Official `MockLanguageModelV3` — Not `vi.fn()`
+
+**What goes wrong:**
+Tests for `callJobParser()` and `callResumeScorer()` in `src/main/lib/aiProvider.ts` need to mock `generateObject` from the `ai` package to return controlled results. The developer uses `vi.mock('ai', () => ({ generateObject: vi.fn().mockResolvedValue({ object: mockResult }) }))`. The test runs but `generateObject` internally validates its arguments (model, schema, messages) and the mock bypasses this validation entirely, allowing tests to pass even when the actual implementation would reject the call. More subtly, if `generateObject` is called with the wrong model interface, the mock returns success but the real call would throw. Tests become fixtures that verify nothing.
+
+**Why it happens:**
+`vi.fn()` mocks replace the entire function with a stub that returns whatever you specify. It does not enforce the shape of arguments or validate that the model passed to `generateObject` is a valid `LanguageModel` instance. The Vercel AI SDK exports `MockLanguageModelV3` from `ai/test` specifically to allow tests that validate the full call path without making real API requests.
+
+**How to avoid:**
+Use the Vercel AI SDK's official test utilities:
+
+```typescript
+import { MockLanguageModelV3 } from 'ai/test'
+
+const mockModel = new MockLanguageModelV3({
+  doGenerate: async () => ({
+    rawCall: { rawPrompt: null, rawSettings: {} },
+    finishReason: 'stop',
+    usage: { promptTokens: 10, completionTokens: 20 },
+    text: JSON.stringify(mockJobParserResult),
+  }),
+})
+```
+
+Then pass `mockModel` to the function under test instead of the real Anthropic/OpenAI provider. This validates that the function constructs a valid provider call, processes the response correctly, and handles the Zod schema validation. Test both success cases and failure cases (malformed JSON response, missing required fields in the schema).
+
+**Warning signs:**
+- AI tests use `vi.mock('ai')` and stub `generateObject` with `vi.fn()`
+- Tests pass even when the Zod schema for the expected output is changed to something incompatible
+- No test covers the `generateObject` call with a schema mismatch or retry behavior
+- `MockLanguageModelV3` is not imported in any test file
+
+**Phase to address:**
+AI integration test suite phase — establish `MockLanguageModelV3` as the standard pattern for all AI tests before writing any individual test case.
+
+---
+
+### Pitfall 50: IPC Handler Tests Register Duplicate Handlers When Tests Re-Import the Module
+
+**What goes wrong:**
+The data layer tests call `registerJobHandlers()` in a `beforeAll()` block to set up IPC handlers for testing. When multiple test files are run together, each imports and calls `registerJobHandlers()`. Because `ipcMain.handle()` throws an error if a channel is registered twice (`Error: Attempted to register a second handler for 'jobs:list'`), the second test file to run fails immediately with this error — even though its own handler registration is logically correct.
+
+**Why it happens:**
+`ipcMain.handle()` is a global registry inside the Electron process. Calling `registerJobHandlers()` in multiple test files (or in multiple `beforeAll()` blocks) registers the same channel names multiple times. The mock `ipcMain` from the electron mock does not automatically prevent this — `vi.fn()` allows repeated calls without throwing.
+
+**How to avoid:**
+In the electron mock, implement the duplicate-registration check that real `ipcMain` enforces:
+
+```typescript
+const handlers = new Map<string, Function>()
+const ipcMain = {
+  handle: vi.fn((channel: string, handler: Function) => {
+    if (handlers.has(channel)) {
+      throw new Error(`Duplicate handler: ${channel}`)
+    }
+    handlers.set(channel, handler)
+  }),
+  removeHandler: vi.fn((channel: string) => {
+    handlers.delete(channel)
+  }),
+}
+```
+
+Then call `removeHandler` for all registered channels in `afterAll()`. Alternatively, use `vitest`'s `isolate: true` option to run each test file in its own module context, which resets all mocks and module-level state between files.
+
+**Warning signs:**
+- `registerXxxHandlers()` is called in `beforeAll()` in multiple test files without corresponding cleanup
+- Tests fail with "Attempted to register a second handler" when more than one test file is run
+- The electron mock's `ipcMain.handle` is a bare `vi.fn()` with no duplicate detection
+
+**Phase to address:**
+Data layer test suite phase — handler registration lifecycle must be designed before any integration-level tests are written.
+
+---
+
+### Pitfall 51: NSIS Installer Removes User Data on Uninstall If `deleteAppDataOnUninstall` Is Not Explicitly `false`
+
+**What goes wrong:**
+The electron-builder NSIS configuration has a `deleteAppDataOnUninstall` option that defaults to `false`, but some project templates or tutorials set it to `true` for "clean uninstalls." When a user uninstalls the app to upgrade or troubleshoot, their entire userData directory — containing the SQLite database with all their work history, template variants, and submission records — is silently deleted. For a job search tracking app, this data is irreplaceable.
+
+**Why it happens:**
+"Clean uninstall" sounds like a feature when writing the config. The developer who sets this option is thinking about leaving no traces, not about user data loss. The SQLite database at `app.getPath('userData')` is the only copy of the user's resume data — there is no cloud sync and no export reminder on uninstall.
+
+**How to avoid:**
+Ensure `deleteAppDataOnUninstall: false` is explicitly set in the `nsis` section of `electron-builder.yml` (it is the default but make it explicit). Add an uninstall dialog step (via custom NSIS script if needed) that warns: "Your resume data and application settings will NOT be deleted. You can find them at `%APPDATA%\resumehelper`. To permanently delete your data, remove this folder manually after uninstalling." Do not add a "wipe data on uninstall" option even if requested — the risk of accidental data loss outweighs the convenience.
+
+**Warning signs:**
+- `deleteAppDataOnUninstall: true` appears anywhere in the electron-builder config
+- NSIS configuration was copied from a tutorial that sets this option
+- No uninstall dialog or documentation mentions what happens to user data
+
+**Phase to address:**
+Windows installer phase. Review the entire NSIS configuration before producing the first release build, with explicit attention to data preservation.
+
+---
 
 ## Technical Debt Patterns
+
+Shortcuts that seem reasonable but create long-term problems.
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
@@ -1096,9 +1377,17 @@ Three-layer data model phase -- schema additions step. Add a startup table-exist
 | Using HTML5 Drag and Drop API for chip reordering | No extra dependency | Broken on Windows/Electron; ghost image quirks; snap-back on drop | Never -- use dnd-kit pointer events instead |
 | Mounting DndContext/DragOverlay inside a transform-scaled container | Obvious component co-location | DragOverlay position is wrong; drag preview jumps on start | Never -- must mount above any transform ancestor |
 
+| Keeping placeholder `appId: com.electron.app` in electron-builder.yml | Zero effort | userData path uses placeholder name; changing it later breaks existing user data | Never — set a permanent meaningful appId before first install |
+| Using `vi.fn()` to mock `generateObject` from the AI SDK | Fast to write | Mock validates nothing; tests pass even when argument shape is completely wrong | Never — use `MockLanguageModelV3` from `ai/test` |
+| Testing IPC handlers without mocking the full `electron` module | Simpler mock setup | Tests crash with "Cannot find module 'electron'" or miss safeStorage failures | Never — mock the complete electron module upfront |
+| Registering IPC handlers in `beforeAll()` without cleanup in `afterAll()` | Straightforward setup | Duplicate handler registration error when multiple test files run together | Never — always pair handler registration with removal |
+| Using `__dirname` for Drizzle migration path in packaged app | Works in dev | Migrations not found in packaged binary; schema never migrates for end users | Never — use `process.resourcesPath` with `app.isPackaged` conditional |
+
 ---
 
 ## Integration Gotchas
+
+Common mistakes when connecting to external services.
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
@@ -1136,9 +1425,20 @@ Three-layer data model phase -- schema additions step. Add a startup table-exist
 | Company/role LLM extraction | Auto-saving extracted values to DB on LLM response | Pre-fill editable form fields only; require explicit user save before writing to `job_postings` |
 | `buildSnapshotForVariant` + analysis overrides | Building snapshot without consulting `analysis_overrides` | Pass `analysisId` to snapshot builder; apply overrides before freezing bullet text |
 
+| NSIS installer + no code signing | App is blocked by SmartScreen on user machines | Document SmartScreen bypass in README for personal distribution; use Azure Trusted Signing for wider distribution |
+| electron-builder appId placeholder | `com.electron.app` persists as userData path | Set permanent reverse-domain appId before first public build; never change it after release |
+| Drizzle migration path in packaged app | `__dirname`-based path resolves inside ASAR, not `extraResources` | Use `app.isPackaged ? join(process.resourcesPath, 'drizzle') : join(__dirname, '../../drizzle')` |
+| Vitest + electron module | Handler tests crash with "Cannot find module 'electron'" | Create comprehensive `__mocks__/electron.ts` covering `ipcMain`, `safeStorage`, `app`, `BrowserWindow`, `dialog` |
+| IPC handler test isolation | Multiple test files register same channels, get "duplicate handler" error | Mock `ipcMain.handle` to track registered channels; clean up in `afterAll()` |
+| Vercel AI SDK testing | Mocking `generateObject` with `vi.fn()` validates nothing | Use `MockLanguageModelV3` from `ai/test` as the language model instance in all AI tests |
+| DOCX unit testing | Treating DOCX export as untestable because PDF export uses BrowserWindow | DOCX export only needs `docx` library (no browser); test by building `BuilderData` + calling builder + asserting buffer |
+| NSIS `deleteAppDataOnUninstall` | Accidentally set to `true` from a tutorial or template | Explicitly set `deleteAppDataOnUninstall: false`; add uninstall dialog explaining data location |
+
 ---
 
 ## Performance Traps
+
+Patterns that work at small scale but fail as usage grows.
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
@@ -1160,9 +1460,14 @@ Three-layer data model phase -- schema additions step. Add a startup table-exist
 | Fetching all analysis overrides for every preview re-render | Visible lag when variant builder toggles bullets | Load overrides once on analysis context mount; reuse in memo | Noticeable with 20+ override rows active |
 | Re-running skills category migration on every app start | Startup delay grows with number of skills | Gate migration with a version flag or check if categories table is already populated | Adds 50-200ms from 500+ skills |
 
+| Running all vitest tests sequentially on every file save | Test feedback loop exceeds 30 seconds | Configure vitest `pool: 'threads'` with appropriate concurrency; use in-memory SQLite per test file so tests can parallelize safely | Noticeable from first test run with 20+ test files |
+| AI tests that call real LLM APIs | Flaky test results; high API cost; slow CI | Mock all LLM calls in unit tests using `MockLanguageModelV3`; real API calls only in manual integration smoke tests | Every test run if unmocked |
+
 ---
 
 ## Security Mistakes
+
+Domain-specific security issues beyond general web security.
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
@@ -1179,6 +1484,8 @@ Three-layer data model phase -- schema additions step. Add a startup table-exist
 ---
 
 ## UX Pitfalls
+
+Common user experience mistakes in this domain.
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
@@ -1207,9 +1514,14 @@ Three-layer data model phase -- schema additions step. Add a startup table-exist
 | Analysis override accepted but base variant not saved | User accepts rewrites in optimize view but navigates away; override applied to analysis but variant not ready for submission | Show "variants affected" summary before leaving optimize view; surface a "ready to submit" CTA |
 | Company/role fields pre-filled with no indication they came from LLM | User submits wrong company name without noticing | Show "extracted" label on auto-filled fields; allow one-click reset to manually entered value |
 
+| SmartScreen warning with no explanation in the app | User sees "Windows protected your PC" and abandons install | README with screenshot + "This is expected for unsigned apps — click 'Run anyway'" |
+| Installer deletes user data on uninstall without warning | User loses all resume data and work history | Confirm `deleteAppDataOnUninstall: false`; add informational text to uninstall screen about data location |
+
 ---
 
 ## "Looks Done But Isn't" Checklist
+
+Things that appear complete but are missing critical pieces.
 
 - [ ] **Submission tracking:** Submission record stores a snapshot of resume content at send time — not just a foreign key to the live template. Verify by editing the template after submission and confirming the submission still shows the original content.
 - [ ] **Template variant rendering:** Variant renders experience items from the experience table (JOIN), not from text columns stored on the variant itself. Verify by editing an experience item and confirming both variants that include it reflect the change.
@@ -1258,9 +1570,23 @@ Three-layer data model phase -- schema additions step. Add a startup table-exist
 - [ ] **New tables startup gate:** Delete the `analysis_overrides` table from the DB manually. Restart the app. Confirm either (a) the app recreates it on startup, or (b) the app logs a fatal error and does not silently proceed.
 - [ ] **Schema migration ordering:** Run `ensureSchema()` on a v2.1 database. Confirm `analysis_overrides`, `skill_categories`, and `skill_category_assignments` all exist after startup. Confirm each has the expected columns.
 
+- [ ] **NSIS installer -- appId:** Build the installer and install it. Run `app.getPath('userData')` in dev tools. Confirm the path contains the product name (e.g., `resumehelper`), not `com.electron.app`.
+- [ ] **NSIS installer -- Start Menu shortcut:** After install, confirm Start Menu contains the correct shortcut with the correct app icon. Launch from Start Menu and confirm app starts.
+- [ ] **NSIS installer -- uninstall data preservation:** Uninstall the app. Confirm the userData directory still exists. Confirm the SQLite database file is still present.
+- [ ] **NSIS installer -- upgrade install:** Install v2.3, create data, then run the v2.4 installer. Confirm existing data survives the upgrade install.
+- [ ] **Drizzle migration path -- packaged:** Install the packaged binary on a clean machine with an existing v2.3 database. Confirm migrations run on first launch (check startup logs). Confirm all new tables exist.
+- [ ] **Data layer tests -- isolation:** Run the full vitest test suite with `vitest run`. Confirm no test fails due to database state leaking from another test. Confirm tests pass in any order.
+- [ ] **AI tests -- MockLanguageModelV3:** Confirm all AI tests use `MockLanguageModelV3` and no test makes a real API call. Run tests with network offline; all should pass.
+- [ ] **IPC handler tests -- no duplicate registration:** Run vitest with multiple test files that each register IPC handlers. Confirm no "duplicate handler" errors in test output.
+- [ ] **Export data layer tests:** Run `getBuilderDataForVariant()` unit tests with in-memory SQLite. Confirm all three layers (base, variant exclusions, analysis overrides) are applied correctly in isolation.
+- [ ] **DOCX unit tests:** Call the DOCX builder with a known `BuilderData` fixture. Confirm output buffer is non-empty. Confirm the output is valid DOCX (parseable as a ZIP containing `word/document.xml`).
+- [ ] **SmartScreen documentation:** README contains a section explaining the SmartScreen warning with a "Run anyway" screenshot for unsigned builds.
+
 ---
 
 ## Recovery Strategies
+
+When pitfalls occur despite prevention, how to recover.
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
@@ -1296,9 +1622,17 @@ Three-layer data model phase -- schema additions step. Add a startup table-exist
 | Company/role auto-saved without confirmation | LOW | Allow user to edit metadata fields on the job posting; one-field fix, no data model changes |
 | Snapshot freezes base text (overrides missing) | MEDIUM | For submissions already made with wrong snapshots: no retroactive fix possible (immutable by design); for future submissions, fix `buildSnapshotForVariant` to apply overrides |
 
+| appId changed after release (userData path changed) | HIGH | Write startup migration that detects old path and copies database + encrypted settings to new path; test on user machines before distributing; no automated recovery if user never launches new version |
+| `deleteAppDataOnUninstall: true` shipped and user data deleted | HIGH | No recovery possible if user did not have a backup; add export-to-JSON before this setting is ever used; inform affected users immediately |
+| Drizzle migration path wrong in packaged app (schema never migrated) | MEDIUM | Fix path using `process.resourcesPath`; distribute patch; users may need manual schema recovery script if new columns are expected |
+| AI tests using real API calls (flaky CI) | LOW | Replace real provider instances with `MockLanguageModelV3`; no production code change required |
+| IPC handler duplicate registration crashes test suite | LOW | Add `removeHandler` to `afterAll()`; use `vi.isolate` if needed; no production code change |
+
 ---
 
 ## Pitfall-to-Phase Mapping
+
+How roadmap phases should address these pitfalls.
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
@@ -1345,6 +1679,16 @@ Three-layer data model phase -- schema additions step. Add a startup table-exist
 | Toggle-entire-job surfaces stale overrides | Three-layer data model phase (merge-at-render) | Verify: toggling job off then on does not inject stale override text |
 | Company/role extraction overwrites user input | Analysis UX phase | Verify: extraction pre-fills fields only; DB write requires explicit save |
 | Migration ordering fails silently | Three-layer data model phase (schema) | Verify: startup assertion confirms all new tables exist after schema run |
+
+| SmartScreen warning with no documentation | Windows installer phase | Verify: README has SmartScreen bypass instructions; tested on a machine that has never seen the app |
+| appId placeholder left in electron-builder.yml | Windows installer phase (first step) | Verify: install packaged app; confirm `app.getPath('userData')` path uses product name not `com.electron.app` |
+| Drizzle migration path wrong in packaged build | Windows installer phase | Verify: install packaged app with existing database; confirm startup logs show successful migration run |
+| deleteAppDataOnUninstall risk | Windows installer phase | Verify: `electron-builder.yml` explicitly has `deleteAppDataOnUninstall: false`; uninstall test confirms userData preserved |
+| electron module mock missing for tests | Data layer test suite phase | Verify: all handler test files run without "Cannot find module 'electron'" errors; safeStorage calls work correctly |
+| Shared database instance across tests | Data layer test suite phase | Verify: running test suite twice in different orders produces identical results; no cross-test contamination |
+| printToPDF untestable without split | Export pipeline test suite phase | Verify: `getBuilderDataForVariant()` has unit tests with in-memory SQLite; DOCX builder has buffer output tests |
+| generateObject mocked with vi.fn() | AI integration test suite phase | Verify: all AI tests use `MockLanguageModelV3`; tests pass with network offline |
+| Duplicate IPC handler registration in tests | Data layer test suite phase | Verify: vitest run with all test files shows no "duplicate handler" errors; test order does not matter |
 
 ---
 
@@ -1409,6 +1753,31 @@ Three-layer data model phase -- schema additions step. Add a startup table-exist
 - [Electron native file drag-and-drop -- Official Docs](https://www.electronjs.org/docs/latest/tutorial/native-file-drag-drop)
 - Codebase audit: `src/main/db/index.ts`, `src/main/db/schema.ts`, `src/renderer/src/components/OptimizeVariant.tsx`, `src/main/handlers/submissions.ts`, `src/renderer/src/components/SkillList.tsx`
 
+- [electron-builder NSIS configuration — Official Docs](https://www.electron.build/nsis.html)
+- [electron-builder Common Configuration — Official Docs](https://www.electron.build/configuration.html)
+- [electron-builder Windows Code Signing — Official Docs](https://www.electron.build/code-signing-win.html)
+- [NSIS code signing and SmartScreen issue #1185 — electron-builder GitHub](https://github.com/electron-userland/electron-builder/issues/1185)
+- [NSIS default oneClick issue #9281 — electron-builder GitHub](https://github.com/electron-userland/electron-builder/issues/9281)
+- [NSIS app installation directory difference for oneClick vs attended — electron-builder issue #4070](https://github.com/electron-userland/electron-builder/issues/4070)
+- [How to Sign a Windows App in Electron Builder — Code Signing Store](https://codesigningstore.com/how-to-sign-a-windows-app-in-electron-builder)
+- [Azure Trusted Signing — electron-builder issue #8764 (SmartScreen without EV cert)](https://github.com/electron-userland/electron-builder/issues/8764)
+- [Electron app.getPath('userData') wrong path issues — GitHub issue #6628](https://github.com/electron/electron/issues/6628)
+- [Wrong user data folder name in dev mode — electron-react-boilerplate issue #2197](https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/2197)
+- [Drizzle ORM migrations in Electron discussion #1891 — drizzle-orm GitHub](https://github.com/drizzle-team/drizzle-orm/discussions/1891)
+- [better-sqlite3 + electron-builder issue #5317](https://github.com/electron-userland/electron-builder/issues/5317)
+- [npmRebuild not respected issue #7095 — electron-builder GitHub](https://github.com/electron-userland/electron-builder/issues/7095)
+- [asarUnpack whole dependency issue #7959 — electron-builder GitHub](https://github.com/electron-userland/electron-builder/issues/7959)
+- [Electron Testing — Official Docs](https://www.electronjs.org/docs/latest/development/testing)
+- [Electron Automated Testing — Official Docs](https://www.electronjs.org/docs/latest/tutorial/automated-testing)
+- [Vercel AI SDK Core Testing — Official Docs](https://ai-sdk.dev/docs/ai-sdk-core/testing)
+- [Can't mock electron API — vitest issue #425](https://github.com/vitest-dev/vitest/issues/425)
+- [Vitest/Electron mocking with doMock issue #4166](https://github.com/vitest-dev/vitest/issues/4166)
+- [How to create Mock object of ipcMain — vite-electron-builder discussion #726](https://github.com/cawa-93/vite-electron-builder/discussions/726)
+- [safeStorage.isEncryptionAvailable() returns false in Windows — Electron issue #33640](https://github.com/electron/electron/issues/33640)
+- [electron-mock-ipc — GitHub h3poteto/electron-mock-ipc](https://github.com/h3poteto/electron-mock-ipc)
+- [Writing an LLM Eval with Vercel's AI SDK and Vitest — Xata.io blog](https://xata.io/blog/llm-evals-with-vercel-ai-and-vitest)
+- Codebase audit: `src/main/handlers/ai.ts`, `src/main/handlers/export.ts`, `src/main/lib/aiProvider.ts`, `src/shared/overrides.ts`, `src/preload/index.ts`, `electron-builder.yml`
+
 ---
-*Pitfalls research for: Resume management desktop app (Electron + SQLite + AI matching + PDF/DOCX export + HTML/CSS templates)*
-*Researched: 2026-03-14 (v1.1 update: projects section, resume.json import/themes, tag autocomplete) / 2026-03-23 (v2.0 update: LLM integration, API key security, provider abstraction, match scoring, bullet rewrites, UI redesign) / 2026-03-25 (v2.1 update: HTML/CSS templates, printToPDF, DOCX ATS compliance) / 2026-03-26 (v2.2 update: three-layer data model, analysis-scoped overrides, skills category migration, drag-and-drop chip grid)*
+*Pitfalls research for: Resume management desktop app (Electron + SQLite + AI matching + PDF/DOCX export + HTML/CSS templates + Windows NSIS installer + test suites)*
+*Researched: 2026-03-14 (v1.1 update: projects section, resume.json import/themes, tag autocomplete) / 2026-03-23 (v2.0 update: LLM integration, API key security, provider abstraction, match scoring, bullet rewrites, UI redesign) / 2026-03-25 (v2.1 update: HTML/CSS templates, printToPDF, DOCX ATS compliance) / 2026-03-26 (v2.2 update: three-layer data model, analysis-scoped overrides, skills category migration, drag-and-drop chip grid) / 2026-04-03 (v2.4 update: Windows NSIS installer, test suites for data layer, export pipeline, AI integration)*
