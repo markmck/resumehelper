@@ -15,8 +15,8 @@ Requirements for v2.4 Polish & Reliability milestone. Each maps to roadmap phase
 
 ### Test Infrastructure
 
-- [ ] **TEST-01**: Vitest is configured with electron module mock and in-memory SQLite helper
-- [ ] **TEST-02**: Test runner scripts added to package.json
+- [x] **TEST-01**: Vitest is configured with electron module mock and in-memory SQLite helper
+- [x] **TEST-02**: Test runner scripts added to package.json
 
 ### Data Layer Tests
 
@@ -67,8 +67,8 @@ Requirements for v2.4 Polish & Reliability milestone. Each maps to roadmap phase
 | INST-01 | Phase 25 | Complete |
 | INST-02 | Phase 25 | Complete |
 | INST-03 | Phase 25 | Complete |
-| TEST-01 | Phase 26 | Pending |
-| TEST-02 | Phase 26 | Pending |
+| TEST-01 | Phase 26 | Complete |
+| TEST-02 | Phase 26 | Complete |
 | DATA-01 | Phase 27 | Pending |
 | DATA-02 | Phase 27 | Pending |
 | DATA-03 | Phase 27 | Pending |

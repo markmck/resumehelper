@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Polish & Reliability
-status: executing
-stopped_at: "Phase 25-01 at checkpoint:human-verify — installer built, awaiting verification"
-last_updated: "2026-04-03T23:05:32.066Z"
-last_activity: 2026-04-03 -- Phase 25 execution started
+status: verifying
+stopped_at: Completed 26-01-PLAN.md
+last_updated: "2026-04-04T16:57:32.377Z"
+last_activity: 2026-04-04
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-03)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 25 — windows-installer
+**Current focus:** Phase 26 — test-infrastructure
 
 ## Current Position
 
-Phase: 25 (windows-installer) — EXECUTING
+Phase: 26 (test-infrastructure) — EXECUTING
 Plan: 1 of 1
-Status: Executing Phase 25
-Last activity: 2026-04-03 -- Phase 25 execution started
+Status: Phase complete — ready for verification
+Last activity: 2026-04-04
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 26-test-infrastructure P01 | 15 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,9 @@ Recent decisions affecting current work:
 - (v2.3): generateObject for PDF/URL extraction — type-safe auto-retry on malformed JSON
 - (v2.3): isJobPosting guard in URL extraction — catches JS-rendered/auth-walled pages without site-specific logic
 - [Phase 25]: appId dev.resumehelper.app used in both electron-builder.yml and setAppUserModelId — NSIS wizard mode, no desktop shortcut, no publish section
+- [Phase 26-test-infrastructure]: vitest.config.ts standalone (not extending electron-vite) — electron-vite defineConfig produces main/preload/renderer shape incompatible with Vitest
+- [Phase 26-test-infrastructure]: electron alias under test.alias in vitest.config.ts (not resolve.alias) — Vitest module redirect, not Vite path alias
+- [Phase 26-test-infrastructure]: Drizzle relational queries with better-sqlite3 sync driver require .sync() call — db.query.*.findMany().sync()
 
 ### Pending Todos
 
@@ -78,6 +82,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-03T23:05:28.019Z
-Stopped at: Phase 25-01 at checkpoint:human-verify — installer built, awaiting verification
+Last session: 2026-04-04T16:57:32.375Z
+Stopped at: Completed 26-01-PLAN.md
 Resume file: None

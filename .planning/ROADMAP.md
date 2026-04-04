@@ -84,7 +84,9 @@ Plans:
   2. Running `npm run test:coverage` generates a coverage report without crashing
   3. The `electron` module resolves to a static mock in test context — no import errors for any file that imports from `electron`
   4. `createTestDb()` returns an in-memory Drizzle instance with the full schema applied, ready for use in any test file
-**Plans**: TBD
+**Plans:** 1/1 plans complete
+Plans:
+- [x] 26-01-PLAN.md — Install Vitest, create electron mock + createTestDb helper, smoke tests
 
 ### Phase 27: Data Layer Tests
 **Goal**: The three-layer merge logic and core IPC handler business logic have verified test coverage against real in-memory SQLite behavior
@@ -125,8 +127,8 @@ Plans:
 | 13-16 | v2.1 | 12/12 | Complete | 2026-03-26 |
 | 17-21 | v2.2 | 13/13 | Complete | 2026-04-01 |
 | 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
-| 25. Windows Installer | v2.4 | 1/1 | Complete   | 2026-04-03 |
-| 26. Test Infrastructure | v2.4 | 0/? | Not started | - |
+| 25. Windows Installer | v2.4 | 1/1 | Complete    | 2026-04-03 |
+| 26. Test Infrastructure | v2.4 | 1/1 | Complete   | 2026-04-04 |
 | 27. Data Layer Tests | v2.4 | 0/? | Not started | - |
 | 28. AI Integration Tests | v2.4 | 0/? | Not started | - |
 | 29. Export Pipeline Tests | v2.4 | 0/? | Not started | - |
