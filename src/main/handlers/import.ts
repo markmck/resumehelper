@@ -3,6 +3,9 @@ import { promises as fs } from 'fs'
 import { sqlite } from '../db'
 import { PDFParse } from 'pdf-parse'
 import { callResumeExtractor } from '../lib/aiProvider'
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
+import type * as schema from '../db/schema'
+export type Db = BetterSQLite3Database<typeof schema>
 
 interface ResumeJson {
   basics?: {
