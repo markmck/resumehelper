@@ -4,8 +4,12 @@ import { submissions, submissionEvents, templateVariants, templateVariantItems, 
 import { eq, desc, asc, and } from 'drizzle-orm'
 import type { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
 import { applyOverrides } from '../../shared/overrides'
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
+import type * as schema from '../db/schema'
 
-interface SubmissionSnapshot {
+type Db = BetterSQLite3Database<typeof schema>
+
+export interface SubmissionSnapshot {
   layoutTemplate: string
   templateOptions?: { accentColor?: string; skillsDisplay?: string; marginTop?: number; marginBottom?: number; marginSides?: number; showSummary?: boolean }
   profile?: { name: string; email: string; phone: string; location: string; linkedin: string; summary?: string }
@@ -21,7 +25,7 @@ interface SubmissionSnapshot {
   references: BuilderReference[]
 }
 
-async function buildSnapshotForVariant(variantId: number, analysisId?: number): Promise<SubmissionSnapshot> {
+export async function buildSnapshotForVariant(db: Db, variantId: number, analysisId?: number): Promise<SubmissionSnapshot> {
   const [variant] = await db
     .select({ layoutTemplate: templateVariants.layoutTemplate, templateOptions: templateVariants.templateOptions })
     .from(templateVariants)
@@ -273,299 +277,301 @@ async function buildSnapshotForVariant(variantId: number, analysisId?: number): 
   }
 }
 
+export async function listSubmissions(db: Db) {
+  const rows = await db
+    .select({
+      id: submissions.id,
+      company: submissions.company,
+      role: submissions.role,
+      submittedAt: submissions.submittedAt,
+      variantId: submissions.variantId,
+      resumeSnapshot: submissions.resumeSnapshot,
+      url: submissions.url,
+      notes: submissions.notes,
+      status: submissions.status,
+      scoreAtSubmit: submissions.scoreAtSubmit,
+      analysisId: submissions.analysisId,
+      variantName: templateVariants.name,
+    })
+    .from(submissions)
+    .leftJoin(templateVariants, eq(submissions.variantId, templateVariants.id))
+    .orderBy(desc(submissions.submittedAt))
+
+  return rows.map((row) => ({
+    id: row.id,
+    company: row.company,
+    role: row.role,
+    submittedAt: row.submittedAt,
+    variantId: row.variantId,
+    resumeSnapshot: row.resumeSnapshot,
+    url: row.url,
+    notes: row.notes,
+    status: row.status ?? 'applied',
+    scoreAtSubmit: row.scoreAtSubmit ?? null,
+    analysisId: row.analysisId ?? null,
+    variantName: row.variantName ?? null,
+  }))
+}
+
+export async function createSubmission(
+  db: Db,
+  data: {
+    company: string
+    role: string
+    submittedAt?: Date
+    variantId: number | null
+    url?: string
+    notes?: string
+    status?: string
+    scoreAtSubmit?: number | null
+    analysisId?: number | null
+  },
+) {
+  let snapshot: SubmissionSnapshot = { layoutTemplate: 'traditional', jobs: [], skills: [], projects: [], education: [], volunteer: [], awards: [], publications: [], languages: [], interests: [], references: [] }
+  if (data.variantId != null) {
+    snapshot = await buildSnapshotForVariant(db, data.variantId, data.analysisId ?? undefined)
+  }
+
+  const rows = await db
+    .insert(submissions)
+    .values({
+      company: data.company,
+      role: data.role,
+      submittedAt: data.submittedAt ?? new Date(),
+      variantId: data.variantId,
+      resumeSnapshot: JSON.stringify(snapshot),
+      url: data.url ?? null,
+      notes: data.notes ?? null,
+      status: data.status ?? 'applied',
+      scoreAtSubmit: data.scoreAtSubmit ?? null,
+      analysisId: data.analysisId ?? null,
+    })
+    .returning()
+
+  const newRow = rows[0]
+
+  // Also create an initial submission event
+  await db
+    .insert(submissionEvents)
+    .values({
+      submissionId: newRow.id,
+      status: data.status ?? 'applied',
+      note: 'Submission created',
+    })
+
+  // Return with variantName via LEFT JOIN
+  const [fullRow] = await db
+    .select({
+      id: submissions.id,
+      company: submissions.company,
+      role: submissions.role,
+      submittedAt: submissions.submittedAt,
+      variantId: submissions.variantId,
+      resumeSnapshot: submissions.resumeSnapshot,
+      url: submissions.url,
+      notes: submissions.notes,
+      status: submissions.status,
+      scoreAtSubmit: submissions.scoreAtSubmit,
+      analysisId: submissions.analysisId,
+      variantName: templateVariants.name,
+    })
+    .from(submissions)
+    .leftJoin(templateVariants, eq(submissions.variantId, templateVariants.id))
+    .where(eq(submissions.id, newRow.id))
+
+  return {
+    ...fullRow,
+    status: fullRow.status ?? 'applied',
+    scoreAtSubmit: fullRow.scoreAtSubmit ?? null,
+    analysisId: fullRow.analysisId ?? null,
+    variantName: fullRow.variantName ?? null,
+  }
+}
+
+export async function updateSubmission(
+  db: Db,
+  id: number,
+  data: {
+    company?: string
+    role?: string
+    submittedAt?: Date
+    url?: string | null
+    notes?: string | null
+  },
+) {
+  const rows = await db
+    .update(submissions)
+    .set({
+      ...(data.company !== undefined && { company: data.company }),
+      ...(data.role !== undefined && { role: data.role }),
+      ...(data.submittedAt !== undefined && { submittedAt: data.submittedAt }),
+      ...(data.url !== undefined && { url: data.url }),
+      ...(data.notes !== undefined && { notes: data.notes }),
+    })
+    .where(eq(submissions.id, id))
+    .returning()
+
+  return rows[0]
+}
+
+export async function deleteSubmission(db: Db, id: number) {
+  await db.delete(submissions).where(eq(submissions.id, id))
+}
+
+export async function findByAnalysis(db: Db, analysisId: number) {
+  const row = await db
+    .select({
+      id: submissions.id,
+      submittedAt: submissions.submittedAt,
+    })
+    .from(submissions)
+    .where(eq(submissions.analysisId, analysisId))
+    .limit(1)
+
+  return row[0] ?? null
+}
+
+export async function updateStatus(db: Db, id: number, status: string, note?: string) {
+  await db
+    .update(submissions)
+    .set({ status })
+    .where(eq(submissions.id, id))
+
+  await db
+    .insert(submissionEvents)
+    .values({
+      submissionId: id,
+      status,
+      note: note ?? null,
+    })
+}
+
+export async function getEvents(db: Db, submissionId: number) {
+  const rows = await db
+    .select()
+    .from(submissionEvents)
+    .where(eq(submissionEvents.submissionId, submissionId))
+    .orderBy(desc(submissionEvents.createdAt), desc(submissionEvents.id))
+
+  return rows
+}
+
+export async function addEvent(db: Db, data: { submissionId: number; status: string; note?: string }) {
+  const rows = await db
+    .insert(submissionEvents)
+    .values({
+      submissionId: data.submissionId,
+      status: data.status,
+      note: data.note ?? null,
+    })
+    .returning()
+
+  return rows[0]
+}
+
+export async function getSubmissionMetrics(db: Db) {
+  const all = await db
+    .select({
+      id: submissions.id,
+      submittedAt: submissions.submittedAt,
+      status: submissions.status,
+      scoreAtSubmit: submissions.scoreAtSubmit,
+    })
+    .from(submissions)
+
+  const total = all.length
+  if (total === 0) {
+    return {
+      total: 0,
+      thisMonth: 0,
+      active: 0,
+      responseRate: 0,
+      respondedCount: 0,
+      avgScore: null,
+      respondedAvgScore: null,
+    }
+  }
+
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  const thisMonth = all.filter(
+    (s) => s.submittedAt != null && s.submittedAt >= startOfMonth,
+  ).length
+
+  const active = all.filter(
+    (s) => s.status === 'screening' || s.status === 'interview',
+  ).length
+
+  const responded = all.filter(
+    (s) => s.status != null && s.status !== 'applied',
+  )
+
+  const responseRate = Math.round((responded.length / total) * 100)
+  const respondedCount = responded.length
+
+  const scoredAll = all.filter((s) => s.scoreAtSubmit != null)
+  const avgScore =
+    scoredAll.length > 0
+      ? scoredAll.reduce((sum, s) => sum + (s.scoreAtSubmit ?? 0), 0) / scoredAll.length
+      : null
+
+  const scoredResponded = responded.filter((s) => s.scoreAtSubmit != null)
+  const respondedAvgScore =
+    scoredResponded.length > 0
+      ? scoredResponded.reduce((sum, s) => sum + (s.scoreAtSubmit ?? 0), 0) / scoredResponded.length
+      : null
+
+  return {
+    total,
+    thisMonth,
+    active,
+    responseRate,
+    respondedCount,
+    avgScore,
+    respondedAvgScore,
+  }
+}
+
+export async function getAnalysisById(db: Db, analysisId: number) {
+  const rows = await db
+    .select({
+      id: analysisResults.id,
+      company: jobPostings.company,
+      role: jobPostings.role,
+      score: analysisResults.matchScore,
+      variantId: analysisResults.variantId,
+      variantName: templateVariants.name,
+      createdAt: analysisResults.createdAt,
+    })
+    .from(analysisResults)
+    .innerJoin(jobPostings, eq(analysisResults.jobPostingId, jobPostings.id))
+    .leftJoin(templateVariants, eq(analysisResults.variantId, templateVariants.id))
+    .where(eq(analysisResults.id, analysisId))
+
+  if (rows.length === 0) return null
+
+  const row = rows[0]
+  return {
+    id: row.id,
+    company: row.company,
+    role: row.role,
+    score: row.score,
+    variantId: row.variantId ?? 0,
+    variantName: row.variantName ?? '',
+    createdAt: row.createdAt ? row.createdAt.toISOString() : new Date().toISOString(),
+  }
+}
+
 export function registerSubmissionHandlers(): void {
-  ipcMain.handle('submissions:list', async () => {
-    const rows = await db
-      .select({
-        id: submissions.id,
-        company: submissions.company,
-        role: submissions.role,
-        submittedAt: submissions.submittedAt,
-        variantId: submissions.variantId,
-        resumeSnapshot: submissions.resumeSnapshot,
-        url: submissions.url,
-        notes: submissions.notes,
-        status: submissions.status,
-        scoreAtSubmit: submissions.scoreAtSubmit,
-        analysisId: submissions.analysisId,
-        variantName: templateVariants.name,
-      })
-      .from(submissions)
-      .leftJoin(templateVariants, eq(submissions.variantId, templateVariants.id))
-      .orderBy(desc(submissions.submittedAt))
-
-    return rows.map((row) => ({
-      id: row.id,
-      company: row.company,
-      role: row.role,
-      submittedAt: row.submittedAt,
-      variantId: row.variantId,
-      resumeSnapshot: row.resumeSnapshot,
-      url: row.url,
-      notes: row.notes,
-      status: row.status ?? 'applied',
-      scoreAtSubmit: row.scoreAtSubmit ?? null,
-      analysisId: row.analysisId ?? null,
-      variantName: row.variantName ?? null,
-    }))
-  })
-
-  ipcMain.handle(
-    'submissions:create',
-    async (
-      _,
-      data: {
-        company: string
-        role: string
-        submittedAt?: Date
-        variantId: number | null
-        url?: string
-        notes?: string
-        status?: string
-        scoreAtSubmit?: number | null
-        analysisId?: number | null
-      },
-    ) => {
-      let snapshot: SubmissionSnapshot = { layoutTemplate: 'traditional', jobs: [], skills: [], projects: [], education: [], volunteer: [], awards: [], publications: [], languages: [], interests: [], references: [] }
-      if (data.variantId != null) {
-        snapshot = await buildSnapshotForVariant(data.variantId, data.analysisId ?? undefined)
-      }
-
-      const rows = await db
-        .insert(submissions)
-        .values({
-          company: data.company,
-          role: data.role,
-          submittedAt: data.submittedAt ?? new Date(),
-          variantId: data.variantId,
-          resumeSnapshot: JSON.stringify(snapshot),
-          url: data.url ?? null,
-          notes: data.notes ?? null,
-          status: data.status ?? 'applied',
-          scoreAtSubmit: data.scoreAtSubmit ?? null,
-          analysisId: data.analysisId ?? null,
-        })
-        .returning()
-
-      const newRow = rows[0]
-
-      // Also create an initial submission event
-      await db
-        .insert(submissionEvents)
-        .values({
-          submissionId: newRow.id,
-          status: data.status ?? 'applied',
-          note: 'Submission created',
-        })
-
-      // Return with variantName via LEFT JOIN
-      const [fullRow] = await db
-        .select({
-          id: submissions.id,
-          company: submissions.company,
-          role: submissions.role,
-          submittedAt: submissions.submittedAt,
-          variantId: submissions.variantId,
-          resumeSnapshot: submissions.resumeSnapshot,
-          url: submissions.url,
-          notes: submissions.notes,
-          status: submissions.status,
-          scoreAtSubmit: submissions.scoreAtSubmit,
-          analysisId: submissions.analysisId,
-          variantName: templateVariants.name,
-        })
-        .from(submissions)
-        .leftJoin(templateVariants, eq(submissions.variantId, templateVariants.id))
-        .where(eq(submissions.id, newRow.id))
-
-      return {
-        ...fullRow,
-        status: fullRow.status ?? 'applied',
-        scoreAtSubmit: fullRow.scoreAtSubmit ?? null,
-        analysisId: fullRow.analysisId ?? null,
-        variantName: fullRow.variantName ?? null,
-      }
-    },
-  )
-
-  ipcMain.handle(
-    'submissions:update',
-    async (
-      _,
-      id: number,
-      data: {
-        company?: string
-        role?: string
-        submittedAt?: Date
-        url?: string | null
-        notes?: string | null
-      },
-    ) => {
-      const rows = await db
-        .update(submissions)
-        .set({
-          ...(data.company !== undefined && { company: data.company }),
-          ...(data.role !== undefined && { role: data.role }),
-          ...(data.submittedAt !== undefined && { submittedAt: data.submittedAt }),
-          ...(data.url !== undefined && { url: data.url }),
-          ...(data.notes !== undefined && { notes: data.notes }),
-        })
-        .where(eq(submissions.id, id))
-        .returning()
-
-      return rows[0]
-    },
-  )
-
-  ipcMain.handle('submissions:delete', async (_, id: number) => {
-    await db.delete(submissions).where(eq(submissions.id, id))
-  })
-
-  ipcMain.handle('submissions:findByAnalysis', async (_, analysisId: number) => {
-    const row = await db
-      .select({
-        id: submissions.id,
-        submittedAt: submissions.submittedAt,
-      })
-      .from(submissions)
-      .where(eq(submissions.analysisId, analysisId))
-      .limit(1)
-
-    return row[0] ?? null
-  })
-
-  ipcMain.handle('submissions:updateStatus', async (_, id: number, status: string, note?: string) => {
-    await db
-      .update(submissions)
-      .set({ status })
-      .where(eq(submissions.id, id))
-
-    await db
-      .insert(submissionEvents)
-      .values({
-        submissionId: id,
-        status,
-        note: note ?? null,
-      })
-  })
-
-  ipcMain.handle('submissions:getEvents', async (_, submissionId: number) => {
-    const rows = await db
-      .select()
-      .from(submissionEvents)
-      .where(eq(submissionEvents.submissionId, submissionId))
-      .orderBy(desc(submissionEvents.createdAt))
-
-    return rows
-  })
-
-  ipcMain.handle(
-    'submissions:addEvent',
-    async (_, data: { submissionId: number; status: string; note?: string }) => {
-      const rows = await db
-        .insert(submissionEvents)
-        .values({
-          submissionId: data.submissionId,
-          status: data.status,
-          note: data.note ?? null,
-        })
-        .returning()
-
-      return rows[0]
-    },
-  )
-
-  ipcMain.handle('submissions:metrics', async () => {
-    const all = await db
-      .select({
-        id: submissions.id,
-        submittedAt: submissions.submittedAt,
-        status: submissions.status,
-        scoreAtSubmit: submissions.scoreAtSubmit,
-      })
-      .from(submissions)
-
-    const total = all.length
-    if (total === 0) {
-      return {
-        total: 0,
-        thisMonth: 0,
-        active: 0,
-        responseRate: 0,
-        respondedCount: 0,
-        avgScore: null,
-        respondedAvgScore: null,
-      }
-    }
-
-    const now = new Date()
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
-    const thisMonth = all.filter(
-      (s) => s.submittedAt != null && s.submittedAt >= startOfMonth,
-    ).length
-
-    const active = all.filter(
-      (s) => s.status === 'screening' || s.status === 'interview',
-    ).length
-
-    const responded = all.filter(
-      (s) => s.status != null && s.status !== 'applied',
-    )
-
-    const responseRate = Math.round((responded.length / total) * 100)
-    const respondedCount = responded.length
-
-    const scoredAll = all.filter((s) => s.scoreAtSubmit != null)
-    const avgScore =
-      scoredAll.length > 0
-        ? scoredAll.reduce((sum, s) => sum + (s.scoreAtSubmit ?? 0), 0) / scoredAll.length
-        : null
-
-    const scoredResponded = responded.filter((s) => s.scoreAtSubmit != null)
-    const respondedAvgScore =
-      scoredResponded.length > 0
-        ? scoredResponded.reduce((sum, s) => sum + (s.scoreAtSubmit ?? 0), 0) / scoredResponded.length
-        : null
-
-    return {
-      total,
-      thisMonth,
-      active,
-      responseRate,
-      respondedCount,
-      avgScore,
-      respondedAvgScore,
-    }
-  })
-
-  ipcMain.handle('submissions:getAnalysisById', async (_, analysisId: number) => {
-    const rows = await db
-      .select({
-        id: analysisResults.id,
-        company: jobPostings.company,
-        role: jobPostings.role,
-        score: analysisResults.matchScore,
-        variantId: analysisResults.variantId,
-        variantName: templateVariants.name,
-        createdAt: analysisResults.createdAt,
-      })
-      .from(analysisResults)
-      .innerJoin(jobPostings, eq(analysisResults.jobPostingId, jobPostings.id))
-      .leftJoin(templateVariants, eq(analysisResults.variantId, templateVariants.id))
-      .where(eq(analysisResults.id, analysisId))
-
-    if (rows.length === 0) return null
-
-    const row = rows[0]
-    return {
-      id: row.id,
-      company: row.company,
-      role: row.role,
-      score: row.score,
-      variantId: row.variantId ?? 0,
-      variantName: row.variantName ?? '',
-      createdAt: row.createdAt ? row.createdAt.toISOString() : new Date().toISOString(),
-    }
-  })
+  ipcMain.handle('submissions:list', () => listSubmissions(db))
+  ipcMain.handle('submissions:create', (_, data) => createSubmission(db, data))
+  ipcMain.handle('submissions:update', (_, id, data) => updateSubmission(db, id, data))
+  ipcMain.handle('submissions:delete', (_, id) => deleteSubmission(db, id))
+  ipcMain.handle('submissions:findByAnalysis', (_, analysisId) => findByAnalysis(db, analysisId))
+  ipcMain.handle('submissions:updateStatus', (_, id, status, note) => updateStatus(db, id, status, note))
+  ipcMain.handle('submissions:getEvents', (_, submissionId) => getEvents(db, submissionId))
+  ipcMain.handle('submissions:addEvent', (_, data) => addEvent(db, data))
+  ipcMain.handle('submissions:metrics', () => getSubmissionMetrics(db))
+  ipcMain.handle('submissions:getAnalysisById', (_, analysisId) => getAnalysisById(db, analysisId))
 }
