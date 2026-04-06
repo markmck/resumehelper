@@ -36,6 +36,9 @@ import { profile, jobs, jobBullets, skills, skillCategories, projects, projectBu
 import { eq, asc, desc } from 'drizzle-orm'
 import { applyOverrides } from '../../shared/overrides'
 import { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
+import type * as schema from '../db/schema'
+type Db = BetterSQLite3Database<typeof schema>
 
 interface BuilderData {
   jobs: BuilderJob[]
@@ -50,7 +53,7 @@ interface BuilderData {
   references: BuilderReference[]
 }
 
-export async function getBuilderDataForVariant(variantId: number, analysisId?: number): Promise<BuilderData> {
+export async function getBuilderDataForVariant(db: Db, variantId: number, analysisId?: number): Promise<BuilderData> {
   const allJobs = await db.select().from(jobs).orderBy(desc(jobs.startDate))
   const allBullets = await db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder))
   const allSkills = await db.select({
@@ -349,7 +352,7 @@ export function registerExportHandlers(): void {
 
     // 3. Fetch data directly from DB
     const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
-    const builderData = await getBuilderDataForVariant(variantId, analysisId)
+    const builderData = await getBuilderDataForVariant(db, variantId, analysisId)
 
     const includedJobs = builderData.jobs.filter((j) => !j.excluded)
     const includedSkills = builderData.skills.filter((s) => !s.excluded)
