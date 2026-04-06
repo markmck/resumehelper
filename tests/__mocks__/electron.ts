@@ -1,7 +1,8 @@
 import { vi } from 'vitest'
+import os from 'os'
 
 export const app = {
-  getPath: vi.fn().mockReturnValue('/tmp/test'),
+  getPath: vi.fn().mockReturnValue(os.tmpdir()),
   isPackaged: false,
   quit: vi.fn(),
   on: vi.fn(),
