@@ -55,7 +55,7 @@ Phases 22-24 covered: ATS score threshold with slider/target arc/color bands, PD
 
 </details>
 
-### 🚧 v2.4 Polish & Reliability (In Progress)
+### v2.4 Polish & Reliability (In Progress)
 
 **Milestone Goal:** Make the app installable via a proper Windows NSIS installer and establish test coverage across the core data layer, AI integration, and export pipeline.
 
@@ -96,7 +96,11 @@ Plans:
   1. `applyOverrides()` tests pass for base-only, variant-only, and full three-layer merge scenarios
   2. IPC handler tests for experience, variants, and submissions pass against an in-memory SQLite DB with seeded data
   3. Handler business logic that required extraction (e.g., from `handlers/templates.ts`, `handlers/ai.ts`) is exported as named pure functions and covered by unit tests
-**Plans**: TBD
+**Plans:** 3/3 plans complete
+Plans:
+- [ ] 27-01-PLAN.md — Factories, applyOverrides extension, extract+test jobs/bullets/profile
+- [ ] 27-02-PLAN.md — Batch extract 15 remaining handler files
+- [ ] 27-03-PLAN.md — Extract+test templates.ts and submissions.ts with three-layer integration
 
 ### Phase 28: AI Integration Tests
 **Goal**: Zod schemas for all AI flows validate correctly and score derivation produces verified weighted results, with AI provider calls mocked for deterministic testing
@@ -106,7 +110,12 @@ Plans:
   1. `JobParserSchema`, `ResumeScorerSchema`, and `ResumeJsonSchema` each have tests for valid parse and rejection of invalid input
   2. `deriveOverallScore()` tests cover correct weighted output, edge cases (0-100 clamping), and all weighted fields
   3. `callJobParser()` and related AI provider functions have tests that use a mock LLM provider and never call a real API
-**Plans**: TBD
+**Plans:** 1/4 plans executed
+Plans:
+- [x] 28-01-PLAN.md — Refactor aiProvider signatures + relocate JobUrlExtractionSchema + extract extractJsonFromText + extend electron safeStorage mock
+- [ ] 28-02-PLAN.md — Unit tests: all four Zod schemas, deriveOverallScore, extractJsonFromText
+- [ ] 28-03-PLAN.md — MockLanguageModelV3 tests for callJobParser, callResumeScorer, callResumeExtractor
+- [ ] 28-04-PLAN.md — runAnalysis integration tests: cache-miss and cache-hit paths
 
 ### Phase 29: Export Pipeline Tests
 **Goal**: DOCX generation, submission snapshot shape, and template component rendering each have verified test coverage
@@ -128,9 +137,9 @@ Plans:
 | 17-21 | v2.2 | 13/13 | Complete | 2026-04-01 |
 | 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
 | 25. Windows Installer | v2.4 | 1/1 | Complete    | 2026-04-03 |
-| 26. Test Infrastructure | v2.4 | 1/1 | Complete   | 2026-04-04 |
-| 27. Data Layer Tests | v2.4 | 0/? | Not started | - |
-| 28. AI Integration Tests | v2.4 | 0/? | Not started | - |
+| 26. Test Infrastructure | v2.4 | 1/1 | Complete    | 2026-04-04 |
+| 27. Data Layer Tests | v2.4 | 0/3 | Complete    | 2026-04-06 |
+| 28. AI Integration Tests | v2.4 | 1/4 | In Progress|  |
 | 29. Export Pipeline Tests | v2.4 | 0/? | Not started | - |
 
 ## Future (v3.0+)
