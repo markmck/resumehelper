@@ -110,12 +110,12 @@ Plans:
   1. `JobParserSchema`, `ResumeScorerSchema`, and `ResumeJsonSchema` each have tests for valid parse and rejection of invalid input
   2. `deriveOverallScore()` tests cover correct weighted output, edge cases (0-100 clamping), and all weighted fields
   3. `callJobParser()` and related AI provider functions have tests that use a mock LLM provider and never call a real API
-**Plans:** 2/4 plans executed
+**Plans:** 4/4 plans complete
 Plans:
 - [x] 28-01-PLAN.md — Refactor aiProvider signatures + relocate JobUrlExtractionSchema + extract extractJsonFromText + extend electron safeStorage mock
 - [x] 28-02-PLAN.md — Unit tests: all four Zod schemas, deriveOverallScore, extractJsonFromText
-- [ ] 28-03-PLAN.md — MockLanguageModelV3 tests for callJobParser, callResumeScorer, callResumeExtractor
-- [ ] 28-04-PLAN.md — runAnalysis integration tests: cache-miss and cache-hit paths
+- [x] 28-03-PLAN.md — MockLanguageModelV3 tests for callJobParser, callResumeScorer, callResumeExtractor
+- [x] 28-04-PLAN.md — runAnalysis integration tests: cache-miss and cache-hit paths
 
 ### Phase 29: Export Pipeline Tests
 **Goal**: DOCX generation, submission snapshot shape, and template component rendering each have verified test coverage
@@ -139,7 +139,7 @@ Plans:
 | 25. Windows Installer | v2.4 | 1/1 | Complete    | 2026-04-03 |
 | 26. Test Infrastructure | v2.4 | 1/1 | Complete    | 2026-04-04 |
 | 27. Data Layer Tests | v2.4 | 0/3 | Complete    | 2026-04-06 |
-| 28. AI Integration Tests | v2.4 | 2/4 | In Progress|  |
+| 28. AI Integration Tests | v2.4 | 4/4 | Complete   | 2026-04-07 |
 | 29. Export Pipeline Tests | v2.4 | 0/? | Not started | - |
 
 ## Future (v3.0+)
