@@ -2,7 +2,7 @@ import { ipcMain, dialog, safeStorage } from 'electron'
 import { promises as fs } from 'fs'
 import { sqlite } from '../db'
 import { PDFParse } from 'pdf-parse'
-import { callResumeExtractor } from '../lib/aiProvider'
+import { callResumeExtractor, getModel } from '../lib/aiProvider'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type * as schema from '../db/schema'
 export type Db = BetterSQLite3Database<typeof schema>
@@ -321,9 +321,10 @@ export function registerImportHandlers(): void {
 
     // 5. AI extraction — decrypt API key, call generateText + JSON parse
     const apiKey = safeStorage.decryptString(Buffer.from(aiRow.apiKey, 'base64'))
+    const llmModel = getModel(aiRow.provider, aiRow.model, apiKey)
     let data: ResumeJson
     try {
-      data = await callResumeExtractor(pdfText, apiKey, aiRow.provider, aiRow.model) as ResumeJson
+      data = await callResumeExtractor(pdfText, llmModel) as ResumeJson
     } catch (err) {
       return { canceled: false, error: `AI extraction failed: ${err instanceof Error ? err.message : String(err)}` }
     }

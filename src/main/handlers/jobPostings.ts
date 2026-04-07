@@ -4,18 +4,11 @@ import { jobPostings, analysisResults, templateVariants, aiSettings } from '../d
 import { eq, desc } from 'drizzle-orm'
 import { generateObject } from 'ai'
 import { z } from 'zod'
-import { getModel } from '../lib/aiProvider'
+import { getModel, JobUrlExtractionSchema } from '../lib/aiProvider'
 import { buildJobPostingUrlPrompt } from '../lib/jobPostingUrlPrompt'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type * as schema from '../db/schema'
 type Db = BetterSQLite3Database<typeof schema>
-
-const JobUrlExtractionSchema = z.object({
-  isJobPosting: z.boolean(),
-  jobTitle: z.string(),
-  company: z.string(),
-  jobDescriptionText: z.string(),
-})
 
 function stripHtml(html: string): string {
   return html

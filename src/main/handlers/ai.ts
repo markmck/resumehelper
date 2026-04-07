@@ -2,7 +2,7 @@ import { ipcMain, safeStorage } from 'electron'
 import { eq, and } from 'drizzle-orm'
 import { db, sqlite } from '../db'
 import { aiSettings, jobPostings, analysisResults, profile, analysisBulletOverrides, analysisSkillAdditions } from '../db/schema'
-import { callJobParser, callResumeScorer, deriveOverallScore } from '../lib/aiProvider'
+import { callJobParser, callResumeScorer, deriveOverallScore, getModel } from '../lib/aiProvider'
 import { buildResumeTextForLlm } from '../lib/analysisPrompts'
 import { getBuilderDataForVariant } from './export'
 import { buildResumeJson } from '../lib/themeRegistry'
@@ -26,6 +26,7 @@ export async function runAnalysis(db: Db, event: Electron.IpcMainInvokeEvent, jo
     const apiKey = safeStorage.decryptString(Buffer.from(row.apiKey, 'base64'))
     const provider = row.provider
     const model = row.model
+    const llm = getModel(provider, model, apiKey)
 
     // 2. Load job posting by id
     const posting = db.select().from(jobPostings).where(eq(jobPostings.id, jobPostingId)).get()
@@ -53,7 +54,7 @@ export async function runAnalysis(db: Db, event: Electron.IpcMainInvokeEvent, jo
       // Call 1 — parse job posting
       event.sender.send('ai:progress', 'parsing', 10)
 
-      parsedJob = await callJobParser(posting.rawText, apiKey, provider, model)
+      parsedJob = await callJobParser(posting.rawText, llm)
 
       // Cache parsed result in the job posting row
       db.update(jobPostings)
@@ -87,7 +88,7 @@ export async function runAnalysis(db: Db, event: Electron.IpcMainInvokeEvent, jo
     // 5. Call 2 — score resume
     event.sender.send('ai:progress', 'scoring', 50)
 
-    const scoreResult = await callResumeScorer(resumeText, parsedJob, apiKey, provider, model)
+    const scoreResult = await callResumeScorer(resumeText, parsedJob, llm)
     const overallScore = deriveOverallScore(scoreResult)
 
     // 6. Store results in analysis_results table
