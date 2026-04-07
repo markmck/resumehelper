@@ -1,4 +1,5 @@
 import { generateObject, generateText } from 'ai'
+import type { LanguageModel } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { z } from 'zod'
@@ -110,6 +111,15 @@ export const ResumeJsonSchema = z.object({
   })),
 })
 
+export const JobUrlExtractionSchema = z.object({
+  isJobPosting: z.boolean(),
+  jobTitle: z.string(),
+  company: z.string(),
+  jobDescriptionText: z.string(),
+})
+
+export type JobUrlExtraction = z.infer<typeof JobUrlExtractionSchema>
+
 // ─── Exported Types ──────────────────────────────────────────────────────────
 
 export type ParsedJob = z.infer<typeof JobParserSchema>
@@ -143,68 +153,59 @@ export function getModel(
 
 export async function callJobParser(
   rawText: string,
-  apiKey: string,
-  provider: string,
-  model: string
+  model: LanguageModel,
 ): Promise<ParsedJob> {
   const { system, prompt } = buildJobParserPrompt(rawText)
-  const modelInstance = getModel(provider, model, apiKey)
-
   const result = await generateObject({
-    model: modelInstance as Parameters<typeof generateObject>[0]['model'],
+    model: model as Parameters<typeof generateObject>[0]['model'],
     schema: JobParserSchema,
     system,
     prompt,
     temperature: 0,
   })
-
   return result.object
 }
 
 export async function callResumeScorer(
   resumeText: string,
   parsedJob: ParsedJob,
-  apiKey: string,
-  provider: string,
-  model: string
+  model: LanguageModel,
 ): Promise<ResumeScore> {
   const { system, prompt } = buildScorerPrompt(resumeText, parsedJob)
-  const modelInstance = getModel(provider, model, apiKey)
-
   const result = await generateObject({
-    model: modelInstance as Parameters<typeof generateObject>[0]['model'],
+    model: model as Parameters<typeof generateObject>[0]['model'],
     schema: ResumeScorerSchema,
     system,
     prompt,
     temperature: 0,
   })
-
   return result.object
 }
 
 export async function callResumeExtractor(
   pdfText: string,
-  apiKey: string,
-  provider: string,
-  model: string
+  model: LanguageModel,
 ): Promise<ResumeJsonParsed> {
   const { system, prompt } = buildPdfResumeParserPrompt(pdfText)
-  const modelInstance = getModel(provider, model, apiKey)
-
   const result = await generateText({
-    model: modelInstance as Parameters<typeof generateText>[0]['model'],
+    model: model as Parameters<typeof generateText>[0]['model'],
     system,
     prompt,
     temperature: 0,
   })
+  const parsed = ResumeJsonSchema.parse(extractJsonFromText(result.text))
+  return parsed
+}
 
-  // Extract JSON from response (may be wrapped in ```json ... ```)
-  let jsonText = result.text.trim()
+/**
+ * Strips ```json ... ``` or ``` ... ``` markdown fences if present, then JSON.parses.
+ * Throws on invalid JSON — propagation is intentional.
+ */
+export function extractJsonFromText(text: string): unknown {
+  let jsonText = text.trim()
   const fenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/)
   if (fenceMatch) jsonText = fenceMatch[1].trim()
-
-  const parsed = ResumeJsonSchema.parse(JSON.parse(jsonText))
-  return parsed
+  return JSON.parse(jsonText)
 }
 
 // ─── Score Derivation ─────────────────────────────────────────────────────────
