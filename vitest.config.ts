@@ -13,6 +13,7 @@ export default defineConfig({
     environment: 'node',
     alias: {
       electron: resolve(import.meta.dirname, 'tests/__mocks__/electron.ts'),
+      '@electron-toolkit/utils': resolve(import.meta.dirname, 'tests/__mocks__/@electron-toolkit/utils.ts'),
     },
     include: ['tests/**/*.test.ts'],
     coverage: {
