@@ -36,9 +36,9 @@ export const dialog = {
 }
 
 export const safeStorage = {
-  isEncryptionAvailable: vi.fn().mockReturnValue(false),
-  encryptString: vi.fn().mockImplementation((s: string) => Buffer.from(s)),
-  decryptString: vi.fn().mockImplementation((b: Buffer) => b.toString()),
+  isEncryptionAvailable: vi.fn().mockReturnValue(true),
+  encryptString: vi.fn().mockImplementation((s: string) => Buffer.from(s, 'utf8')),
+  decryptString: vi.fn().mockImplementation((b: Buffer) => b.toString('utf8')),
 }
 
 export const net = {
