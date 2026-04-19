@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Polish & Reliability
 status: executing
-stopped_at: Completed 29-01-PLAN.md
-last_updated: "2026-04-19T22:53:11.653Z"
+stopped_at: Completed 29-02-PLAN.md
+last_updated: "2026-04-19T22:56:30.864Z"
 last_activity: 2026-04-19
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 ## Current Position
 
 Phase: 29 (export-pipeline-tests) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-19
 
@@ -58,6 +58,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 28-ai-integration-tests P04 | 2 | 2 tasks | 3 files |
 | Phase 28-ai-integration-tests P03 | 10min | 2 tasks | 1 files |
 | Phase 29-export-pipeline-tests P01 | 3 | 2 tasks | 4 files |
+| Phase 29-export-pipeline-tests P02 | 3 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,7 @@ Recent decisions affecting current work:
 - [Phase 28-ai-integration-tests]: @electron-toolkit/utils requires test alias in vitest.config — export.ts import chain triggers CJS require under ESM Vitest
 - [Phase 28-ai-integration-tests]: MockLanguageModelV3 confirmed v3 spec; warnings:[] required in doGenerate return; prompt captured via options.prompt message array
 - [Phase 29-export-pipeline-tests]: buildResumeDocx extracted as pure function in docxBuilder.ts — accepts BuilderData/profileRow/templateKey/templateOptions, returns Document, no side effects
+- [Phase 29-export-pipeline-tests]: Font assertions use w:ascii= attribute — docx library serializes fonts via w:rFonts not w:val
 
 ### Pending Todos
 
@@ -95,6 +97,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-19T22:53:11.650Z
-Stopped at: Completed 29-01-PLAN.md
+Last session: 2026-04-19T22:56:30.861Z
+Stopped at: Completed 29-02-PLAN.md
 Resume file: None
