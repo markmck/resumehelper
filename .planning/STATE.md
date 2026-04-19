@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Polish & Reliability
-status: verifying
-stopped_at: Completed 28-03-PLAN.md
-last_updated: "2026-04-07T15:13:28.222Z"
-last_activity: 2026-04-07
+status: executing
+stopped_at: Completed 29-01-PLAN.md
+last_updated: "2026-04-19T22:53:11.653Z"
+last_activity: 2026-04-19
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 12
+  completed_plans: 10
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-03)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 28 — ai-integration-tests
+**Current focus:** Phase 29 — export-pipeline-tests
 
 ## Current Position
 
-Phase: 29
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-07
+Phase: 29 (export-pipeline-tests) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-04-19
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 28-ai-integration-tests P02 | 1min | 3 tasks | 3 files |
 | Phase 28-ai-integration-tests P04 | 2 | 2 tasks | 3 files |
 | Phase 28-ai-integration-tests P03 | 10min | 2 tasks | 1 files |
+| Phase 29-export-pipeline-tests P01 | 3 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,7 @@ Recent decisions affecting current work:
 - [Phase 28-ai-integration-tests]: vi.spyOn(aiProvider, 'getModel') satisfies D-03 — spy on named export, not module replacement
 - [Phase 28-ai-integration-tests]: @electron-toolkit/utils requires test alias in vitest.config — export.ts import chain triggers CJS require under ESM Vitest
 - [Phase 28-ai-integration-tests]: MockLanguageModelV3 confirmed v3 spec; warnings:[] required in doGenerate return; prompt captured via options.prompt message array
+- [Phase 29-export-pipeline-tests]: buildResumeDocx extracted as pure function in docxBuilder.ts — accepts BuilderData/profileRow/templateKey/templateOptions, returns Document, no side effects
 
 ### Pending Todos
 
@@ -93,6 +95,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-07T15:10:27.547Z
-Stopped at: Completed 28-03-PLAN.md
+Last session: 2026-04-19T22:53:11.650Z
+Stopped at: Completed 29-01-PLAN.md
 Resume file: None
