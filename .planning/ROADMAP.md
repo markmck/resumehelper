@@ -125,7 +125,11 @@ Plans:
   1. DOCX generation tests assert correct paragraph structure, heading styles, and per-template font names for at least one template
   2. Submission snapshot tests confirm that profile, content, and templateOptions are all present and correctly shaped in a frozen snapshot
   3. Template component render tests (via jsdom) confirm expected HTML structure is produced for at least one template without crashing on minimal props
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 29-01-PLAN.md — Install deps (fflate, jsdom), update vitest config, extract buildResumeDocx pure function
+- [ ] 29-02-PLAN.md — DOCX builder tests: per-template fonts, margins, headings, content
+- [ ] 29-03-PLAN.md — Submission snapshot shape tests + template component render tests
 
 ## Progress
 
@@ -139,8 +143,8 @@ Plans:
 | 25. Windows Installer | v2.4 | 1/1 | Complete    | 2026-04-03 |
 | 26. Test Infrastructure | v2.4 | 1/1 | Complete    | 2026-04-04 |
 | 27. Data Layer Tests | v2.4 | 0/3 | Complete    | 2026-04-06 |
-| 28. AI Integration Tests | v2.4 | 4/4 | Complete   | 2026-04-07 |
-| 29. Export Pipeline Tests | v2.4 | 0/? | Not started | - |
+| 28. AI Integration Tests | v2.4 | 4/4 | Complete    | 2026-04-07 |
+| 29. Export Pipeline Tests | v2.4 | 0/3 | Not started | - |
 
 ## Future (v3.0+)
 
