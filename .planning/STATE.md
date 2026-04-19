@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Polish & Reliability
-status: executing
-stopped_at: Completed 29-02-PLAN.md
-last_updated: "2026-04-19T22:56:30.864Z"
+status: verifying
+stopped_at: Completed 29-03-PLAN.md
+last_updated: "2026-04-19T22:57:37.277Z"
 last_activity: 2026-04-19
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 Phase: 29 (export-pipeline-tests) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-19
 
 Progress: [░░░░░░░░░░] 0%
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 28-ai-integration-tests P03 | 10min | 2 tasks | 1 files |
 | Phase 29-export-pipeline-tests P01 | 3 | 2 tasks | 4 files |
 | Phase 29-export-pipeline-tests P02 | 3 | 1 tasks | 1 files |
+| Phase 29-export-pipeline-tests P03 | 5 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,7 @@ Recent decisions affecting current work:
 - [Phase 28-ai-integration-tests]: MockLanguageModelV3 confirmed v3 spec; warnings:[] required in doGenerate return; prompt captured via options.prompt message array
 - [Phase 29-export-pipeline-tests]: buildResumeDocx extracted as pure function in docxBuilder.ts — accepts BuilderData/profileRow/templateKey/templateOptions, returns Document, no side effects
 - [Phase 29-export-pipeline-tests]: Font assertions use w:ascii= attribute — docx library serializes fonts via w:rFonts not w:val
+- [Phase 29-export-pipeline-tests]: Snapshot exclusion marks items with excluded:true rather than filtering — filtering happens at render time via filterResumeData
 
 ### Pending Todos
 
@@ -97,6 +99,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-19T22:56:30.861Z
-Stopped at: Completed 29-02-PLAN.md
+Last session: 2026-04-19T22:57:37.275Z
+Stopped at: Completed 29-03-PLAN.md
 Resume file: None

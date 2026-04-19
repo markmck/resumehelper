@@ -27,8 +27,8 @@ Requirements for v2.4 Polish & Reliability milestone. Each maps to roadmap phase
 ### Export Pipeline Tests
 
 - [x] **EXPORT-01**: DOCX generation produces valid document structure with correct template fonts and heading styles
-- [ ] **EXPORT-02**: Submission snapshot shape is validated (profile + content + templateOptions frozen correctly)
-- [ ] **EXPORT-03**: Template components render expected HTML structure via jsdom
+- [x] **EXPORT-02**: Submission snapshot shape is validated (profile + content + templateOptions frozen correctly)
+- [x] **EXPORT-03**: Template components render expected HTML structure via jsdom
 
 ### AI Integration Tests
 
@@ -73,8 +73,8 @@ Requirements for v2.4 Polish & Reliability milestone. Each maps to roadmap phase
 | DATA-02 | Phase 27 | Pending |
 | DATA-03 | Phase 27 | Pending |
 | EXPORT-01 | Phase 29 | Complete |
-| EXPORT-02 | Phase 29 | Pending |
-| EXPORT-03 | Phase 29 | Pending |
+| EXPORT-02 | Phase 29 | Complete |
+| EXPORT-03 | Phase 29 | Complete |
 | AI-01 | Phase 28 | Complete |
 | AI-02 | Phase 28 | Complete |
 | AI-03 | Phase 28 | Complete |
