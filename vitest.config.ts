@@ -15,7 +15,7 @@ export default defineConfig({
       electron: resolve(import.meta.dirname, 'tests/__mocks__/electron.ts'),
       '@electron-toolkit/utils': resolve(import.meta.dirname, 'tests/__mocks__/@electron-toolkit/utils.ts'),
     },
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
