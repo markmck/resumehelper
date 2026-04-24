@@ -8,7 +8,8 @@
 - ✅ **v2.1 Resume Templates** - Phases 13-16 (shipped 2026-03-26)
 - ✅ **v2.2 Three Layer Data** - Phases 17-21 (shipped 2026-04-01)
 - ✅ **v2.3 Job Hunt Accelerator** - Phases 22-24 (shipped 2026-04-03)
-- 🚧 **v2.4 Polish & Reliability** - Phases 25-29 (in progress)
+- ✅ **v2.4 Polish & Reliability** - Phases 25-29 (shipped 2026-04-21)
+- 🚧 **v2.5 Portability & Debt Cleanup** - Phases 30-34 (in progress)
 
 ## Phases
 
@@ -55,81 +56,88 @@ Phases 22-24 covered: ATS score threshold with slider/target arc/color bands, PD
 
 </details>
 
-### v2.4 Polish & Reliability (In Progress)
+<details>
+<summary>✅ v2.4 Polish & Reliability (Phases 25-29) - SHIPPED 2026-04-21</summary>
 
-**Milestone Goal:** Make the app installable via a proper Windows NSIS installer and establish test coverage across the core data layer, AI integration, and export pipeline.
+Phases 25-29 covered: Windows NSIS installer with setup wizard, Vitest test infrastructure with electron mock and in-memory SQLite, data layer tests (57 tests — handler extraction, applyOverrides, three-layer merge), AI integration tests (44 tests — MockLanguageModelV3, Zod schemas, score derivation, runAnalysis), export pipeline tests (42 tests — DOCX XML assertions, snapshot shape, template rendering).
+
+5 phases, 12 plans, 14 requirements. Full details in `.planning/milestones/v2.4-ROADMAP.md`.
+
+</details>
+
+### v2.5 Portability & Debt Cleanup (Phases 30-34)
+
+- [ ] **Phase 30: Merge-Helper Reconciliation + DOCX showSummary Fix** - Unify three parallel merge paths and honor showSummary in DOCX export
+- [ ] **Phase 31: Base Resume.json Export** - Export full experience DB as valid resume.json from Experience tab
+- [ ] **Phase 32: Variant-Merged Resume.json Export** - Export a variant's fully-merged view as resume.json from VariantEditor
+- [ ] **Phase 33: Tech Debt Cleanup** - Remove orphan TEMPLATE_LIST export, vestigial compact prop, dead tests/setup.ts, and fix jobs.test.ts race
+- [ ] **Phase 34: Configurable SQLite DB Location** - User can relocate the SQLite DB via Settings with copy → verify → switch → restart migration
 
 ## Phase Details
 
-### Phase 25: Windows Installer
-**Goal**: Users can install ResumeHelper on Windows via a professional setup wizard with correct metadata and no broken auto-update plumbing
-**Depends on**: Phase 24
-**Requirements**: INST-01, INST-02, INST-03
+### Phase 30: Merge-Helper Reconciliation + DOCX showSummary Fix
+**Goal**: A single authoritative merge path feeds HTML, PDF, and DOCX — and the user's showSummary toggle is honored consistently across all three
+**Depends on**: Nothing (first phase of v2.5)
+**Requirements**: MERGE-01, MERGE-02, MERGE-03, DOCX-01
 **Success Criteria** (what must be TRUE):
-  1. Running the .exe launches a wizard where the user can choose install directory and confirm installation
-  2. After install, ResumeHelper appears in Start Menu and Add/Remove Programs with correct product name and version
-  3. Uninstalling via Add/Remove Programs fully removes the app without leftover artifacts
-  4. The app launches successfully after installer completes (runAfterFinish works)
-  5. `electron-builder.yml` contains no dead asarUnpack entries for removed jsonresume theme packages
-**Plans:** 1/1 plans complete
-Plans:
-- [x] 25-01-PLAN.md — Apply installer config/metadata corrections and build verified installer
+  1. User toggles `showSummary` off on a variant and the summary paragraph is omitted from DOCX export (matching PDF/HTML behavior)
+  2. HTML preview, PDF export, and DOCX export of the same variant produce identical bullet sets, skill additions, and summary/job inclusions
+  3. `buildMergedBuilderData(db, variantId, analysisId?)` is the single function called by PDF/DOCX/snapshot/preview paths — grep shows no remaining parallel merge implementations
+  4. A parameterized test suite exercises HTML + PDF + DOCX × summary on/off × all 5 templates and fails loudly if any surface drifts
+  5. `ResumeJson` interface lives at `src/shared/resumeJson.ts` and is imported by both import.ts and (eventually) the new export builders
+**Plans**: TBD
+**UI hint**: yes
 
-### Phase 26: Test Infrastructure
-**Goal**: The Vitest test runner is configured and operational with an Electron module mock and in-memory SQLite helper that all subsequent test phases can depend on
-**Depends on**: Phase 25
-**Requirements**: TEST-01, TEST-02
+### Phase 31: Base Resume.json Export
+**Goal**: User can export the full experience DB as a valid resume.json file that downstream JSON Resume validators accept
+**Depends on**: Phase 30 (ResumeJson interface lifted to shared)
+**Requirements**: JSON-01, JSON-02, JSON-03, JSON-04, JSON-05, JSON-06
 **Success Criteria** (what must be TRUE):
-  1. Running `npm test` exits with zero failures (no test files produce errors)
-  2. Running `npm run test:coverage` generates a coverage report without crashing
-  3. The `electron` module resolves to a static mock in test context — no import errors for any file that imports from `electron`
-  4. `createTestDb()` returns an in-memory Drizzle instance with the full schema applied, ready for use in any test file
-**Plans:** 1/1 plans complete
-Plans:
-- [x] 26-01-PLAN.md — Install Vitest, create electron mock + createTestDb helper, smoke tests
+  1. User clicks "Export JSON" in the Experience tab header, picks a location, and saves `${profileName}_Resume.json` containing their full experience DB
+  2. Exported file passes `ResumeJsonSchema.parse` (Zod) and is accepted by strict JSON Resume validators — null/empty optional fields are omitted, not emitted as `null` or `""`
+  3. When validation fails the user sees a user-actionable error (not a silent write of bad data, not a stack trace)
+  4. User re-opens the save dialog and it defaults to the last-used export directory; filename auto-populates using existing sanitization rules
+  5. ImportConfirmModal copy and `buildBaseResumeJson` source both clearly communicate the "lossy-faithful" semantics (append-only on re-import, documented field subset)
+**Plans**: TBD
+**UI hint**: yes
 
-### Phase 27: Data Layer Tests
-**Goal**: The three-layer merge logic and core IPC handler business logic have verified test coverage against real in-memory SQLite behavior
-**Depends on**: Phase 26
-**Requirements**: DATA-01, DATA-02, DATA-03
+### Phase 32: Variant-Merged Resume.json Export
+**Goal**: User can export any variant's fully-rendered, three-layer-merged view as resume.json matching its PDF/DOCX output
+**Depends on**: Phase 30 (unified merge helper), Phase 31 (validated ResumeJson shape and writer)
+**Requirements**: JSON-07, JSON-08, JSON-09, JSON-10, JSON-11
 **Success Criteria** (what must be TRUE):
-  1. `applyOverrides()` tests pass for base-only, variant-only, and full three-layer merge scenarios
-  2. IPC handler tests for experience, variants, and submissions pass against an in-memory SQLite DB with seeded data
-  3. Handler business logic that required extraction (e.g., from `handlers/templates.ts`, `handlers/ai.ts`) is exported as named pure functions and covered by unit tests
-**Plans:** 3/3 plans complete
-Plans:
-- [ ] 27-01-PLAN.md — Factories, applyOverrides extension, extract+test jobs/bullets/profile
-- [ ] 27-02-PLAN.md — Batch extract 15 remaining handler files
-- [ ] 27-03-PLAN.md — Extract+test templates.ts and submissions.ts with three-layer integration
+  1. User clicks the "JSON" button (peer of PDF / DOCX) in the VariantEditor preview toolbar and saves `${profileName}_Resume_${variantName}.json`
+  2. The exported JSON reflects the full three-layer merge — base + variant selection + accepted skill additions + bullet overrides — matching what the same variant's PDF/DOCX produce
+  3. Excluded items (summary off, excluded jobs, excluded bullets) do not appear in the exported JSON
+  4. Exported JSON contains no `meta` sidecar field — it is pure resume.json output only
+  5. Hovering the JSON button reveals a tooltip explaining export-only semantics: re-importing creates new base entries, it will not recreate this variant
+**Plans**: TBD
+**UI hint**: yes
 
-### Phase 28: AI Integration Tests
-**Goal**: Zod schemas for all AI flows validate correctly and score derivation produces verified weighted results, with AI provider calls mocked for deterministic testing
-**Depends on**: Phase 26
-**Requirements**: AI-01, AI-02, AI-03
+### Phase 33: Tech Debt Cleanup
+**Goal**: Four long-standing debt items are removed without breaking tests, types, or rendered output
+**Depends on**: Phase 30 (merge reconciliation lands first to avoid touching the same files twice)
+**Requirements**: DEBT-01, DEBT-02, DEBT-03, DEBT-04
 **Success Criteria** (what must be TRUE):
-  1. `JobParserSchema`, `ResumeScorerSchema`, and `ResumeJsonSchema` each have tests for valid parse and rejection of invalid input
-  2. `deriveOverallScore()` tests cover correct weighted output, edge cases (0-100 clamping), and all weighted fields
-  3. `callJobParser()` and related AI provider functions have tests that use a mock LLM provider and never call a real API
-**Plans:** 4/4 plans complete
-Plans:
-- [x] 28-01-PLAN.md — Refactor aiProvider signatures + relocate JobUrlExtractionSchema + extract extractJsonFromText + extend electron safeStorage mock
-- [x] 28-02-PLAN.md — Unit tests: all four Zod schemas, deriveOverallScore, extractJsonFromText
-- [x] 28-03-PLAN.md — MockLanguageModelV3 tests for callJobParser, callResumeScorer, callResumeExtractor
-- [x] 28-04-PLAN.md — runAnalysis integration tests: cache-miss and cache-hit paths
+  1. `TEMPLATE_LIST` export is gone from `resolveTemplate.ts` and a full-workspace grep (including `.claude/`, `dist/`, `scripts/`) finds no remaining readers
+  2. The vestigial `compact` prop is removed from `ResumeTemplateProps` and all 5 template components — `tsc` and `vitest` both pass, and a manual render of all 5 templates shows no regressions
+  3. `tests/setup.ts` is deleted; the full test suite runs 3× consecutively before and after deletion with identical pass counts
+  4. `jobs.test.ts` no longer contains `.where(undefined as any)` (replaced with a correct filter or removed with documented intent), and the full suite runs 10× consecutively under the default thread pool with zero race failures
+**Plans**: TBD
 
-### Phase 29: Export Pipeline Tests
-**Goal**: DOCX generation, submission snapshot shape, and template component rendering each have verified test coverage
-**Depends on**: Phase 26
-**Requirements**: EXPORT-01, EXPORT-02, EXPORT-03
+### Phase 34: Configurable SQLite DB Location
+**Goal**: User can safely relocate the SQLite database to any folder they choose, with integrity verification, rollback on failure, and a cloud-storage warning
+**Depends on**: Phases 30, 31, 32, 33 (last — touches module-level DB singletons imported by 20+ handlers)
+**Requirements**: DB-01, DB-02, DB-03, DB-04, DB-05, DB-06, DB-07, DB-08, DB-09, DB-10
 **Success Criteria** (what must be TRUE):
-  1. DOCX generation tests assert correct paragraph structure, heading styles, and per-template font names for at least one template
-  2. Submission snapshot tests confirm that profile, content, and templateOptions are all present and correctly shaped in a frozen snapshot
-  3. Template component render tests (via jsdom) confirm expected HTML structure is produced for at least one template without crashing on minimal props
-**Plans:** 3/3 plans complete
-Plans:
-- [x] 29-01-PLAN.md — Install deps (fflate, jsdom), update vitest config, extract buildResumeDocx pure function
-- [x] 29-02-PLAN.md — DOCX builder tests: per-template fonts, margins, headings, content
-- [x] 29-03-PLAN.md — Submission snapshot shape tests + template component render tests
+  1. User opens Settings, sees a `Database Location` card with the current DB path, "Reveal in Explorer" button, and "Change location" button
+  2. User picks a folder, confirms the 5-step plan modal, and the DB is checkpoint-closed, copied, integrity-verified, bootstrap-written, and renamed `.bak` — then prompted to restart (Restart now / Later)
+  3. On restart, the app resolves the DB via `userData/db-location.json` bootstrap override before opening the database — the new location is in use
+  4. When the user picks a UNC path or a well-known cloud folder (OneDrive / Dropbox / iCloud Drive), a non-blocking warning modal explains the WAL-over-network risk and lets them proceed
+  5. Any failure during the change sequence rolls back cleanly — the source DB remains accessible, no partial state is left on disk, and the error is surfaced to the user
+  6. After a successful relocation, a "Delete old backup" button appears in the Database Location card and only deletes the `.bak` file on explicit user click
+**Plans**: TBD
+**UI hint**: yes
 
 ## Progress
 
@@ -140,11 +148,8 @@ Plans:
 | 13-16 | v2.1 | 12/12 | Complete | 2026-03-26 |
 | 17-21 | v2.2 | 13/13 | Complete | 2026-04-01 |
 | 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
-| 25. Windows Installer | v2.4 | 1/1 | Complete    | 2026-04-03 |
-| 26. Test Infrastructure | v2.4 | 1/1 | Complete    | 2026-04-04 |
-| 27. Data Layer Tests | v2.4 | 0/3 | Complete    | 2026-04-06 |
-| 28. AI Integration Tests | v2.4 | 4/4 | Complete    | 2026-04-07 |
-| 29. Export Pipeline Tests | v2.4 | 3/3 | Complete   | 2026-04-19 |
+| 25-29 | v2.4 | 12/12 | Complete | 2026-04-21 |
+| 30-34 | v2.5 | 0/0 | Not started | - |
 
 ## Future (v3.0+)
 
@@ -152,4 +157,4 @@ Plans:
 
 ## Backlog
 
-(Empty — all items promoted to v2.4)
+(Empty — all tech debt items promoted to v2.5)

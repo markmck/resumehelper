@@ -46,6 +46,7 @@ Full visibility into job applications — which resume version was sent to which
 - ✓ Immutable submission snapshots (profile + content + template options frozen at submit time) — v2.1
 - ✓ Old resume.json themes removed, single rendering pipeline — v2.1
 - ✓ Three-layer data model (base → variant → analysis overrides) — v2.2
+
 - ✓ Per-click accept/dismiss with analysis-scoped overrides — v2.2
 - ✓ Preview/export merges all three layers, snapshots freeze merged result — v2.2
 - ✓ Log submission from analysis/optimize screens with pre-fill — v2.2
@@ -59,25 +60,54 @@ Full visibility into job applications — which resume version was sent to which
 - ✓ Variant card timestamps corrected — v2.2
 - ✓ Modern template inline skills overflow fixed — v2.2
 - ✓ Stale "coming soon" messages cleaned up — v2.2
+- ✓ ATS score threshold with slider, target arc, and threshold-relative color bands — v2.3
+- ✓ Below-target callout in OptimizeVariant listing pending rewrites and missing keywords — v2.3
+- ✓ Soft warning in SubmissionLogForm when score below threshold — v2.3
+- ✓ PDF resume import with AI extraction (pdf-parse + generateObject/Zod) — v2.3
+- ✓ Append-mode import preserving existing data (INSERT-only) — v2.3
+- ✓ Job posting URL scraping via net.fetch + AI extraction — v2.3
+- ✓ Active URL tab in NewAnalysisForm with auto-populate of text/company/role — v2.3
+- ✓ Windows installer (NSIS) with install wizard, Start Menu shortcut, and uninstaller — v2.4
+- ✓ Test infrastructure: Vitest with electron mock and in-memory SQLite helper — v2.4
+- ✓ Data layer test coverage: handler extraction to pure functions, applyOverrides, three-layer merge — v2.4
+- ✓ AI integration test coverage: Zod schemas, score derivation, MockLanguageModelV3, runAnalysis — v2.4
+- ✓ Export pipeline test coverage: DOCX XML assertions, snapshot shape, template rendering — v2.4
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-No active requirements — v2.2 shipped. See backlog items in ROADMAP.md for future work.
+- [ ] User can export full experience DB as resume.json (base export)
+- [ ] User can export a variant's merged view as resume.json (three-layer merge matches preview/PDF)
+- [ ] User can configure SQLite DB location via Settings with copy → verify → switch migration
+- [ ] DOCX export honors the variant's showSummary toggle
+- [ ] Orphan TEMPLATE_LIST export removed from resolveTemplate.ts
+- [ ] Vestigial compact prop removed from ResumeTemplateProps
+- [ ] Dead tests/setup.ts deleted (or properly wired into vitest)
+- [ ] Race condition in jobs.test.ts under concurrent thread pool fixed
+
+## Current Milestone: v2.5 Portability & Debt Cleanup
+
+**Goal:** Make resume data portable via JSON export and settle all outstanding tech debt.
+
+**Target features:**
+- Resume.json export (base) — full experience DB as valid resume.json
+- Resume.json export (variant-merged) — per-variant three-layer merge, export-only (no roundtrip guarantee)
+- Configurable SQLite DB location with copy → verify → switch migration
+- DOCX showSummary toggle honored
+- Tech debt cleanup: TEMPLATE_LIST, compact prop, tests/setup.ts, jobs.test.ts race
 
 ## Current State
 
-**Latest shipped:** v2.2 Three Layer Data (2026-04-01)
+**Latest shipped:** v2.4 Polish & Reliability (2026-04-21)
 
-All planned milestones through v2.2 are complete. The app is a fully functional resume management tool with AI analysis, three-layer data model (base → variant → analysis overrides), skills chip grid, submission tracking, and 5 professional templates.
+The app is a fully functional resume management tool with AI analysis, three-layer data model, skills chip grid, submission tracking, 5 professional templates, ATS score thresholds, PDF resume import, and job posting URL scraping. Now installable via Windows NSIS installer with 143 tests across 16 files covering data layer, AI integration, and export pipeline.
 
 ### Out of Scope
 
 - AI-generated resume text from scratch — AI suggests rewording of existing bullets but never fabricates experience
 - Mobile app — desktop-first via Electron
 - Cover letter generation — separate concern
-- Job board integration/scraping — manual entry
 - Runtime theme installation — bundle curated templates only for now
 - AI-powered auto-variant generation — future milestone
 - Automated tailoring pipeline (paste → analyze → generate → export) — future milestone
@@ -94,8 +124,10 @@ All planned milestones through v2.2 are complete. The app is a fully functional 
 - v2.0 shipped: AI analysis, bullet suggestions, submission pipeline, dark-theme UI redesign
 - v2.1 shipped: 5 purpose-built templates, unified rendering pipeline, template controls, snapshot immutability, old theme cleanup
 - v2.2 shipped: Three-layer data model, skills chip grid, analysis submission flow, variant UX cleanup
-- Stack: Electron + React 19 + TypeScript + Drizzle ORM + SQLite + @dnd-kit + design system tokens (CSS custom properties)
-- 23,313 lines of TypeScript/TSX across 85+ source files
+- v2.3 shipped: ATS score thresholds, PDF resume import with AI extraction, job posting URL scraping
+- v2.4 shipped: Windows installer, Vitest test infrastructure, 143 tests across data layer/AI/export pipeline
+- Stack: Electron + React 19 + TypeScript + Drizzle ORM + SQLite + @dnd-kit + Vitest + design system tokens (CSS custom properties)
+- 26,816 lines of TypeScript/TSX across 90+ source files (including 16 test files)
 - Single rendering pipeline: print.html + PrintApp + postMessage for all preview/export/snapshot paths
 - Three-layer data: base experience → variant selection → analysis-scoped overrides (merge at render)
 
@@ -140,6 +172,34 @@ All planned milestones through v2.2 are complete. The app is a fully functional 
 | @dnd-kit for drag-and-drop | Electron/Windows pointer-event compatibility. PointerSensor with activationConstraint. | ✓ Good |
 | On-demand staleness detection | Compare analysis.createdAt against bullet/variant updatedAt at view time. No stored column. | ✓ Good |
 | Simple regex for company/role extraction | No extra LLM call at paste-time. Regex patterns parse common job posting formats. LLM extraction during analysis run unchanged. | ✓ Good |
+| scoreThreshold optional on TemplateVariant | Pre-existing variants may lack the column until DB migrates. Default 80. | ✓ Good |
+| Shared scoreColor utility | Single source of truth for threshold-relative color bands across all analysis components. | ✓ Good |
+| generateObject for PDF/URL extraction | Type-safe auto-retry on malformed JSON. Mirrors existing callJobParser pattern. | ✓ Good |
+| confirmAppend INSERT-only (no DELETE) | Append semantics preserve existing data — user imports additively. | ✓ Good |
+| isJobPosting guard in URL extraction | Catches JS-rendered pages, auth walls, CAPTCHA without site-specific logic. | ✓ Good |
+| Auto-switch to paste tab after URL fetch | User sees populated content and can review before running analysis. | ✓ Good |
+| Composition-based LLM mocking via MockLanguageModelV3 | Inject LanguageModel through call signatures instead of vi.mock('ai'). Deterministic, no module replacement, prompt-wiring assertable. | ✓ Good |
+| Handler extraction pattern (db: Db first param) | Pure functions taking db as first arg; ipcMain.handle is thin wiring. Unlocks direct unit testing without IPC. | ✓ Good |
+| DOCX XML assertions over in-memory object tree | docx library internals are unstable across versions; word/document.xml is the contract Word consumes. fflate unzip + string assertions. | ✓ Good |
+| Per-file jsdom via vitest docblock | Global env stays node; .tsx test files opt in with `/** @vitest-environment jsdom */`. No global DOM pollution. | ✓ Good |
+| renderToString over Testing Library for template tests | No @testing-library/react dependency; pure string assertions on HTML output. Sufficient for structure verification. | ✓ Good |
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after v2.2 milestone shipped*
+*Last updated: 2026-04-23 after v2.5 milestone started*

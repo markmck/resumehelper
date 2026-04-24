@@ -1,260 +1,202 @@
 # Project Research Summary
 
-**Project:** ResumeHelper v2.4
-**Domain:** Electron desktop app — Windows NSIS installer completion + test suite infrastructure
-**Researched:** 2026-04-03
-**Confidence:** HIGH (installer config verified against codebase + official docs); MEDIUM (test framework — Vitest/Electron interaction patterns from community sources; AI SDK v6 mock API needs in-project verification)
+**Project:** ResumeHelper — Milestone v2.5 Portability & Debt Cleanup
+**Domain:** Electron desktop app (React 19 + TypeScript + Drizzle + better-sqlite3)
+**Researched:** 2026-04-23
+**Confidence:** HIGH
 
 ## Executive Summary
 
-ResumeHelper v2.4 is a focused infrastructure milestone that adds two orthogonal deliverables to an existing, fully-functional Electron + React + SQLite + AI desktop app: a complete Windows NSIS installer and a Vitest-based test suite covering the data layer, export pipeline, and AI integration. Neither concern touches the app's data model, IPC surface, or renderer components. The work is primarily configuration completion (electron-builder NSIS) and new test infrastructure (vitest.config.ts, mocks, test helpers) rather than feature development.
+v2.5 is a narrow, **additive** milestone against a mature codebase: five target deliverables (base resume.json export, variant-merged resume.json export, configurable DB location, DOCX `showSummary` fix, four tech-debt items) with **zero new runtime dependencies**. Every capability required is either already installed (`zod`, `better-sqlite3`, Electron `dialog`/`app`/`shell`) or built into Node. The work is primarily about reusing existing infrastructure — `ResumeJsonSchema` (aiProvider.ts:47), `applyOverrides()` (shared/overrides.ts), `getBuilderDataForVariant()` (handlers/export.ts:16) — and carefully threading one new cross-cutting concern: persisting the DB path **outside** the DB itself in a `userData/db-location.json` bootstrap file.
 
-The recommended approach is sequential: installer config first (zero code risk, verifiable in 30 minutes), then test infrastructure setup (unblocks all test writing), then test suites in parallel across data layer, AI integration, and export pipeline. The installer work has no dependencies on the test work; they are safe to execute in any order. The native module challenge (better-sqlite3 compiled for Electron's Node ABI) is a well-documented pattern — use Node-compiled better-sqlite3 with in-memory `:memory:` SQLite for tests, which sidesteps the Electron binary requirement entirely.
+Two cross-cutting risks dominate and recur across three of the four research files: **(1) a `showSummary` dual-source-of-truth** where HTML/PDF reads from `template_variant_items` (exclusion sentinel row) while DOCX reads only from `templateOptions` JSON and silently ignores the flag (docxBuilder.ts:59); and **(2) two parallel `getBuilderDataForVariant` implementations** — one in `handlers/export.ts` (no `summaryExcluded`, no skill-additions merge), another in `handlers/templates.ts` (returns `summaryExcluded`), with skill-addition merging living in a *third* place (`handlers/submissions.ts:166-186`). Fixing both is the **same underlying refactor** and it is the single highest-leverage Phase-1 action: reconcile the merge path into one function that both DOCX and the variant JSON export consume.
 
-The key risks are: (1) the `appId` in `electron-builder.yml` and `setAppUserModelId()` in `src/main/index.ts` must match — a mismatch causes broken uninstallation; (2) the broken `publish.url` pointing to `https://example.com/auto-updates` will cause silent runtime failures if not removed before shipping; (3) the AI SDK v6 `ai/test` mock class name needs in-project verification before tests are written — the documented `MockLanguageModelV1` is from AI SDK v3.4 and the project is on v6. All three risks are low-effort to address upfront.
-
----
+The recommended approach is a **5-phase roadmap** that front-loads the merge-path reconciliation (unblocking both variant export and the DOCX fix), parallelizes the independent streams (base export, tech debt), and sequences the DB relocation last because it touches module-level singletons imported by 20+ handler files. The chosen switch mechanism is `app.relaunch(); app.exit(0)` after copy+verify — not an in-process Proxy swap — because the singleton retrofit is out of scope for a debt-cleanup milestone and the UX cost of a ~1s restart matches VS Code/Obsidian conventions users already accept.
 
 ## Key Findings
 
 ### Recommended Stack
 
-electron-builder is already installed at `^26.0.12` and partially configured — v2.4 completes the NSIS config, not installs it. Vitest `^3.2` is the correct test runner choice: it shares Vite transforms with electron-vite, requires no separate Babel config, and its `vi.mock()` API is Jest-compatible. Vitest 4.x must be avoided — it requires Vite 8, but electron-vite 5 is pinned to Vite 7.
+Stack work is **entirely additive reuse**: no new packages, zero installs. All APIs needed for v2.5 are present in `package.json` as of milestone start (verified). The single "new" storage mechanism is a 4-line JSON file alongside the DB for path override — not `electron-store`, not a new table.
 
-**Core technologies:**
-- `electron-builder ^26` (existing): NSIS installer packaging — already installed, needs `oneClick: false` + metadata fixes
-- `vitest ^3.2` (new dev dep): test runner — Vite-native, zero additional config for electron-vite projects; do NOT use 4.x (Vite 8 peer dep conflict)
-- `@vitest/coverage-v8 ^3.2` (new dev dep): coverage reporting — V8 provider, no Istanbul setup needed
-- `better-sqlite3` `:memory:` (existing): in-memory DB for tests — Node-compiled build works in Vitest node environment without Electron binary
-- `jsdom` (new dev dep): DOM environment for renderer component tests
-- `@testing-library/react ^16.3` + `@testing-library/dom ^10.4` (new dev deps): React 19 requires v16.1.0+
-- `@testing-library/user-event ^14.5` (new dev dep): realistic user interaction simulation for component tests
-- `jszip ^3.10` (new dev dep, optional): DOCX content inspection in tests — DOCX is a ZIP archive; skip if DOCX test complexity exceeds value
-- `ai/test` subpath (existing `ai` package): mock LLM providers for AI integration tests — class name needs in-project verification for v6
+**Core technologies (all pre-installed):**
+- `electron@^39.2.6` — `dialog.showSaveDialog`, `showOpenDialog({properties:['openDirectory']})`, `app.relaunch()`, `app.exit()`, `shell.showItemInFolder` — already used by existing export handlers
+- `better-sqlite3@^12.8.0` — `.close()`, `PRAGMA wal_checkpoint(TRUNCATE)`, `PRAGMA integrity_check` — sync API is the right fit for copy→verify→switch
+- `zod@^4.3.6` — reuse existing `ResumeJsonSchema` (aiProvider.ts:47-112) as validator on export, same schema used for v2.3 import
+- `drizzle-orm@^0.45.1` — no changes; `ensureSchema()` re-runs idempotently on reopen
+- `node:fs/promises`, `node:path` — built-in, already used throughout main process
+
+**What NOT to use:** `electron-store` (overkill for one setting), `fs-extra` (not installed), `app.setPath('userData', ...)` to move the DB (moves too much — only `app.db` relocates), `fs.copyFile` without prior WAL checkpoint (data loss), in-process Proxy DB hot-swap (singleton retrofit is out of scope).
 
 ### Expected Features
 
-**Must have — Windows Installer (ship with v2.4):**
-- Fix `productName` to "ResumeHelper" and `appId` to `com.resumehelper.app` in electron-builder.yml
-- Fix `author` in package.json away from "example.com"
-- Update `version` to `2.4.0`
-- Add `build/icon.ico` — missing; installer looks broken without it
-- Set `oneClick: false` — enables wizard UI with install directory picker and confirmation steps
-- Set `allowToChangeInstallationDirectory: true` — power user option
-- Change `createDesktopShortcut: always` to `askCreateDesktopShortcut: true` — opt-in, not forced
-- Add `runAfterFinish: true` — reduces friction from install to first run
-- Remove or stub broken `publish.url: https://example.com/auto-updates` — silent runtime failure risk
-- Remove dead `asarUnpack` entries for jsonresume theme packages removed in v2.1
-- Update `setAppUserModelId('com.electron')` in `src/main/index.ts` to match new appId
+**Must have (v2.5 MVP — all P1):**
+- Base `Export JSON` button in Experience tab header (next to Import JSON / Import PDF) — full DB dump, roundtrip-compatible with existing INSERT-only import
+- Per-variant `JSON` button in VariantEditor preview toolbar (next to PDF / DOCX) — three-layer merge, export-only
+- `Database Location` card in Settings with current-path label, Reveal-in-Explorer, Change-location flow with copy→verify→switch→backup→restart confirmation
+- DOCX export honors `showSummary` (one-line fix in `buildResumeDocx` + thread the flag from `export:docx` handler)
+- Tech-debt cleanup: orphan `TEMPLATE_LIST` export, vestigial `compact` prop, dead `tests/setup.ts`, `jobs.test.ts` race + broken `.where(undefined as any)` clause
 
-**Must have — Test Suites (ship with v2.4):**
-- `vitest.config.ts` with `node` environment, `electron` resolve alias pointing to mock file
-- `tests/__mocks__/electron.ts`: static mock for all Electron imports (ipcMain, app, safeStorage, dialog, BrowserWindow, shell)
-- `tests/helpers/test-db.ts`: `createTestDb()` factory returning in-memory Drizzle instance
-- `tests/setup.ts`: global test setup
-- Unit tests for `applyOverrides()` in `src/shared/overrides.ts` (pure function, zero deps — highest ROI)
-- Unit tests for `scoreColor()` and `deriveOverallScore()` (pure functions)
-- DB CRUD tests for jobs, variants, skills, submissions via in-memory SQLite helper
-- AI Zod schema tests: `schema.parse()` and `schema.safeParse()` with fixture JSON
-- Handler logic extraction for `handlers/templates.ts` and `handlers/ai.ts` + IPC handler unit tests
-- DOCX structure tests asserting paragraph/heading/font output for at least one template
+**Should have (polish — P2, optional):**
+- `$schema` pointer in exported JSON (improves downstream validator UX, zero cost)
+- "Reveal in Explorer" next to DB path label (standard Electron convention)
+- Network/cloud-folder warning modal when user picks OneDrive/Dropbox/UNC path (heuristic, not a hard block)
 
-**Should have (v2.4.x):**
-- Custom `build/uninstaller.nsh` — prompt user to keep/delete app data on uninstall (requires NSIS macro work; independent of core installer functionality)
-- Coverage for remaining IPC handlers — add as regression tests when bugs surface
-- PDF import full extraction path tests
-
-**Defer (v3+):**
-- E2E Playwright tests — only if a specific regression requires full app launch to reproduce
-- React component rendering tests with jsdom — only if component bugs become a pattern
-- Code signing / auto-update infrastructure — only if distributing publicly (EV certs cost $300-500/yr)
-- MSI installer format — no benefit over NSIS for personal distribution
+**Defer (explicitly out of scope):**
+- Variant JSON roundtrip / import (violates JSON Resume spec, tempts sibling import path)
+- "Export all variants" bulk/zip (N×dialog friction or new dep)
+- Live in-process DB swap without restart (requires Proxy retrofit across 20+ handler imports)
+- In-app DB browser, scheduled auto-backup, cloud sync integration
 
 ### Architecture Approach
 
-v2.4 adds two build/dev-time concerns as satellites to the unchanged app core. The installer is a configuration-only concern in `electron-builder.yml` plus one `src/main/index.ts` line. The test suite adds a `tests/` tree with its own config, mocks, and helpers that do not touch any production source file. The only production files modified are handler files where business logic is extracted into named exports for testability — a low-risk refactor (thin IPC wrapper + exported pure function) already established in `handlers/export.ts` (`getBuilderDataForVariant` is already exported as a named function).
+Five features graft onto existing Electron/Drizzle/SQLite architecture via one foundational refactor plus four additive layers. The **central architectural finding** is that the codebase currently has three parallel "what goes into a rendered variant?" code paths — `handlers/export.ts:16` (PDF/DOCX consumer, merges bullet overrides only), `handlers/templates.ts:318` (preview consumer, also returns `summaryExcluded`), and `handlers/submissions.ts:166-186` (snapshot consumer, also merges skill additions). v2.5 must unify these into a single authoritative `buildMergedBuilderData(db, variantId, analysisId?)` before the variant JSON export can be trusted.
 
 **Major components:**
-1. `electron-builder.yml` — NSIS installer config: `oneClick: false`, wizard options, correct metadata, asarUnpack cleanup
-2. `vitest.config.ts` — Vitest projects config with `node` environment for main process, `jsdom` for renderer; `electron` resolve alias
-3. `tests/__mocks__/electron.ts` — static Electron mock; avoids `vi.mock()` factory hoisting bugs documented in Vitest issues #425 and #4166
-4. `tests/helpers/test-db.ts` — in-memory SQLite + Drizzle factory; each test gets a fresh isolated DB with no file I/O
-5. `tests/data-layer/` — pure function tests + DB operation tests + three-layer merge tests
-6. `tests/ai-integration/` — Zod schema tests + prompt builder tests + mocked AI SDK provider tests
-7. `tests/export-pipeline/` — DOCX structure tests + snapshot shape tests + template component render tests
-
-**Key patterns to follow:**
-- Electron mock via `resolve.alias` (not `vi.mock()` factory) — avoids known hoisting bugs
-- In-memory SQLite via `new Database(':memory:')` with `beforeEach` schema reset — real SQL behavior, no file cleanup
-- Export business logic from handler files for testability — `ipcMain.handle()` becomes a thin wrapper
-- Mock `ai` package via `MockLanguageModelV1` (verify class name in v6) or `vi.mock('ai', ...)` — no real LLM API calls in tests
+1. **`src/shared/resumeJson.ts` (new)** — lifted `ResumeJson` interface (from import.ts:10-75), single source of truth for both import and export
+2. **`src/shared/resumeJsonBuilder.ts` or inlined in export.ts (new)** — `buildBaseResumeJson(db)` and `buildVariantResumeJson(db, variantId, analysisId?)` pure functions; both emit the same shape; validate with `ResumeJsonSchema.parse` before write
+3. **Unified merge helper** — consolidates bullet overrides + skill additions + summary/job exclusions into one function; called by DOCX export, variant JSON export, snapshot builder, and PrintApp data loader
+4. **`src/main/config/appConfig.ts` (new)** — reads/writes `userData/db-location.json`; owns the `dbPath` setting; read at boot before DB opens
+5. **`src/main/db/index.ts` (modified)** — bootstrap path resolution (`readBootstrapOverride() ?? default`); no Proxy wrapper; relaunch after switch
+6. **Settings UI — `DatabaseLocationCard` (new)** — second card in SettingsTab, below AI Configuration; folder picker → confirmation modal → progress state → restart prompt
+7. **`src/main/lib/docxBuilder.ts` (modified)** — widen `templateOptions` to include `showSummary?: boolean` (default `true`); wrap summary paragraph in conditional (one-line destructure + one-line guard)
 
 ### Critical Pitfalls
 
-**v2.4-specific pitfalls:**
+Top five, drawn from PITFALLS.md and cross-referenced against architecture/feature findings:
 
-1. **`appId` mismatch between electron-builder.yml and `setAppUserModelId()`** — Must update both in the same commit. Current `src/main/index.ts` has `setAppUserModelId('com.electron')` — must match new `com.resumehelper.app`. Mismatch causes broken uninstallation and incorrect Windows taskbar grouping.
+1. **DOCX `showSummary` divergence (Pitfall 8)** — flag is stored in `template_variant_items` (sentinel row) but DOCX reads `variant.templateOptions` JSON column only. Fix: reconcile merge helper in Phase 1, destructure `showSummary` in `buildResumeDocx:59`, wrap paragraph emission. Test parameterized across HTML + PDF + DOCX so drift cannot return.
 
-2. **Broken `publish.url` causes silent auto-update runtime failure** — `electron-builder.yml` has `publish.url: https://example.com/auto-updates`. `electron-updater` is in dependencies. At app startup it will attempt to check for updates and fail silently (or not-so-silently). Remove or stub the publish config entirely for v2.4.
+2. **Variant export silently drops accepted skill additions (Pitfall 3)** — `getBuilderDataForVariant` in `export.ts` does NOT merge accepted rows from `analysis_skill_additions` (only `submissions.ts` does). Naive reuse produces a JSON that doesn't match the PDF the user just saved. Fix: unified merge helper in Phase 1; integration test with variant + analysis + accepted skill asserts both bullet override and skill addition appear in JSON output.
 
-3. **`vi.mock('electron', factory)` hoisting bugs in Vitest** — Vitest issues #425 and #4166 document initialization errors when using `vi.mock('electron')` with a factory function. Use `resolve.alias` in `vitest.config.ts` to point the `electron` module to a static `tests/__mocks__/electron.ts` file instead. No factory function, no hoisting issue.
+3. **WAL checkpoint missing before DB copy (Pitfall 5)** — app runs `PRAGMA journal_mode = WAL`; a naive `fs.copyFile` captures the main `.db` but not the `.db-wal` tail, silently losing the last few transactions. Fix: `PRAGMA wal_checkpoint(TRUNCATE)` → `sqlite.close()` → `fs.copyFile` → verify (readonly open + `integrity_check`) → reopen at new path or rollback. Non-negotiable for Phase 34.
 
-4. **AI SDK v6 `ai/test` mock class name unverified** — Documentation references `MockLanguageModelV1` from AI SDK v3.4. Installed version is `ai ^6.0.136`. Run `node -e "const t = require('ai/test'); console.log(Object.keys(t))"` before writing any mock provider tests. Class name may differ in v6; fall back to `vi.mock('ai', ...)` if the mock class is unavailable.
+4. **Null vs. omit in exported JSON (Pitfall 2)** — Drizzle returns `null` for unset `endDate`; naive `JSON.stringify` emits `"endDate": null`, which strict JSON Resume validators reject. Fix: field-filtering serializer that OMITS keys for null/empty values; YYYY-MM precision retained (valid ISO 8601); unit test runs export through `resume-cli validate` or equivalent ajv check.
 
-5. **Handler extraction scope creep** — Extract logic only from handlers that need test coverage (`handlers/templates.ts`, `handlers/ai.ts`). Do not refactor all 20 IPC handlers. The thin-wrapper + named-export pattern already exists in `handlers/export.ts` — follow it, don't gold-plate it.
+5. **Windows file-handle lock blocks DB copy (Pitfall 6)** — better-sqlite3 holds exclusive handle on open DB; `fs.copyFile` fails with `EBUSY` if the handle isn't released first. Fix: strict sequence checkpoint → close → copy → verify → swap-bootstrap-path → `app.relaunch()`; rollback on any step with `try/finally` that reopens source path.
 
-**Carry-forward pitfalls relevant to test writing:**
+Two more deserve flagging for Phase 34 planning: **Pitfall 7** (network/OneDrive path breaks WAL silently — detect UNC and cloud-folder names, warn not block) and **Pitfall 12** (`jobs.test.ts` has a latent `.where(undefined as any)` bug that does update-all, and the alleged "race" is almost certainly the global `vi.mock` in the dead `tests/setup.ts` — fix by deleting setup.ts first, then fixing the WHERE clause, then running the suite 10× to prove stability).
 
-6. **SQLite native module packaging** (Pitfall 4) — Already mitigated in production. For tests: Node-compiled `better-sqlite3` from npm works fine in Vitest node environment for `:memory:` testing. Do NOT use `ELECTRON_RUN_AS_NODE=1` approach — it adds startup overhead and CI complexity with no benefit for unit tests.
+### Cross-Cutting Reconciliations
 
-7. **Real AI API calls in tests** — Mock the `ai` package. Never call real LLM APIs in tests. Test prompt construction, schema validation, and score derivation — not LLM response fidelity.
+Three places where researcher outputs needed reconciliation:
 
----
+**A. Variant-merged export + skill additions — ARCHITECTURE vs. PITFALLS.** Architecture said "reuse `applyOverrides()` / `getBuilderDataForVariant` — already merges." Pitfalls said "that only merges bullet overrides; accepted skill additions live in `analysis_skill_additions` and only `buildSnapshotForVariant` merges those." **PITFALLS is correct.** The merge helper must unify the snapshot's skill-addition merge with the export path. Architecture's Q2 answer is right in spirit (reuse the merged view, don't re-merge) but understates that the current merged view itself is incomplete for skill additions. Phase 30 refactor consolidates both.
+
+**B. DB switch mechanism — STACK vs. ARCHITECTURE.** Stack recommended `app.relaunch(); app.exit(0)` as the one-line answer. Architecture proposed Proxy-wrapped `db`/`sqlite` exports to avoid relaunch (Option A), with relaunch as Option B "user-hostile." **STACK wins for v2.5.** Proxy retrofit is exactly the kind of singleton churn this milestone should not bundle with debt cleanup, and `app.relaunch()` is the Chrome/VS Code/Obsidian convention users accept. Architecture's Option A is a good candidate for a future milestone if user feedback demands seamless swap.
+
+**C. `showSummary` fix scope — single-line vs. refactor.** Stack called it "one-line read in docxBuilder.ts." Architecture said "two-line fix" (docxBuilder + handler pass-through). Pitfalls flagged it needs the reconciled merge helper. **All three are correct at different layers.** The physical code change in `docxBuilder.ts` is one line of destructure + one line of guard. The handler (`export:docx`) must switch to the merged builder (which returns `summaryExcluded`). The merge helper reconciliation is the underlying refactor. All three happen in Phase 30 together.
 
 ## Implications for Roadmap
 
-Based on combined research, there is a clear natural phase ordering driven by dependency flow. The installer and test infrastructure are independent of each other; test suites depend on the infrastructure being in place.
+### Canonical Phase Sequence
 
-### Phase 1: Installer Config Completion
+### Phase 30: Merge-Helper Reconciliation + DOCX showSummary Fix
 
-**Rationale:** Zero code dependencies, lowest risk, immediately verifiable — run `npm run build:win` and click through the installer wizard. Produces a shippable artifact. No blockers.
+**Rationale:** Reconcile the three parallel merge paths first. Unblocks variant JSON export and the DOCX `showSummary` fix is the natural verification that the reconciliation works end-to-end.
 
-**Delivers:** A professional Windows installer with correct metadata, wizard UI, opt-in desktop shortcut, launch-on-finish, and no broken auto-update plumbing. Produces `dist/ResumeHelper-2.4.0-setup.exe`.
+**Delivers:**
+- Unified `buildMergedBuilderData(db, variantId, analysisId?)` consolidating bullet overrides, skill additions, and summary/job exclusions
+- `summaryExcluded` available on the merged view consumed by DOCX
+- `buildResumeDocx` destructures `showSummary` (default true) and gates summary paragraph
+- `ResumeJson` interface lifted to `src/shared/resumeJson.ts` (prep for Phases 31-32)
+- Parameterized test: HTML + PDF + DOCX × summary on/off × all 5 templates
 
-**Addresses:** All installer table-stakes from FEATURES.md (productName, appId, author, version, icon, oneClick: false, shortcut opt-in, runAfterFinish, publish stub removal, dead asarUnpack cleanup).
+### Phase 31: Base Resume.json Export
 
-**Avoids:** appId mismatch pitfall (update `electron-builder.yml` and `setAppUserModelId()` in the same commit); broken publish.url silent failure.
+**Rationale:** Simpler than variant-merged (no merge path); validates the `ResumeJson` shape + writer before adding the variant layer on top.
 
-**Research flag:** No further research needed. Official electron-builder NSIS docs are authoritative and the existing config was read directly. Standard patterns apply.
+**Delivers:**
+- `buildBaseResumeJson(db)` pure function — walks all 11 entity tables
+- `export:resumeJsonBase` IPC handler + preload bridge
+- `Export JSON` button in Experience tab header, filename `${profileName}_Resume.json`
+- Zod validation via `ResumeJsonSchema.parse` before write
+- Field-omission semantics: no `null` or `""` for optional fields
+- Documented as **"lossy-faithful export"**
 
----
+### Phase 32: Variant-Merged Resume.json Export
 
-### Phase 2: Test Infrastructure Setup
+**Rationale:** Depends on Phase 30 (unified merge helper) and Phase 31 (`ResumeJson` shape + writer).
 
-**Rationale:** All test suites depend on this phase. Vitest config, electron mock, and in-memory DB helper must exist before any test file is written. One-time setup that unblocks Phases 3, 4, and 5.
+**Delivers:**
+- `buildVariantResumeJson(db, variantId, analysisId?)` — calls unified merge helper, filters excluded items, maps to ResumeJson
+- `export:resumeJsonVariant` IPC handler + preload bridge
+- `JSON` button in VariantEditor preview toolbar (peer of PDF / DOCX)
+- Tooltip: "Exports the final rendered resume. Re-importing creates new base entries."
+- Test matrix: all four toggle types (summary, job, bullet, skill) × excluded + included
 
-**Delivers:** `vitest.config.ts`, `tests/__mocks__/electron.ts`, `tests/helpers/test-db.ts`, `tests/setup.ts`, `test` and `test:coverage` scripts in package.json. Running `npm test` produces zero failing tests (no test files yet).
+### Phase 33: Tech Debt Cleanup
 
-**Uses:** Vitest ^3.2, @vitest/coverage-v8, @testing-library/react ^16.3, @testing-library/dom ^10.4, jsdom (all new dev deps).
+**Rationale:** Parallelizable with Phases 31/32 after Phase 30 lands.
 
-**Avoids:** `vi.mock()` hoisting bug (use `resolve.alias` pattern); Electron binary complexity for DB tests (use Node-compiled `better-sqlite3`).
+**Delivers (four plans in dependency order):**
+- 33-01: Remove orphan `TEMPLATE_LIST` export (full-workspace grep)
+- 33-02: Remove vestigial `compact` prop (tsc + vitest + 5-template render)
+- 33-03: Delete `tests/setup.ts` (grep for direct imports; run full suite 3× pre/post)
+- 33-04: Fix `jobs.test.ts` — replace `.where(undefined as any)`; run suite 10× consecutive
 
-**Research flag:** Verify `ai/test` mock class name (`node -e "const t = require('ai/test'); console.log(Object.keys(t))"`) before Phase 4 begins. One command, required before any AI mock provider test is written.
+### Phase 34: Configurable SQLite DB Location
 
----
+**Rationale:** Highest-risk integration — module-level singleton plus Windows file-handle semantics plus WAL sidecar correctness. Last to avoid blocking other work.
 
-### Phase 3: Data Layer Tests
+**Delivers:**
+- `src/main/config/appConfig.ts` — reads/writes `userData/db-location.json`
+- Bootstrap path resolution in `src/main/db/index.ts`
+- `settings:setDbPath` handler — validates, checkpoints WAL, closes, copies, verifies, writes bootstrap, renames old → `.bak`, `app.relaunch()`
+- `Database Location` card in SettingsTab
+- Confirmation + restart-required modals
+- Network/cloud path heuristic warning
+- Rollback on any step; no partial-state orphans
+- Tempfile-based integration tests for checkpoint→copy→verify sequence
 
-**Rationale:** Highest ROI tests — pure functions have zero setup overhead and in-memory SQLite tests verify real SQL behavior. Foundation for correctness guarantees on the three-layer merge model that is the core of the app's value.
+### Parallelization Map
 
-**Delivers:** Tests for `applyOverrides()`, `deriveOverallScore()`, `scoreColor()` (pure functions, immediate), DB CRUD operations (jobs, variants, skills, submissions via test-db helper), `getBuilderDataForVariant()` with seeded in-memory DB. Handler logic extraction for `handlers/templates.ts` and `handlers/ai.ts` as needed.
+| Can run in parallel | After | Because |
+|---------------------|-------|---------|
+| Phase 31 + Phase 33 | Phase 30 | No file overlap; shape lifted by Phase 30 unblocks Phase 31 |
+| Phase 32 + Phase 33 | Phase 31 | Phase 32 depends on shape proven in Phase 31 |
+| Phase 33-01, 33-02 | Phase 30 | No interdep |
+| Phase 33-03 | Phase 33-01, 33-02 | Isolate each debt commit |
+| Phase 33-04 | Phase 33-03 | Removing setup.ts likely fixes the race |
+| **Phase 34** | **Phases 30, 31, 32, 33** | Touches module singletons; last |
 
-**Avoids:** Mocking the entire db module (tests verify real SQL behavior, not just function invocations); testing IPC registration boilerplate (no value); `ELECTRON_RUN_AS_NODE` complexity.
+## Resolved Open Questions
 
-**Research flag:** No further research needed. Pure function testing and in-memory SQLite patterns are well-documented. Handler extraction pattern already established in `handlers/export.ts`.
+1. **Variant-merged export needs skill-addition merging**, not just `applyOverrides`. Phase 30 unifies them.
+2. **DB path lives outside the DB** — `userData/db-location.json` bootstrap file.
+3. **`app.relaunch(); app.exit(0)`** is the chosen switch mechanism (not Proxy).
+4. **DOCX `showSummary`** = one-line destructure + one-line guard in `buildResumeDocx:59` + handler switch to merged builder (all in Phase 30).
 
----
+## Remaining Open Questions
 
-### Phase 4: AI Integration Tests
-
-**Rationale:** Can run in parallel with Phase 3 — depends only on Phase 2 infrastructure. AI Zod schema tests have zero blockers (pure TypeScript/Zod, no Electron, no DB). Mock provider tests require the Phase 2 prerequisite verification of AI SDK v6 class names.
-
-**Delivers:** Tests for `JobParserSchema`/`ResumeScorerSchema`/`ResumeJsonSchema` parse/reject behavior with fixture JSON, prompt builder output content assertions (`buildJobParserPrompt()`, `buildScorerPrompt()`), `deriveOverallScore()` weight verification and edge cases (0-100 clamping, weighting), `callJobParser()` with mocked AI SDK.
-
-**Uses:** `ai/test` mock providers (or `vi.mock('ai', ...)` fallback if class name unavailable in v6).
-
-**Avoids:** Real LLM API calls; testing LLM response fidelity (not the project's responsibility).
-
-**Research flag:** In-project verification of `ai/test` API shape for AI SDK v6 is required before writing mock provider tests. Zod schema tests can be written immediately with no blockers.
-
----
-
-### Phase 5: Export Pipeline Tests
-
-**Rationale:** Can run in parallel with Phases 3 and 4 — depends only on Phase 2 infrastructure. Template component tests are the most isolated (no IPC, no DB). DOCX structure tests require the `test-db` helper from Phase 2 and can reference seeded data patterns from Phase 3.
-
-**Delivers:** Template React component render tests (no crash on minimal props, expected text appears), DOCX buffer content assertions (paragraph text, heading structure, font names per template), snapshot shape validation (expected fields present), PDF export control flow test (mocked `webContents.printToPDF` called with correct params).
-
-**Uses:** `jszip ^3.10` for DOCX ZIP inspection; `@testing-library/react` for template component tests.
-
-**Avoids:** Full PDF generation in tests (requires Electron/BrowserWindow — out of scope for this milestone); E2E Playwright tests.
-
-**Research flag:** No further research needed. `docx` library is pure Node.js. jszip DOCX inspection is a known pattern for ZIP-based formats.
-
----
-
-### Phase Ordering Rationale
-
-- Phase 1 (Installer) has no dependencies and produces a shippable artifact. Do it first — it validates packaging works before test infrastructure adds complexity.
-- Phase 2 (Infrastructure) is the single gate for all test phases. Do it second — one-time setup, no rework.
-- Phases 3, 4, 5 (Test suites) can be parallelized after Phase 2. Suggested order by diminishing risk: data layer (core business logic), AI integration (Zod schemas unblock immediately, mock provider tests unblock after verification), export pipeline (highest implementation complexity but lowest bug risk given docx is pure Node).
-- Handler extraction (needed for Phase 3 IPC handler tests) is a small refactor embedded in Phase 3 — modifies existing handler files but follows the established `handlers/export.ts` pattern.
-
-### Research Flags
-
-Phases needing in-project verification before writing code:
-- **Phase 4 (AI Integration Tests):** Verify `ai/test` mock API shape for AI SDK v6. One command before mock provider tests are written. Zod schema tests can proceed immediately.
-
-Phases with well-documented, verified patterns (skip research-phase):
-- **Phase 1 (Installer):** electron-builder NSIS docs are authoritative. Config read directly from project. No ambiguity.
-- **Phase 2 (Infrastructure):** Vitest + `resolve.alias` electron mock is a confirmed pattern. Dependency version constraints (^3.2, not 4.x) verified against electron-vite peer deps.
-- **Phase 3 (Data Layer):** In-memory SQLite + Drizzle is standard. Pure function testing is straightforward.
-- **Phase 5 (Export Pipeline):** `docx` library is pure Node.js. jszip DOCX inspection is a known pattern.
-
----
+1. **Filename conventions** — propose `${profileName}_Resume.json` and `${profileName}_Resume_${variantName}.json`
+2. **NAS / OneDrive graceful degradation** — recommend warn-but-allow
+3. **Exported JSON meta flag** — include `{meta: {source, variant, exportedAt}}` in variant exports?
+4. **Lossy-faithful documentation surface** — code comment + release notes (not UI)
+5. **Base export INSERT-on-reimport** — duplicate risk; acknowledge in modal?
+6. **Old DB cleanup UX** — user-initiated only, not auto-expire
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | electron-builder config read directly from project. Vitest version constraint (3.x not 4.x) verified against electron-vite peer deps. `ai/test` mock class name is MEDIUM — needs in-project verification for v6. |
-| Features | HIGH | Installer features from official electron-builder NSIS docs verified against existing config. Test feature set from Vitest docs + codebase inspection. Anti-features well-justified. |
-| Architecture | HIGH | Based on direct codebase inspection of existing handler patterns, asarUnpack config, build scripts, and the `getBuilderDataForVariant` export pattern already established in `handlers/export.ts`. |
-| Pitfalls | HIGH | appId mismatch and publish.url pitfalls verified from code inspection. Vitest hoisting bug verified from official issue tracker. AI SDK mock class name gap identified explicitly and has a known fallback. |
+| Stack | HIGH | Versions verified; zero new packages |
+| Features | HIGH | UX patterns validated against existing codebase |
+| Architecture | HIGH | Every file reference verified to line numbers |
+| Pitfalls | HIGH | WAL/EBUSY/network grounded in official SQLite docs |
 
-**Overall confidence:** HIGH for installer work and data layer tests. MEDIUM for AI integration tests (one unverified class name with a documented fallback). HIGH for all other test work.
-
-### Gaps to Address
-
-- **AI SDK v6 `ai/test` export shape:** The `MockLanguageModelV1` class name is documented for AI SDK v3.4. The project has `ai ^6.0.136`. Must verify before writing Phase 4 mock provider tests. If renamed or removed in v6, fall back to `vi.mock('ai', () => ({ generateObject: vi.fn().mockResolvedValue({...}) }))`. Low effort to check upfront; no blocker if fallback is used.
-
-- **`build/icon.ico` creation:** Required for installer. Not currently in the repo. Must be created before Phase 1 is considered complete. ICO format requires multi-resolution (16x16, 32x32, 48x48, 256x256) — use ImageMagick or an online ICO converter from a source PNG. This is not blocking Phase 1 config changes but is required for a professional installer.
-
-- **Handler extraction scope:** The specific handlers needing business logic extraction should be confirmed at Phase 3 start to avoid over-refactoring. Named candidates from research: `handlers/templates.ts` and `handlers/ai.ts`. `handlers/export.ts` is already done and is the reference implementation.
-
----
+**Overall confidence:** HIGH
 
 ## Sources
 
-### Primary (HIGH confidence — direct code inspection)
+See detailed research files:
+- `.planning/research/STACK.md` — dependency audit + integration points
+- `.planning/research/FEATURES.md` — feature landscape + UX specs + competitor matrix
+- `.planning/research/ARCHITECTURE.md` — integration analysis + file-level change map
+- `.planning/research/PITFALLS.md` — 12 pitfalls + looks-done-but-isn't checklist
 
-- `D:/Projects/resumeHelper/electron-builder.yml` — current NSIS config, appId placeholder, broken publish.url, asarUnpack entries
-- `D:/Projects/resumeHelper/src/main/index.ts` — `setAppUserModelId('com.electron')` placeholder
-- `D:/Projects/resumeHelper/package.json` — existing scripts, no test runner present
-- `D:/Projects/resumeHelper/src/main/handlers/export.ts` — `getBuilderDataForVariant` already exported (reference pattern)
-- `D:/Projects/resumeHelper/src/main/lib/aiProvider.ts` — `callJobParser`, `callResumeScorer`, Zod schemas
-- `D:/Projects/resumeHelper/src/shared/overrides.ts` — `applyOverrides()` pure function (zero-dep test candidate)
-
-### Primary (HIGH confidence — official documentation)
-
-- https://www.electron.build/nsis.html — `oneClick`, `perMachine`, `allowToChangeInstallationDirectory`, `askCreateDesktopShortcut` options
-- https://vitest.dev/config/ — Vitest 3.x projects configuration, `resolve.alias`
-- https://github.com/vitest-dev/vitest/issues/425 — `vi.mock('electron')` hoisting problems; `resolve.alias` approach confirmed
-- https://github.com/vitest-dev/vitest/issues/4166 — same hoisting bug, additional confirmation
-- https://better-sqlite3.github.io/better-sqlite3/api.html — `new Database(':memory:')` documented API
-
-### Secondary (MEDIUM confidence)
-
-- https://ai-sdk.dev/docs/ai-sdk-core/testing — `MockLanguageModelV1` documented for AI SDK v3.4; v6 class name unverified
-- Vitest discussion #2142 — `better-sqlite3` in Vitest node environment behavior
-- https://github.com/drizzle-team/drizzle-orm/discussions/784 — Drizzle ORM unit testing with SQLite in-memory
-- https://www.electron.build/electron-builder.Interface.NsisOptions.html — NsisOptions interface reference
-- NSIS AppData cleanup on uninstall: https://github.com/electron-userland/electron-builder/issues/4141
-
-### Tertiary (LOW confidence — needs validation during implementation)
-
-- jszip DOCX inspection pattern — community examples, no official `docx` library documentation for this approach; validate during Phase 5 implementation
+**Primary docs:** Electron dialog/app/shell API, SQLite WAL docs, SQLite Over a Network, JSON Resume Schema 1.0.0.
 
 ---
-*Research completed: 2026-04-03*
+*Research completed: 2026-04-23*
 *Ready for roadmap: yes*

@@ -1,166 +1,119 @@
-# Feature Research
+# Feature Research — v2.5 Portability & Debt Cleanup
 
-**Domain:** Windows Installer UX (NSIS/electron-builder) + Electron/React Test Suites
-**Researched:** 2026-04-03
-**Confidence:** HIGH (installer config — official docs verified); MEDIUM (testing strategy — native module constraints vary by environment)
+**Domain:** Electron resume-management app — portability milestone (JSON export + configurable DB path + small UX/infra debt)
+**Researched:** 2026-04-23
+**Confidence:** HIGH
+
+Scope is narrow and additive. Features fall into four categories driven by the milestone:
+
+1. **Export JSON** (base + per-variant merged) — new user-facing feature
+2. **DB Portability** (configurable SQLite location) — new user-facing feature
+3. **DOCX Fix** (honor `showSummary`) — bug fix, no new UX
+4. **Tech Debt** (orphan exports, vestigial props, test plumbing, flaky test) — internal only
 
 ---
 
 ## Feature Landscape
 
-### Domain 1: Windows Installer (NSIS via electron-builder)
+### Table Stakes (Users Expect These)
 
-#### Table Stakes (Users Expect These)
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Install wizard UI (not silent one-click) | Standard Windows software pattern; users expect to see install location | LOW | `oneClick: false` already in electron-builder.yml — needs verification it actually presents UI |
-| Start Menu shortcut | Every Windows app creates this; missing it breaks discoverability | LOW | `shortcutName` already in electron-builder.yml — currently set to `${productName}` |
-| Desktop shortcut (opt-in, not forced) | Users expect to opt in/out during install; forced desktop shortcuts are considered rude | LOW | Currently `createDesktopShortcut: always` — should be `askCreateDesktopShortcut: true` |
-| Clean uninstaller via Add/Remove Programs | Users expect to be able to remove the app; missing this is a trust failure | LOW | NSIS target provides this by default — verify it appears correctly in Programs list |
-| App version in Add/Remove Programs | Standard Windows metadata; helps users know what they installed | LOW | Driven by `version` in package.json — currently `1.0.0`, should be `2.4.0` |
-| Correct app name and publisher | Currently `resumehelper` as both appId and productName; needs real name | LOW | Fix `productName` to "ResumeHelper", fix `author` away from "example.com" |
-| Predictable install directory | Users expect apps to land in `AppData\Local` (per-user) or `Program Files` (per-machine) | LOW | NSIS default for `oneClick: false` without `perMachine: true` is per-user `AppData\Local` |
-| App icon in installer and shortcuts | Unsigned apps still look legitimate with a real icon; missing icon looks broken | LOW | Requires `build/icon.ico` — not currently present in repo |
-
-#### Differentiators (Competitive Advantage)
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Install directory picker | Power users appreciate choosing install location | LOW | `allowToChangeInstallationDirectory: true` in nsis config |
-| "Launch on finish" checkbox | Reduces friction from install to first run | LOW | `runAfterFinish: true` in nsis config |
-| Prompt to keep/delete user data on uninstall | SQLite DB in AppData survives uninstall by default; prompting respects user data intent | MEDIUM | Requires custom `build/uninstaller.nsh` macro; `deleteAppDataOnUninstall` only works for `oneClick: true` mode |
-| Correct display name everywhere | "ResumeHelper" not "resumehelper" in taskbar, title bar, installer pages | LOW | Fix `productName` in electron-builder.yml; affects installer title, shortcuts, Programs list |
-
-#### Anti-Features (Commonly Requested, Often Problematic)
-
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Code signing certificate | Eliminates SmartScreen "Unknown Publisher" warning | EV certs cost $300-500/yr and require hardware token; standard certs still show warning initially; Azure Trusted Signing adds pipeline complexity. This is a personal tool — one-time "Run anyway" click is acceptable | Document the SmartScreen bypass for self-distribution; revisit if ever distributed publicly |
-| Auto-update via electron-updater | Keeps users current automatically | `publish.url` currently points to `https://example.com/auto-updates` — this is broken plumbing that will fail silently in prod; auto-update requires real server infrastructure | Remove or stub the publish config entirely for v2.4; electron-updater is already in dependencies but non-functional |
-| Per-machine (system-wide) install | App available to all Windows accounts on the machine | Requires UAC elevation prompt; for a single-user personal tool this is unnecessary friction | Default per-user install; no UAC prompt needed |
-| MSI installer format | Enterprise-grade format some users prefer | Requires significantly more configuration and tooling vs NSIS; no benefit for personal distribution | Stay with NSIS |
-
----
-
-### Domain 2: Test Suites (Data Layer, Export Pipeline, AI Integration)
-
-#### Table Stakes (Developer Expects These)
+Features users assume exist once "Export JSON" is on the roadmap. Missing these = portability feature feels half-built.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Unit tests for pure business logic | `applyOverrides()`, `scoreColor()`, merge logic are pure functions with no deps — fastest possible tests, highest ROI | LOW | `src/shared/overrides.ts` exports pure functions; ideal starting point |
-| Vitest as test runner | Already using electron-vite (Vite-based); Vitest shares the same config/transforms — near-zero setup overhead vs. Jest | LOW | Add `vitest` to devDependencies; configure separate `vitest.config.ts` |
-| In-memory SQLite for DB tests | Avoids hitting real DB file; each test gets fresh schema; fast and fully isolated | MEDIUM | `better-sqlite3` supports in-memory via `new Database(':memory:')` — Drizzle works with it directly |
-| DB CRUD operation tests | Verify schema correctness, insert/select/delete behavior, foreign key constraints | MEDIUM | Use in-memory SQLite + Drizzle; run schema `CREATE TABLE IF NOT EXISTS` in `beforeEach` |
-| Three-layer merge behavior tests | Core correctness guarantee: base data → variant selection → analysis override merge must be deterministic | LOW | `applyOverrides()` in `src/shared/overrides.ts` is already pure — test with crafted fixture data covering edge cases |
-| AI Zod schema validation tests | The Zod schemas used with `generateObject` define the contract with AI output; test that schemas parse valid fixture JSON and reject malformed input | LOW | Test `schema.parse()` and `schema.safeParse()` with fixture JSON; no AI API calls needed |
-| Mock AI provider for integration tests | AI SDK v3.4+ ships `MockLanguageModelV1` and test helpers for deterministic, API-call-free testing | LOW | Use `createMockProvider()` from `ai/test`; avoids real API calls and cost in CI |
+| **Base "Export JSON" button in Experience tab header** | Symmetry: "Import JSON" and "Import PDF" already live there ([ExperienceTab.tsx:187](../../src/renderer/src/components/ExperienceTab.tsx)). Users expect the inverse button next to its siblings. | LOW | Reuse header button styling. Invokes `dialog.showSaveDialog` → reads all tables → writes resume.json (schema 1.0.0). No confirmation modal needed — safe read-only op. |
+| **Per-variant "Export JSON" button in preview toolbar** | Sits next to `PDF` / `DOCX` buttons in VariantEditor ([line 562-603](../../src/renderer/src/components/VariantEditor.tsx)). Users who can PDF/DOCX a variant expect to JSON it too. | MEDIUM | Must merge three layers (base → variant exclusions → analysis overrides) via `applyOverrides()` — same pipeline as `getBuilderDataForVariant()` in [export.ts:16](../../src/main/handlers/export.ts). Output = resume.json shape, not BuilderData shape. Requires a BuilderData → resume.json transformer. |
+| **Default filename uses profile name + variant name** | Already the pattern for PDF/DOCX (`${sanitize(profile.name)}_Resume_${sanitize(variant.name)}.pdf` — [VariantEditor.tsx:229](../../src/renderer/src/components/VariantEditor.tsx)). Users expect the same filename scheme with `.json`. | LOW | `_Resume_VariantName.json` for variant export; `profile.name.json` for base export. |
+| **Success toast on export** | Existing PDF/DOCX pattern: `showToast('Resume exported as PDF')`. Users expect identical feedback. | LOW | `showToast('Resume exported as JSON')`. |
+| **Silent on user-cancelled save dialog** | Existing pattern: `if (!result.canceled) showToast(...)`. No error when user clicks Cancel. | LOW | Handler returns `{ canceled: true }`; renderer skips toast. |
+| **DB location picker in Settings (folder select, not file select)** | VS Code/Obsidian/Immich all expose data-folder-as-folder, not as a database file. Users think in "where my data lives", not "which .sqlite file". | LOW | `dialog.showOpenDialog({ properties: ['openDirectory'] })`. The file itself stays named `app.db`. |
+| **Confirmation modal before moving DB** | Destructive-feeling operations need a confirm step. Matches existing ImportConfirmModal shape ([ImportConfirmModal.tsx](../../src/renderer/src/components/ImportConfirmModal.tsx)) — modal pattern already in project. | LOW | Modal states: source path, destination path, what will happen (copy → verify → switch → keep old as backup). Primary button "Move database". Cancel closes modal. |
+| **Progress indication during move** | better-sqlite3 copy of a small resume DB is near-instant, but users still expect a spinner/"Moving..." state on the button during the IPC round-trip. | LOW | Same pattern as `{exporting === 'pdf' ? 'Exporting...' : 'PDF'}` — button label swaps to `Moving...` and disables. |
+| **Error state with restore** | If copy or verify fails, revert: keep old DB active, show error toast, surface reason. Matches the rollback convention users expect from any "move my data" operation. | MEDIUM | Verify = open copied DB readonly, run sanity query (e.g. `SELECT COUNT(*) FROM profile` returns 1). If fail → don't update path setting, delete copied file, show error. Old DB untouched throughout. |
+| **Old DB kept as `.bak` after successful switch** | Sane-default safety net. Users know file-copy migrations can fail silently; a `.bak` gives them a rescue point. | LOW | Rename old `app.db` → `app.db.bak` (or move to `old/app.db`) after successful switch. Documented in settings help text. |
+| **Restart prompt after switch** | better-sqlite3 handle is opened once at startup ([db/index.ts:9](../../src/main/db/index.ts)). Swapping files under a live connection is fragile. Users are accustomed to "Restart app to apply" from VS Code settings changes and OS-level data migrations. | LOW–MEDIUM | After successful copy+verify+path-setting update, show "Restart ResumeHelper for the change to take effect" modal with "Restart now" / "Later" buttons. Use `app.relaunch(); app.exit()` on confirm. |
+| **DOCX export respects showSummary toggle** | User already toggles `Summary` in VariantBuilder ([VariantBuilder.tsx:258](../../src/renderer/src/components/VariantBuilder.tsx)). PDF respects it (via print.html). DOCX not respecting it = silent data-correctness bug. | LOW | Pass `showSummary` through to `buildResumeDocx()`; omit summary paragraph when false. No UX change. |
 
-#### Differentiators (What Makes the Test Suite Actually Useful)
+### Differentiators (Beyond the Minimum)
+
+Features that would *genuinely* differentiate this milestone. Note: with v2.5 scoped to portability + debt, there's little room for differentiation — this is infrastructure work, not a product expansion.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Handler logic extracted to pure functions | IPC handlers currently mix `ipcMain.handle()` registration with business logic — extraction makes handlers testable without mocking Electron | MEDIUM | Pattern: export `handleGetVariant(db, variantId)` called by the `ipcMain.handle(...)` wrapper; test the export directly |
-| DOCX structure assertions | PDF export is hard to unit test; DOCX builder object is inspectable in memory before `Packer.toBuffer()` — assert on paragraph count, heading text, font names per template | MEDIUM | Create fixture variant + profile data; call `getBuilderDataForVariant` with in-memory DB; assert on output structure |
-| Separate Vitest environments per layer | Main process tests run in `node` environment; renderer utility tests can run in `jsdom` if needed | MEDIUM | Configure via `environmentMatchGlobs` in `vitest.config.ts` — avoids browser-vs-node API conflicts |
-| `beforeEach` schema reset for DB tests | Each test gets a clean DB state; no test pollution between cases | LOW | Standard pattern: recreate in-memory `Database(':memory:')` and run schema creation in `beforeEach` |
-| Fixture-based testing over mocking DB | Test real SQL behavior (not just "was this function called") by using in-memory SQLite with real queries | MEDIUM | Higher confidence than mock-everything approach; catches actual query bugs |
+| **Export badge: "Standard resume.json (schema 1.0.0)"** | Signals compliance with the open [JSON Resume](https://jsonresume.org/schema) spec — differentiates from FlowCV (PDF-only) and many builders that use proprietary JSON shapes. Matters for the user persona who wants portability guarantees. | LOW | One-line label next to the button or in tooltip. Zero code impact on the export path itself. |
+| **"Export variant" shows non-roundtrip warning in tooltip** | Variant export embeds analysis overrides and skips excluded items — re-importing would not reproduce the variant structure. Telling users this up front prevents confused bug reports later. | LOW | Tooltip or small help text: "Exports the final rendered resume. Re-importing creates new base entries — it won't recreate this variant." |
+| **Copy-verify-switch migration with explicit step log** | Most desktop apps treat "move data folder" as a black-box restart. Showing the steps (Copying... → Verifying... → Switching...) surfaces the safety guarantees to the user and builds trust. Borrowed from the SQL Server admin pattern. | MEDIUM | Only valuable if user sees a ≥1s duration. For a ~1 MB DB, move is < 100ms and the steps collapse into "Done." Probably not worth the polish. |
+| **"Reveal in Explorer" button next to DB path** | One-click way to see where the file actually lives. Standard pattern in Electron apps (VS Code, Obsidian). Reduces "where's my data?" support confusion. | LOW | `shell.showItemInFolder(dbPath)`. Tiny icon button inline with path label. |
 
-#### Anti-Features (Commonly Requested, Often Problematic)
+### Anti-Features (Commonly Requested, Often Problematic)
+
+Features that seem attractive but add risk or scope without payoff for v2.5.
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| E2E tests with Playwright launching real Electron | Full end-to-end coverage feels thorough | Requires built app; 30-120s per test; flaky without display server in CI; the app has no complex multi-step flows that unit + integration tests can't cover | Defer E2E entirely for v2.4; add only if a specific regression requires it |
-| React component tests with jsdom | Component coverage feels complete | Most renderer components are display logic wired to `window.api` (preload IPC); testing them requires mocking the entire preload bridge plus Electron state; high setup cost for low signal | Test renderer utility functions (`scoreColor`, `filterResumeData`) as pure unit tests; skip component rendering tests |
-| 100% code coverage target | Feels rigorous | Forces testing of IPC registration boilerplate and DB schema field names that provide zero bug-catching value; wastes time | Target coverage on business logic: merge, scoring, AI schema validation, DOCX structure |
-| Running `better-sqlite3` under plain `npx vitest` | Seems like standard setup | `better-sqlite3` is a native module compiled against Electron's Node version, not system Node. Running under plain Vitest throws native module version errors | Run main process tests via `ELECTRON_RUN_AS_NODE=1 electron ./node_modules/.bin/vitest` or vi.mock the db module pointing to a test-only in-memory instance |
-| Mocking the entire `db` module | Fully isolates handlers | You're only testing that handlers call db methods — not that queries are correct. Zero value for data correctness | Use real in-memory SQLite; mock only at boundaries that cannot run in test (Electron dialogs, BrowserWindow, file system writes) |
+| **Roundtrip guarantee on variant JSON export** | "If I can export, I should be able to import back and get the same variant." | Variant state is *exclusions + overrides relative to base*. Exporting the merged view is export-only by design — round-tripping would require a non-standard schema extension, violating the JSON Resume spec and the "export = portable standard format" promise. | Document explicitly: variant export = final rendered view; base export = full DB. Import path stays INSERT-only into base. |
+| **"Export all variants" bulk button** | Power-user ask. | N variants × one save dialog per file = UX friction, or one zip = new dependency and new error modes. No evidence user has asked for this. | Deferred. Revisit only if multiple users request it. |
+| **Live DB swap without restart** | "Why make me restart?" | better-sqlite3 opens the handle at module load ([db/index.ts](../../src/main/db/index.ts)). Swapping DB files under a live `Database` instance risks WAL-file divergence, stale prepared statements, and open-file locks on Windows. The fix (close/reopen/rewire all singletons) is a full architectural change — out of scope for a debt-cleanup milestone. | Restart prompt. It's the VS Code, Obsidian, and SQL Server convention. Users accept it. |
+| **Export variant as JSON Resume + custom extension field** | Preserve variant semantics ("which items are excluded") in the exported file. | Non-standard extensions break the portability promise and tempt us to build a sibling import path. Explicit base/variant separation (base = roundtrip-safe, variant = export-only) is cleaner. | Document the split. Encourage users who want "another variant" to import base, then build variants in-app. |
+| **In-app DB viewer/browser** | "Let me see my data." | Reimplementing SQLite browsing. Out of scope; users can open `app.db` in DB Browser for SQLite if they need it. | "Reveal in Explorer" is enough. |
+| **Auto-backup DB on schedule** | Safety. | New background subsystem with scheduling, retention, and failure modes. Much bigger than v2.5 debt cleanup. | Old-DB-as-`.bak` during move covers the one dangerous operation. Users can cloud-sync the userData folder themselves. |
+| **Cloud sync / OneDrive integration** | Portability across machines. | Sync engines are a full product. Out of scope. | Configurable DB path in Settings *enables* the user to point at a OneDrive/Dropbox folder manually — that's the portability we're shipping. |
+| **Merge mode for variant JSON import** | Symmetry with export. | Variant export is *not* re-importable by design (see first row). | Explicitly not supported. Spec should say so. |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Vitest setup + vitest.config.ts]
-    └──required by──> [All test suites]
+[Base Export JSON]
+    └──requires──> [BuilderData → resume.json transformer]
+                       └──requires──> [All-entity SELECT (already exists in export.ts)]
 
-[Native module problem solved (ELECTRON_RUN_AS_NODE or vi.mock)]
-    └──required by──> [In-memory SQLite test helper]
+[Variant Export JSON]
+    └──requires──> [applyOverrides() merge (already exists — shared/overrides.ts)]
+    └──requires──> [getBuilderDataForVariant() (already exists — export.ts:16)]
+    └──requires──> [BuilderData → resume.json transformer] (shared with base export)
 
-[In-memory SQLite test helper]
-    └──required by──> [DB operation tests]
-    └──required by──> [IPC handler tests]
-    └──required by──> [Export pipeline tests (getBuilderDataForVariant)]
+[DB Path Picker]
+    └──requires──> [Settings persistence for dbPath (new electron-store or new JSON file alongside DB)]
+    └──requires──> [Startup path resolution (replace hardcoded userData/app.db with settings.dbPath ?? default)]
+    └──requires──> [Copy-verify-switch IPC handler]
 
-[Handler logic extraction (pure function exports)]
-    └──required by──> [IPC handler unit tests]
+[DOCX showSummary fix]
+    └──requires──> [buildResumeDocx() accepts showSummary param (read existing docxBuilder.ts)]
 
-[AI SDK mock provider]
-    └──required by──> [AI integration tests]
-
-[Zod schema fixtures]
-    └──feeds into──> [AI Zod schema tests]
-    └──feeds into──> [AI integration tests]
-
-[NSIS metadata fixes (productName, appId, author, version)]
-    └──required by──> [Any usable installer — must land first]
-
-[build/icon.ico]
-    └──required by──> [Professional installer appearance]
-
-[Custom uninstaller.nsh]
-    └──enhances──> [Uninstall experience]
-    └──independent of──> [Core installer functionality]
+[Tech Debt]
+    └──(no user-facing dependencies)
 ```
 
 ### Dependency Notes
 
-- **NSIS metadata fixes are zero-risk and should land before anything else**: Purely additive config changes in package.json and electron-builder.yml; no code changes.
-- **Native module problem is the critical blocker for all DB-dependent tests**: Must be solved before in-memory SQLite helper, which is itself a prerequisite for DB, IPC handler, and export pipeline tests.
-- **Handler logic extraction is a prerequisite for useful IPC handler tests**: Handlers in `src/main/handlers/` currently mix registration with logic — extraction is a refactor step, not just a test step.
-- **AI Zod schema tests have no blockers**: The schemas are pure TypeScript/Zod, no Electron, no DB. Can be written immediately after Vitest is configured.
+- **Base and Variant JSON export share a transformer.** Write it once: `toResumeJson(builderData, profile) → ResumeJson`. Variant path calls `getBuilderDataForVariant(db, variantId, analysisId)`, base path calls a new `getBaseBuilderData(db)` (no variantId, no exclusion filtering). Both feed the transformer.
+- **DB path setting needs to persist OUTSIDE the SQLite DB itself.** Obvious reason: you can't read "where my DB is" from the DB you're trying to locate. Options: (1) `electron-store` (JSON file in `app.getPath('userData')`) or (2) plain `settings.json` alongside. Either works; the settings file always lives in userData, only the DB is relocatable.
+- **The "restart after DB move" step has a soft dependency on startup path resolution.** If settings.json points to a missing path at startup (e.g. user moved the file externally), app must fall back gracefully — either to the default location or to an error screen with "locate DB" option. Edge case to flag.
+- **DOCX showSummary is strictly additive.** Single code path in `docxBuilder.ts`; threading the flag through is trivial.
 
 ---
 
 ## MVP Definition
 
-### Windows Installer — Ship With v2.4
+v2.5 **is** the MVP for this portability surface — there's no "v2.5.1" planned. The list below is what ships in the milestone.
 
-- [ ] Fix `productName` to "ResumeHelper" in electron-builder.yml
-- [ ] Fix `appId` to something real (e.g., `com.mark.resumehelper`)
-- [ ] Fix `author` in package.json (away from "example.com")
-- [ ] Update `version` in package.json to `2.4.0`
-- [ ] Add `build/icon.ico` (app icon for installer and shortcuts)
-- [ ] Change `createDesktopShortcut: always` to `askCreateDesktopShortcut: true`
-- [ ] Add `runAfterFinish: true` to nsis config
-- [ ] Remove or stub `publish.url` (currently broken `https://example.com/auto-updates`)
-- [ ] Verify `npm run build:win` produces installable .exe with working uninstaller in Add/Remove Programs
+### Launch With (v2.5)
 
-### Test Suites — Ship With v2.4
+- [ ] **Base resume.json export** — button in Experience tab header next to `Import JSON` / `Import PDF`. Filename = `${profileName}_Resume.json`. Toast on success.
+- [ ] **Variant resume.json export** — button next to `PDF` / `DOCX` in VariantEditor preview toolbar. Filename = `${profileName}_Resume_${variantName}.json`. Three-layer merge. Toast on success.
+- [ ] **Configurable DB location** — Settings card with: (a) current path label + "Reveal in Explorer", (b) `Change location...` button → folder picker → confirmation modal → copy-verify-switch → old file renamed to `.bak` → restart prompt.
+- [ ] **DOCX honors showSummary** — threaded through `buildResumeDocx()`; no UI change.
+- [ ] **Tech debt** — TEMPLATE_LIST export removed, `compact` prop removed from `ResumeTemplateProps`, `tests/setup.ts` deleted, `jobs.test.ts` race fixed.
 
-- [ ] Add Vitest to devDependencies; create `vitest.config.ts` with `node` environment
-- [ ] Solve `better-sqlite3` native module problem (ELECTRON_RUN_AS_NODE approach)
-- [ ] Tests for `applyOverrides()` in `src/shared/overrides.ts`
-- [ ] Tests for `scoreColor()` in `src/renderer/src/lib/scoreColor.ts`
-- [ ] Create `src/test/helpers/db.ts` — `createTestDb()` utility returning in-memory Drizzle instance
-- [ ] DB operation tests: CRUD for jobs, variants, skills, submissions
-- [ ] AI Zod schema tests: parse/safeParse with fixture JSON for PDF import and URL extraction schemas
-- [ ] Extract handler logic from at least `handlers/templates.ts` and `handlers/ai.ts` to pure functions
-- [ ] IPC handler unit tests for extracted handler functions
-- [ ] DOCX structure test: assert paragraph/heading/font output for at least one template
+### Explicitly NOT in v2.5
 
-### Add After Validation (v2.4.x)
-
-- [ ] Custom `build/uninstaller.nsh` to prompt for user data deletion on uninstall
-- [ ] Coverage for remaining IPC handlers — add as regression tests when bugs surface
-- [ ] Tests for PDF import full extraction path (pdf-parse + Zod schema + AI mock)
-
-### Future Consideration (v3+)
-
-- [ ] E2E Playwright tests — only if a regression requires full app launch to reproduce
-- [ ] React component tests with jsdom — only if component bugs become a pattern
-- [ ] Code signing and auto-update infrastructure — only if distributing publicly
+- "Export all variants" bulk/zip
+- In-app DB browser
+- Scheduled auto-backups
+- Cloud sync integration
+- Variant JSON roundtrip / import
 
 ---
 
@@ -168,40 +121,182 @@
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Fix installer metadata (productName, appId, author, version) | HIGH | LOW | P1 |
-| Add `build/icon.ico` | HIGH | LOW | P1 |
-| `askCreateDesktopShortcut` + `runAfterFinish` | MEDIUM | LOW | P1 |
-| Remove broken publish URL | HIGH (prevents silent runtime failure) | LOW | P1 |
-| Vitest setup + native module solution | HIGH | MEDIUM | P1 |
-| `applyOverrides()` + `scoreColor()` unit tests | HIGH | LOW | P1 |
-| In-memory SQLite test helper | HIGH | MEDIUM | P1 |
-| DB CRUD tests | HIGH | MEDIUM | P1 |
-| AI Zod schema tests | HIGH | LOW | P1 |
-| Handler logic extraction + IPC tests | HIGH | MEDIUM | P1 |
-| DOCX structure tests | MEDIUM | MEDIUM | P2 |
-| PDF import full extraction tests | MEDIUM | MEDIUM | P2 |
-| Custom uninstaller data-prompt | MEDIUM | MEDIUM | P2 |
-| Code signing | LOW (personal tool) | HIGH | P3 |
-| E2E Playwright tests | LOW | HIGH | P3 |
-| React component tests | LOW | HIGH | P3 |
+| Base resume.json export | HIGH — headline feature | LOW | P1 |
+| Variant resume.json export | HIGH — headline feature | MEDIUM — needs transformer + merge reuse | P1 |
+| DB location picker + migration | HIGH — blocks multi-machine use | MEDIUM — copy/verify/switch + restart flow | P1 |
+| DOCX showSummary fix | MEDIUM — correctness bug | LOW | P1 |
+| Tech debt cleanup | LOW (user) / HIGH (dev) | LOW | P1 |
+| "Reveal in Explorer" next to DB path | LOW–MEDIUM polish | LOW | P2 |
+| Schema/version badge on export | LOW polish | LOW | P2 |
+| Migration step log (Copying... Verifying...) | LOW polish | MEDIUM | P3 — skip |
+
+Everything in the Active list of PROJECT.md is P1 — there's no "should we do this?" question, only "how do we present it?"
+
+---
+
+## Detailed UX Behaviors (for Requirements author)
+
+### Base Export JSON
+
+- **Trigger:** `Export JSON` button in Experience tab header, right of `Import PDF`.
+- **Dialog:** `dialog.showSaveDialog({ title: 'Export Resume as JSON', defaultPath: '${profileName}_Resume.json', filters: [{ name: 'JSON Files', extensions: ['json'] }] })`.
+- **Behavior:**
+  - Read all DB tables (profile, jobs+bullets, skills+categories, projects+bullets, education, volunteer, awards, publications, languages, interests, references).
+  - Transform to JSON Resume schema 1.0.0 shape (see [jsonresume.org/schema](https://jsonresume.org/schema)).
+  - Write via `fs.writeFile(filePath, JSON.stringify(data, null, 2))`.
+- **Success state:** `showToast('Resume exported as JSON')`.
+- **Cancel state:** no toast, no state change (mirrors PDF/DOCX pattern).
+- **Error state:** `showToast('Export failed: ${err.message}')`.
+- **Loading state:** button shows `Exporting...` during operation; disabled; other export buttons in same toolbar untouched.
+
+### Variant Export JSON
+
+- **Trigger:** `JSON` button in VariantEditor preview toolbar, right of `DOCX`. Treated as peer of PDF/DOCX.
+- **Dialog:** `defaultPath: '${profileName}_Resume_${variantName}.json'`.
+- **Behavior:**
+  - Call `getBuilderDataForVariant(db, variantId, analysisId)` — already produces merged three-layer view.
+  - Transform to resume.json; write as above.
+  - Variant name included in filename only (not embedded in JSON content — export matches spec).
+- **Feedback:** Same toast/cancel/error pattern as base.
+- **Edge case:** If `variantName` is empty, fall back to `Untitled`.
+
+### DB Location Settings Card
+
+Place in `SettingsTab.tsx` as **second card**, below AI Configuration. Heading: `Database Location`.
+
+**Field layout:**
+
+```
+┌─ Database Location ────────────────────────────────────┐
+│                                                        │
+│  CURRENT LOCATION                                      │
+│  C:\Users\Mark\AppData\Roaming\resume-helper\app.db    │
+│  [Reveal in Explorer]                                  │
+│                                                        │
+│  [Change location...]                                  │
+│                                                        │
+│  Your resume data lives in a single SQLite file.       │
+│  Move it to a synced folder (OneDrive, Dropbox) to     │
+│  access from multiple machines.                        │
+└────────────────────────────────────────────────────────┘
+```
+
+**`Change location...` flow:**
+
+1. Click → folder picker opens (`properties: ['openDirectory']`).
+2. User selects folder → confirmation modal appears:
+
+   ```
+   ┌─ Move database ──────────────────────────────────┐
+   │                                                  │
+   │  From: C:\Users\Mark\AppData\...\app.db          │
+   │  To:   D:\OneDrive\ResumeHelper\app.db           │
+   │                                                  │
+   │  What will happen:                               │
+   │  1. Copy database file to new location           │
+   │  2. Verify the copy opens and reads correctly    │
+   │  3. Switch to the new location                   │
+   │  4. Rename old file to app.db.bak (kept as       │
+   │     backup — delete manually when ready)         │
+   │  5. Restart ResumeHelper                         │
+   │                                                  │
+   │  If anything fails, nothing changes.             │
+   │                                                  │
+   │  [Cancel]                        [Move database] │
+   └──────────────────────────────────────────────────┘
+   ```
+
+3. Confirm → button becomes `Moving...`, disabled.
+4. IPC handler:
+   - `fs.copyFile(oldPath, newPath)` — if fails, show error toast, no changes.
+   - Open copied DB read-only, `SELECT COUNT(*) FROM profile` (expect 1), close — if fails, delete `newPath`, show error toast, no changes.
+   - Update settings file: `{ dbPath: newPath }`.
+   - Rename `oldPath` → `oldPath + '.bak'`.
+   - Return success.
+5. Restart modal appears:
+
+   ```
+   ┌─ Restart required ───────────────────────────────┐
+   │                                                  │
+   │  Database moved successfully. Restart            │
+   │  ResumeHelper to use the new location.           │
+   │                                                  │
+   │  [Restart later]                  [Restart now]  │
+   └──────────────────────────────────────────────────┘
+   ```
+
+6. `Restart now` → `app.relaunch(); app.exit(0)`.
+7. `Restart later` → modal closes; Settings card shows new path but a banner: `Restart required for changes to take effect`.
+
+**Edge cases requirements should cover:**
+
+- Destination path already contains `app.db` → warn, require explicit "Replace" button in confirm modal.
+- Destination path = source path → picker should prevent OR confirm modal should skip (no-op).
+- Destination folder not writable → catch at copy step, show error.
+- Settings file points to missing path on next startup → fall back to default location, show one-time notice on first render ("Previous database location not found. Using default.").
+- User manually moves `app.db` externally → same fallback behavior.
+- WAL files (`app.db-wal`, `app.db-shm`) must be copied alongside the main file OR we force a checkpoint before copying (per [SQLite backup best practice](https://sqlite.org/backup.html) — writer must be quiesced for file-level copy to be consistent). Easiest: `sqlite.pragma('wal_checkpoint(TRUNCATE)')` before copy, then copy only `app.db`. Flag this in requirements so the author surfaces it.
+
+### DOCX showSummary
+
+- **Trigger:** User toggles Summary checkbox in VariantBuilder ([line 256-260](../../src/renderer/src/components/VariantBuilder.tsx)).
+- **Current behavior (bug):** PDF respects toggle (print.html reads `showSummary`), DOCX always includes summary regardless.
+- **Expected behavior:** DOCX omits the Summary paragraph when `showSummary === false`.
+- **Implementation:** `buildResumeDocx(builderData, profile, layoutTemplate, templateOptions)` already reads `templateOptions.showSummary`; check whether it's being *used* in the DOCX builder. If not wired, wire it. If partially wired, complete it. (Requires reading docxBuilder.ts — not in this research scope.)
+- **No UI change.**
+
+### Tech Debt
+
+All four items are internal. No user-visible behavior. Requirements should just list:
+
+- Remove orphan `TEMPLATE_LIST` export from `resolveTemplate.ts`.
+- Remove vestigial `compact` prop from `ResumeTemplateProps`.
+- Delete dead `tests/setup.ts` (or wire into vitest config if it's meant to run).
+- Fix race in `jobs.test.ts` — likely shared in-memory SQLite across threads; use per-test isolation or pool=forks.
+
+---
+
+## Competitor Feature Analysis
+
+| Feature | JSON Resume registry | Reactive Resume | FlowCV | Our Approach |
+|---------|----------------------|-----------------|--------|--------------|
+| JSON export of full resume | Raw JSON/YAML/TEXT via registry URL | `Export → JSON` button in right sidebar (top-level menu) | Not available (PDF-only, per search results) | **Button in Experience tab header + button in variant toolbar. Two distinct scopes.** |
+| Schema compliance | JSON Resume 1.0.0 (they *are* the spec) | JSON Resume 1.0.0 with known roundtrip bugs ([Issue #2364](https://github.com/AmruthPillai/Reactive-Resume/issues/2364)) | N/A | JSON Resume 1.0.0. Base export is roundtrip-safe (uses existing INSERT-only append import). Variant export is explicitly export-only. |
+| Variant/tailored export | N/A (single resume) | N/A (single active resume) | N/A | **Differentiator: per-variant merged export — no other tool has this because no other tool has the three-layer model.** |
+| Configurable storage location | N/A (web-hosted gist) | N/A (web app or self-hosted container) | N/A (web) | Electron-native. **Differentiator vs. web tools: works offline, user owns the file, swappable folder.** |
+| Data folder restart prompt | N/A | N/A | N/A | Standard Electron/VS Code/Obsidian convention. Low-risk, high-familiarity. |
+
+**Takeaway:** The JSON export feature itself is commoditized (every serious builder has it). What matters is the *variant-merged* export, which is uniquely enabled by our three-layer data model. The DB-location feature has no web-app equivalent and is straightforward desktop-app table stakes.
 
 ---
 
 ## Sources
 
-- electron-builder NSIS official docs: https://www.electron.build/nsis.html
-- electron-builder NsisOptions interface: https://www.electron.build/electron-builder.Interface.NsisOptions.html
-- Electron automated testing guide: https://www.electronjs.org/docs/latest/tutorial/automated-testing
-- Vercel AI SDK testing (mock providers): https://ai-sdk.dev/docs/ai-sdk-core/testing
-- electron-mock-ipc: https://github.com/h3poteto/electron-mock-ipc
-- Vitest + Electron native module discussion: https://github.com/vitest-dev/vitest/discussions/2142
-- Drizzle ORM unit testing with SQLite: https://github.com/drizzle-team/drizzle-orm/discussions/784
-- Electron app testing guide (2026): https://www.accelq.com/blog/electron-app-testing/
-- NSIS SmartScreen / code signing: https://codesigningstore.com/how-to-sign-a-windows-app-in-electron-builder
-- NSIS AppData cleanup on uninstall issue: https://github.com/electron-userland/electron-builder/issues/4141
-- NSIS uninstaller AppData deletion option: https://github.com/electron-userland/electron-builder/issues/2057
+- [Reactive Resume — Exporting your resume](https://docs.rxresu.me/guides/exporting-your-resume) — confirms right-sidebar JSON button pattern.
+- [Reactive Resume — JSON Resume Schema](https://docs.rxresu.me/guides/json-resume-schema) — schema compliance.
+- [Reactive Resume Issue #2364 — export/import roundtrip failures](https://github.com/AmruthPillai/Reactive-Resume/issues/2364) — cautionary tale on schema mismatch; reinforces our "base export = roundtrip, variant export = export-only" split.
+- [JSON Resume — Schema 1.0.0](https://jsonresume.org/schema) — authoritative schema spec.
+- [JSON Resume Docs](https://docs.jsonresume.org/schema) — canonical field list.
+- [Obsidian Forum — How do I move the vault to another location?](https://forum.obsidian.md/t/how-do-i-move-the-vault-to-another-location/637) — confirms "vault switcher + move dialog" is accepted pattern for desktop data-folder moves.
+- [Obsidian — Manage vaults](https://help.obsidian.md/Files+and+folders/Manage+vaults) — vault location UX.
+- [VS Code — Settings Sync](https://code.visualstudio.com/docs/configure/settings-sync) — symbolic link / portable mode as the usual answer for "change settings location"; reinforces that explicit "pick a folder" is the simpler UX for our case.
+- [Electron Issue #24536 — userData folder still created after setPath](https://github.com/electron/electron/issues/24536) — flags that `app.setPath()` must run before `app.whenReady()` and still leaves default folder artifacts. Informs the "restart to apply" decision.
+- [How to store user data in Electron (Cameron Nokes)](https://cameronnokes.com/blog/how-to-store-user-data-in-electron/) — confirms userData default locations per OS.
+- [electron-store](https://github.com/sindresorhus/electron-store) — standard pattern for the meta-settings file (where we record `dbPath`).
+- [SQLite Backup API](https://sqlite.org/backup.html) — authoritative: "close writing connections or use backup API + ensure checkpoint before filesystem copy." Informs the WAL-checkpoint step before `fs.copyFile`.
+- [SQLite Forum — Backup via file system backup software](https://sqlite.org/forum/info/796a192a95ac35b9) — reinforces WAL quiescence requirement.
+- [better-sqlite3 npm](https://www.npmjs.com/package/better-sqlite3) — WAL mode and connection lifecycle.
+- [Move system databases — SQL Server docs](https://learn.microsoft.com/en-us/sql/relational-databases/databases/move-system-databases) — copy → verify → switch → delete-original pattern is standard.
+- Existing codebase:
+  - [ExperienceTab.tsx](../../src/renderer/src/components/ExperienceTab.tsx) (Import button placement — line 187)
+  - [VariantEditor.tsx](../../src/renderer/src/components/VariantEditor.tsx) (PDF/DOCX toolbar — lines 562-603)
+  - [SettingsTab.tsx](../../src/renderer/src/components/SettingsTab.tsx) (Settings card pattern)
+  - [ImportConfirmModal.tsx](../../src/renderer/src/components/ImportConfirmModal.tsx) (modal shape to mirror for DB-move confirm)
+  - [export.ts](../../src/main/handlers/export.ts) (getBuilderDataForVariant — line 16; uses applyOverrides at line 10/192)
+  - [import.ts](../../src/main/handlers/import.ts) (resume.json parse/append structure to mirror for export)
+  - [db/index.ts](../../src/main/db/index.ts) (hardcoded `userData/app.db` — line 8; the string to replace)
 
 ---
 
-*Feature research for: Windows installer UX + Electron/React test suite strategy*
-*Researched: 2026-04-03*
+*Feature research for: v2.5 Portability & Debt Cleanup — ResumeHelper*
+*Researched: 2026-04-23*
