@@ -131,6 +131,53 @@
 
 ---
 
+## Milestone: v2.4 — Polish & Reliability
+
+**Shipped:** 2026-04-21
+**Phases:** 5 | **Plans:** 12 | **Timeline:** 37 days (2026-03-13 → 2026-04-19)
+
+### What Was Built
+- Windows NSIS installer with setup wizard, Start Menu shortcut, uninstaller entry, and clean metadata
+- Vitest test infrastructure with electron mock, in-memory SQLite/Drizzle factory, reusable test helpers and factories
+- Data layer test coverage: 57 tests — handler extraction to pure functions (db: Db pattern), applyOverrides, three-layer merge integration, variant selection cascade
+- AI integration test coverage: 44 tests — composition-based MockLanguageModelV3, Zod schema validation, deriveOverallScore, extractJsonFromText, runAnalysis cache-miss/hit
+- Export pipeline test coverage: 42 tests — buildResumeDocx extracted as pure function, DOCX XML assertions for all 5 templates, submission snapshot shape + JSON round-trip, template rendering via renderToString
+
+### What Worked
+- **Handler extraction pattern** — extracting inline logic into pure functions (db: Db first param) was the most impactful decision. It unlocked direct testing without IPC wiring, and the pattern cascaded cleanly across all 20+ handler files.
+- **Composition-based mocking** — MockLanguageModelV3 injected via vi.spyOn was cleaner and more reliable than vi.mock module replacement. Tests assert prompt wiring, not just outputs.
+- **DOCX XML assertions** — asserting against serialized XML (`word/document.xml`) via fflate unzip is stable across docx library versions. In-memory object tree assertions would have broken on any minor bump.
+- **Phase sequencing** — Infrastructure (26) → Data (27) → AI (28) → Export (29) was the right order. Each phase reused the prior's factories, helpers, and patterns.
+- **Parallel Wave 2 execution** — Phase 29 plans 02 and 03 ran in parallel worktrees without conflicts.
+
+### What Was Inefficient
+- **DATA-01/02/03 checkbox tracking** — Phase 27 completed but REQUIREMENTS.md checkboxes and traceability were never updated. Caught during milestone audit, not during phase completion. The `phase complete` CLI should auto-check requirement boxes.
+- **SUMMARY.md one-liner extraction** — continues to fail for most summaries. The CLI tool can't reliably extract one-liners from the frontmatter format, requiring manual curation during milestone completion.
+- **Nyquist VALIDATION.md files left as drafts** — all 4 VALIDATION.md files were created but never updated to compliant status after execution. The workflow doesn't enforce Nyquist completion during plan execution.
+- **tests/setup.ts dead file** — created in Phase 26 as "for future use" but never wired. Handler tests use direct injection instead. Should have been omitted.
+
+### Patterns Established
+- **Handler extraction pattern** — pure functions with `(db: Db, ...)` signature; ipcMain.handle is thin one-line wiring
+- **Composition-based LLM mocking** — inject LanguageModel through call signatures, spy via `vi.spyOn(module, 'export')`
+- **DOCX XML assertion pattern** — `Packer.toBuffer → fflate.unzipSync → decode word/document.xml → string assertions`
+- **Per-file vitest environment** — `/** @vitest-environment jsdom */` docblock for .tsx files, global stays node
+- **renderToString for template tests** — no Testing Library dependency; pure string assertions sufficient for structure verification
+- **test.each for parametric coverage** — all 5 templates tested via single parameterized test block
+
+### Key Lessons
+1. **Auto-update requirement tracking at phase completion** — the `phase complete` CLI should check off requirements in REQUIREMENTS.md to prevent tracking drift
+2. **Extract-then-test is the right order** — extracting inline code into pure functions (D-01 pattern) before writing tests is cleaner than trying to test code embedded in IPC handlers
+3. **Assert against the contract consumers use** — DOCX XML is what Word reads; renderToString output is what browsers render. Testing internal object representations is fragile.
+4. **Composition > module mocking** — `vi.spyOn` on named exports is more targeted and less fragile than `vi.mock()` module replacement
+5. **Dead files should be deleted, not "kept for future use"** — tests/setup.ts created confusion about the DB mock strategy
+
+### Cost Observations
+- Model mix: opus for orchestration/planning, sonnet for research/execution/verification
+- Sessions: ~5 across the milestone (installer, infra+data, AI tests, export tests, audit+complete)
+- Notable: Phase 29 parallel execution (2 agents in worktrees) worked cleanly — no merge conflicts. Total execution time for all 3 plans was ~10 min.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -140,6 +187,7 @@
 | v2.1 | 2 days | 4 | First milestone with discuss-phase context gathering, UAT-driven gap closure |
 | v2.2 | 6 days | 5 | UI-SPEC design contracts, @dnd-kit integration, three-layer data model |
 | v2.3 | 19 days | 3 | generateObject pattern reuse, fastest per-plan execution (~4 min avg) |
+| v2.4 | 37 days | 5 | First milestone with automated test coverage, handler extraction pattern, parallel worktree execution |
 
 ### Cumulative Quality
 
@@ -148,6 +196,7 @@
 | v2.1 | 0 automated | manual only | 0 (no new npm deps) |
 | v2.2 | 0 automated | manual only | 0 (@dnd-kit already installed) |
 | v2.3 | 0 automated | manual only | 1 (pdf-parse) |
+| v2.4 | 143 automated | data layer + AI + export pipeline | 2 (fflate, jsdom as devDeps) |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -157,3 +206,5 @@
 4. @dnd-kit PointerSensor needs activationConstraint for Electron — universal lesson for any drag interaction
 5. generateObject + Zod is the universal AI extraction pattern — confirmed across 3 use cases (job analysis, PDF import, URL scraping)
 6. Pre-check config/prerequisites before opening file dialogs or starting async operations — avoid dialog-then-fail UX
+7. Extract inline code into pure functions before writing tests — composition-based testing is cleaner than module mocking
+8. Assert against the contract consumers use (XML for DOCX, HTML for templates) — not internal library representations
