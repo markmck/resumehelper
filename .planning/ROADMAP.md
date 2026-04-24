@@ -85,7 +85,13 @@ Phases 25-29 covered: Windows NSIS installer with setup wizard, Vitest test infr
   3. `buildMergedBuilderData(db, variantId, analysisId?)` is the single function called by PDF/DOCX/snapshot/preview paths — grep shows no remaining parallel merge implementations
   4. A parameterized test suite exercises HTML + PDF + DOCX × summary on/off × all 5 templates and fails loudly if any surface drifts
   5. `ResumeJson` interface lives at `src/shared/resumeJson.ts` and is imported by both import.ts and (eventually) the new export builders
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 30-01-PLAN.md — Lift ResumeJson interface + Zod scaffold to src/shared/resumeJson.ts (MERGE-02)
+- [ ] 30-02-PLAN.md — Create src/main/lib/mergeHelper.ts with buildMergedBuilderData (MERGE-01)
+- [ ] 30-03-PLAN.md — Update buildResumeDocx signature to accept showSummary 5th arg + gate summary paragraph (DOCX-01)
+- [ ] 30-04-PLAN.md — Rewire callsites, delete 3 legacy merge paths, flip BuilderData type to showSummary (MERGE-01, DOCX-01)
+- [ ] 30-05-PLAN.md — Parameterized test suite: 5 templates × 2 summary states × 2 surfaces (MERGE-03)
 **UI hint**: yes
 
 ### Phase 31: Base Resume.json Export
@@ -149,7 +155,7 @@ Phases 25-29 covered: Windows NSIS installer with setup wizard, Vitest test infr
 | 17-21 | v2.2 | 13/13 | Complete | 2026-04-01 |
 | 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
 | 25-29 | v2.4 | 12/12 | Complete | 2026-04-21 |
-| 30-34 | v2.5 | 0/0 | Not started | - |
+| 30-34 | v2.5 | 0/5+ | Planning | - |
 
 ## Future (v3.0+)
 
