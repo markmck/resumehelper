@@ -4,7 +4,7 @@ import { db, sqlite } from '../db'
 import { aiSettings, jobPostings, analysisResults, profile, analysisBulletOverrides, analysisSkillAdditions } from '../db/schema'
 import { callJobParser, callResumeScorer, deriveOverallScore, getModel } from '../lib/aiProvider'
 import { buildResumeTextForLlm } from '../lib/analysisPrompts'
-import { getBuilderDataForVariant } from './export'
+import { buildMergedBuilderData } from '../lib/mergeHelper'
 import { buildResumeJson } from '../lib/themeRegistry'
 import type { ParsedJob } from '../lib/aiProvider'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
@@ -80,7 +80,8 @@ export async function runAnalysis(db: Db, event: Electron.IpcMainInvokeEvent, jo
     }
 
     // 4. Build resume text from the specified variant
-    const builderData = await getBuilderDataForVariant(db, variantId)
+    const merged = await buildMergedBuilderData(db, variantId)
+    const { showSummary: _showSummary, ...builderData } = merged
     const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
     const resumeJson = buildResumeJson(profileRow, builderData)
     const resumeText = buildResumeTextForLlm(resumeJson)

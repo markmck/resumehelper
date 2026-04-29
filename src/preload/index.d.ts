@@ -159,7 +159,7 @@ export interface BuilderData {
   languages?: BuilderLanguage[]
   interests?: BuilderInterest[]
   references?: BuilderReference[]
-  summaryExcluded?: boolean
+  showSummary?: boolean
 }
 
 export interface SubmissionSnapshot {

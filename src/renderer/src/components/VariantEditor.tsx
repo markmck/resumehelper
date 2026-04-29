@@ -107,9 +107,9 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant, onVaria
       setMarginsDirty(false)
     }
 
-    // Initialize showSummary from builderData.summaryExcluded
+    // Initialize showSummary from builderData (positive-semantic from helper)
     window.api.templates.getBuilderData(variant.id).then((bd) => {
-      setShowSummary(!(bd.summaryExcluded ?? false))
+      setShowSummary(bd.showSummary ?? true)
     })
   }, [variant.id])
 

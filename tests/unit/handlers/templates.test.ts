@@ -15,11 +15,11 @@ import {
   renameVariant,
   deleteVariant,
   duplicateVariant,
-  getBuilderData,
   setItemExcluded,
   setThreshold,
   getThreshold,
 } from '../../../src/main/handlers/templates'
+import { buildMergedBuilderData as getBuilderData } from '../../../src/main/lib/mergeHelper'
 import * as schema from '../../../src/main/db/schema'
 
 describe('variant CRUD', () => {
