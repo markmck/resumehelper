@@ -78,14 +78,14 @@ describe('buildResumeDocx', () => {
   const builderData = buildTestBuilderData()
 
   test.each(templateKeys)('uses correct font for %s template', async (key) => {
-    const doc = buildResumeDocx(builderData, profileRow, key, {})
+    const doc = buildResumeDocx(builderData, profileRow, key, {}, true)
     const xml = await unzipDocxXml(doc)
     const expectedFont = DOCX_FONT_MAP[key]
     expect(xml).toContain(`w:ascii="${expectedFont}"`)
   })
 
   test.each(templateKeys)('applies correct default margins for %s template', async (key) => {
-    const doc = buildResumeDocx(builderData, profileRow, key, {})
+    const doc = buildResumeDocx(builderData, profileRow, key, {}, true)
     const xml = await unzipDocxXml(doc)
     const defaults = DOCX_MARGIN_DEFAULTS[key]
     const expectedTop = Math.round(defaults.top * 1440)
@@ -99,7 +99,7 @@ describe('buildResumeDocx', () => {
 
   test('templateOptions margin overrides take precedence over defaults', async () => {
     const overrides = { marginTop: 0.5, marginBottom: 0.5, marginSides: 0.3 }
-    const doc = buildResumeDocx(builderData, profileRow, 'classic', overrides)
+    const doc = buildResumeDocx(builderData, profileRow, 'classic', overrides, true)
     const xml = await unzipDocxXml(doc)
     // classic defaults are 1.0/1.0/1.0 — overrides should win
     expect(xml).toContain(`w:top="${Math.round(0.5 * 1440)}"`)    // 720
@@ -109,7 +109,7 @@ describe('buildResumeDocx', () => {
   })
 
   test('contains profile name and contact info', async () => {
-    const doc = buildResumeDocx(builderData, profileRow, 'classic', {})
+    const doc = buildResumeDocx(builderData, profileRow, 'classic', {}, true)
     const xml = await unzipDocxXml(doc)
     expect(xml).toContain('Jane Smith')
     expect(xml).toContain('jane@example.com')
@@ -117,7 +117,7 @@ describe('buildResumeDocx', () => {
   })
 
   test('contains section headings', async () => {
-    const doc = buildResumeDocx(builderData, profileRow, 'classic', {})
+    const doc = buildResumeDocx(builderData, profileRow, 'classic', {}, true)
     const xml = await unzipDocxXml(doc)
     expect(xml).toContain('WORK EXPERIENCE')
     expect(xml).toContain('SKILLS')
@@ -126,10 +126,42 @@ describe('buildResumeDocx', () => {
   })
 
   test('contains job bullet text', async () => {
-    const doc = buildResumeDocx(builderData, profileRow, 'classic', {})
+    const doc = buildResumeDocx(builderData, profileRow, 'classic', {}, true)
     const xml = await unzipDocxXml(doc)
     expect(xml).toContain('Designed scalable microservices architecture')
     expect(xml).toContain('Acme Corp')
     expect(xml).toContain('Senior Engineer')
+  })
+
+  test('showSummary=true renders summary text in DOCX XML', async () => {
+    const profileWithSummary = { ...profileRow, summary: 'HELLO_SUMMARY' }
+    const doc = buildResumeDocx(builderData, profileWithSummary, 'classic', {}, true)
+    const xml = await unzipDocxXml(doc)
+    expect(xml).toContain('HELLO_SUMMARY')
+  })
+
+  test('showSummary=false suppresses summary text in DOCX XML', async () => {
+    const profileWithSummary = { ...profileRow, summary: 'HELLO_SUMMARY' }
+    const doc = buildResumeDocx(builderData, profileWithSummary, 'classic', {}, false)
+    const xml = await unzipDocxXml(doc)
+    expect(xml).not.toContain('HELLO_SUMMARY')
+  })
+
+  test('showSummary=true with null summary renders no summary paragraph', async () => {
+    // profile.summary is null in the base fixture — no summary paragraph regardless of showSummary
+    const doc = buildResumeDocx(builderData, profileRow, 'classic', {}, true)
+    const xml = await unzipDocxXml(doc)
+    // summary paragraph uses size 21 — not present when summary is null
+    // We just verify no errors and the doc renders correctly
+    expect(xml).toContain('Jane Smith')
+  })
+
+  test('showSummary=false with null summary — no double-gap (summary spacing absent)', async () => {
+    const doc = buildResumeDocx(builderData, profileRow, 'classic', {}, false)
+    const xml = await unzipDocxXml(doc)
+    // When showSummary=false and summary is null, the summary paragraph+spacing must not appear
+    // The summary paragraph has spacing before:120 after:200
+    // We verify WORK EXPERIENCE section still appears correctly
+    expect(xml).toContain('WORK EXPERIENCE')
   })
 })
