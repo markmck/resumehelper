@@ -56,7 +56,8 @@ export function buildResumeDocx(
   builderData: BuilderData,
   profileRow: { name?: string | null; email?: string | null; phone?: string | null; location?: string | null; linkedin?: string | null; summary?: string | null } | undefined,
   templateKey: string,
-  templateOptions: { marginTop?: number; marginBottom?: number; marginSides?: number; skillsDisplay?: string; accentColor?: string }
+  templateOptions: { marginTop?: number; marginBottom?: number; marginSides?: number; skillsDisplay?: string; accentColor?: string },
+  showSummary: boolean,
 ): Document {
   const fontName = DOCX_FONT_MAP[templateKey] ?? 'Calibri'
 
@@ -119,8 +120,10 @@ export function buildResumeDocx(
             alignment: AlignmentType.CENTER,
             spacing: { after: 200 },
           }),
-          // Professional summary — rendered when profile has summary content
-          ...(profileRow?.summary ? [
+          // Professional summary — rendered when showSummary=true AND profile has summary content.
+          // When showSummary=false, the entire array collapses to [] — both the paragraph AND
+          // its spacing are suppressed, so the next section (WORK EXPERIENCE) owns its top gap. (Phase 30 D-09)
+          ...(showSummary && profileRow?.summary ? [
             new Paragraph({
               children: [
                 new TextRun({ text: profileRow.summary, size: 21, font: fontName }),
