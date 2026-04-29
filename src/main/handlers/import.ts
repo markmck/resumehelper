@@ -6,73 +6,7 @@ import { callResumeExtractor, getModel } from '../lib/aiProvider'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type * as schema from '../db/schema'
 export type Db = BetterSQLite3Database<typeof schema>
-
-interface ResumeJson {
-  basics?: {
-    name?: string
-    email?: string
-    phone?: string
-    location?: { city?: string }
-    profiles?: Array<{ url?: string }>
-  }
-  work?: Array<{
-    name?: string
-    position?: string
-    startDate?: string
-    endDate?: string
-    highlights?: string[]
-  }>
-  skills?: Array<{
-    name?: string
-    keywords?: string[]
-  }>
-  projects?: Array<{
-    name?: string
-    highlights?: string[]
-  }>
-  education?: Array<{
-    institution?: string
-    area?: string
-    studyType?: string
-    startDate?: string
-    endDate?: string
-    score?: string
-    courses?: string[]
-  }>
-  volunteer?: Array<{
-    organization?: string
-    position?: string
-    startDate?: string
-    endDate?: string
-    summary?: string
-    highlights?: string[]
-  }>
-  awards?: Array<{
-    title?: string
-    date?: string
-    awarder?: string
-    summary?: string
-  }>
-  publications?: Array<{
-    name?: string
-    publisher?: string
-    releaseDate?: string
-    url?: string
-    summary?: string
-  }>
-  languages?: Array<{
-    language?: string
-    fluency?: string
-  }>
-  interests?: Array<{
-    name?: string
-    keywords?: string[]
-  }>
-  references?: Array<{
-    name?: string
-    reference?: string
-  }>
-}
+import type { ResumeJson } from '../../shared/resumeJson'
 
 const truncDate = (d: string | undefined | null): string | null =>
   d ? d.slice(0, 7) : null
