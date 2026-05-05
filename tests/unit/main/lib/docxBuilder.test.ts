@@ -1,15 +1,7 @@
 import { describe, test, expect } from 'vitest'
-import { Packer } from 'docx'
-import { unzipSync } from 'fflate'
 import { buildResumeDocx, DOCX_FONT_MAP, DOCX_MARGIN_DEFAULTS } from '../../../../src/main/lib/docxBuilder'
 import type { BuilderData } from '../../../../src/main/lib/docxBuilder'
-
-async function unzipDocxXml(doc: ReturnType<typeof buildResumeDocx>): Promise<string> {
-  const buffer = await Packer.toBuffer(doc)
-  const uint8 = new Uint8Array(buffer)
-  const files = unzipSync(uint8)
-  return new TextDecoder('utf-8').decode(files['word/document.xml'])
-}
+import { unzipDocxXml } from '../../../helpers/docx'
 
 function buildTestProfile() {
   return {
