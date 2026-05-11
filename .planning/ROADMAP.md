@@ -104,7 +104,11 @@ Plans:
   3. When validation fails the user sees a user-actionable error (not a silent write of bad data, not a stack trace)
   4. User re-opens the save dialog and it defaults to the last-used export directory; filename auto-populates using existing sanitization rules
   5. ImportConfirmModal copy and `buildBaseResumeJson` source both clearly communicate the "lossy-faithful" semantics (append-only on re-import, documented field subset)
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 31-01-PLAN.md — Schema migration (app_settings) + settings.ts k/v helpers + sanitizeFilename promotion (JSON-04)
+- [ ] 31-02-PLAN.md — buildBaseResumeJson pure builder + ExportValidationError + unit tests (JSON-01, JSON-02, JSON-03, JSON-06)
+- [ ] 31-03-PLAN.md — export:json handler + preload + ExperienceTab button + ImportConfirmModal note + PDF/DOCX lastExportDir backfill (JSON-01, JSON-04, JSON-05, JSON-06)
 **UI hint**: yes
 
 ### Phase 32: Variant-Merged Resume.json Export
@@ -117,7 +121,11 @@ Plans:
   3. Excluded items (summary off, excluded jobs, excluded bullets) do not appear in the exported JSON
   4. Exported JSON contains no `meta` sidecar field — it is pure resume.json output only
   5. Hovering the JSON button reveals a tooltip explaining export-only semantics: re-importing creates new base entries, it will not recreate this variant
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 31-01-PLAN.md — Schema migration (app_settings) + settings.ts k/v helpers + sanitizeFilename promotion (JSON-04)
+- [ ] 31-02-PLAN.md — buildBaseResumeJson pure builder + ExportValidationError + unit tests (JSON-01, JSON-02, JSON-03, JSON-06)
+- [ ] 31-03-PLAN.md — export:json handler + preload + ExperienceTab button + ImportConfirmModal note + PDF/DOCX lastExportDir backfill (JSON-01, JSON-04, JSON-05, JSON-06)
 **UI hint**: yes
 
 ### Phase 33: Tech Debt Cleanup
@@ -129,7 +137,11 @@ Plans:
   2. The vestigial `compact` prop is removed from `ResumeTemplateProps` and all 5 template components — `tsc` and `vitest` both pass, and a manual render of all 5 templates shows no regressions
   3. `tests/setup.ts` is deleted; the full test suite runs 3× consecutively before and after deletion with identical pass counts
   4. `jobs.test.ts` no longer contains `.where(undefined as any)` (replaced with a correct filter or removed with documented intent), and the full suite runs 10× consecutively under the default thread pool with zero race failures
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 31-01-PLAN.md — Schema migration (app_settings) + settings.ts k/v helpers + sanitizeFilename promotion (JSON-04)
+- [ ] 31-02-PLAN.md — buildBaseResumeJson pure builder + ExportValidationError + unit tests (JSON-01, JSON-02, JSON-03, JSON-06)
+- [ ] 31-03-PLAN.md — export:json handler + preload + ExperienceTab button + ImportConfirmModal note + PDF/DOCX lastExportDir backfill (JSON-01, JSON-04, JSON-05, JSON-06)
 
 ### Phase 34: Configurable SQLite DB Location
 **Goal**: User can safely relocate the SQLite database to any folder they choose, with integrity verification, rollback on failure, and a cloud-storage warning
@@ -142,7 +154,11 @@ Plans:
   4. When the user picks a UNC path or a well-known cloud folder (OneDrive / Dropbox / iCloud Drive), a non-blocking warning modal explains the WAL-over-network risk and lets them proceed
   5. Any failure during the change sequence rolls back cleanly — the source DB remains accessible, no partial state is left on disk, and the error is surfaced to the user
   6. After a successful relocation, a "Delete old backup" button appears in the Database Location card and only deletes the `.bak` file on explicit user click
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 31-01-PLAN.md — Schema migration (app_settings) + settings.ts k/v helpers + sanitizeFilename promotion (JSON-04)
+- [ ] 31-02-PLAN.md — buildBaseResumeJson pure builder + ExportValidationError + unit tests (JSON-01, JSON-02, JSON-03, JSON-06)
+- [ ] 31-03-PLAN.md — export:json handler + preload + ExperienceTab button + ImportConfirmModal note + PDF/DOCX lastExportDir backfill (JSON-01, JSON-04, JSON-05, JSON-06)
 **UI hint**: yes
 
 ## Progress
