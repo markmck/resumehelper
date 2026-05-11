@@ -171,6 +171,11 @@ function ensureSchema(): void {
 
     INSERT OR IGNORE INTO \`ai_settings\` (\`id\`) VALUES (1);
 
+    CREATE TABLE IF NOT EXISTS \`app_settings\` (
+      \`key\` text PRIMARY KEY NOT NULL,
+      \`value\` text NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS \`job_postings\` (
       \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
       \`company\` text NOT NULL,
