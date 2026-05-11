@@ -9,13 +9,13 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Merge Reconciliation
 
-- [ ] **MERGE-01**: Unified `buildMergedBuilderData(db, variantId, analysisId?)` function consolidates bullet overrides, accepted skill additions, and summary/job exclusions — replaces the three parallel paths in export.ts/templates.ts/submissions.ts
-- [ ] **MERGE-02**: Shared `ResumeJson` interface lifted to `src/shared/resumeJson.ts` — single source of truth for both import and export
-- [ ] **MERGE-03**: Parameterized tests cover HTML + PDF + DOCX × summary on/off × all 5 templates — preventing future drift
+- [x] **MERGE-01**: Unified `buildMergedBuilderData(db, variantId, analysisId?)` function consolidates bullet overrides, accepted skill additions, and summary/job exclusions — replaces the three parallel paths in export.ts/templates.ts/submissions.ts
+- [x] **MERGE-02**: Shared `ResumeJson` interface lifted to `src/shared/resumeJson.ts` — single source of truth for both import and export
+- [x] **MERGE-03**: Parameterized tests cover HTML + PDF + DOCX × summary on/off × all 5 templates — preventing future drift
 
 ### DOCX Export Fix
 
-- [ ] **DOCX-01**: User's `showSummary` toggle on a variant is honored by DOCX export — summary paragraph omitted when toggled off, matching PDF/HTML behavior
+- [x] **DOCX-01**: User's `showSummary` toggle on a variant is honored by DOCX export — summary paragraph omitted when toggled off, matching PDF/HTML behavior
 
 ### Base Resume.json Export
 
@@ -76,10 +76,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MERGE-01 | Phase 30 | Pending |
-| MERGE-02 | Phase 30 | Pending |
-| MERGE-03 | Phase 30 | Pending |
-| DOCX-01 | Phase 30 | Pending |
+| MERGE-01 | Phase 30 | Complete |
+| MERGE-02 | Phase 30 | Complete |
+| MERGE-03 | Phase 30 | Complete |
+| DOCX-01 | Phase 30 | Complete |
 | JSON-01 | Phase 31 | Pending |
 | JSON-02 | Phase 31 | Pending |
 | JSON-03 | Phase 31 | Pending |

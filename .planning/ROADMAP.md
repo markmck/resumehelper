@@ -67,7 +67,7 @@ Phases 25-29 covered: Windows NSIS installer with setup wizard, Vitest test infr
 
 ### v2.5 Portability & Debt Cleanup (Phases 30-34)
 
-- [ ] **Phase 30: Merge-Helper Reconciliation + DOCX showSummary Fix** - Unify three parallel merge paths and honor showSummary in DOCX export
+- [x] **Phase 30: Merge-Helper Reconciliation + DOCX showSummary Fix** - Unify three parallel merge paths and honor showSummary in DOCX export (completed 2026-05-11)
 - [ ] **Phase 31: Base Resume.json Export** - Export full experience DB as valid resume.json from Experience tab
 - [ ] **Phase 32: Variant-Merged Resume.json Export** - Export a variant's fully-merged view as resume.json from VariantEditor
 - [ ] **Phase 33: Tech Debt Cleanup** - Remove orphan TEMPLATE_LIST export, vestigial compact prop, dead tests/setup.ts, and fix jobs.test.ts race
@@ -85,13 +85,13 @@ Phases 25-29 covered: Windows NSIS installer with setup wizard, Vitest test infr
   3. `buildMergedBuilderData(db, variantId, analysisId?)` is the single function called by PDF/DOCX/snapshot/preview paths — grep shows no remaining parallel merge implementations
   4. A parameterized test suite exercises HTML + PDF + DOCX × summary on/off × all 5 templates and fails loudly if any surface drifts
   5. `ResumeJson` interface lives at `src/shared/resumeJson.ts` and is imported by both import.ts and (eventually) the new export builders
-**Plans:** 5 plans
+**Plans:** 5/5 plans complete
 Plans:
-- [ ] 30-01-PLAN.md — Lift ResumeJson interface + Zod scaffold to src/shared/resumeJson.ts (MERGE-02)
-- [ ] 30-02-PLAN.md — Create src/main/lib/mergeHelper.ts with buildMergedBuilderData (MERGE-01)
-- [ ] 30-03-PLAN.md — Update buildResumeDocx signature to accept showSummary 5th arg + gate summary paragraph (DOCX-01)
-- [ ] 30-04-PLAN.md — Rewire callsites, delete 3 legacy merge paths, flip BuilderData type to showSummary (MERGE-01, DOCX-01)
-- [ ] 30-05-PLAN.md — Parameterized test suite: 5 templates × 2 summary states × 2 surfaces (MERGE-03)
+- [x] 30-01-PLAN.md — Lift ResumeJson interface + Zod scaffold to src/shared/resumeJson.ts (MERGE-02)
+- [x] 30-02-PLAN.md — Create src/main/lib/mergeHelper.ts with buildMergedBuilderData (MERGE-01)
+- [x] 30-03-PLAN.md — Update buildResumeDocx signature to accept showSummary 5th arg + gate summary paragraph (DOCX-01)
+- [x] 30-04-PLAN.md — Rewire callsites, delete 3 legacy merge paths, flip BuilderData type to showSummary (MERGE-01, DOCX-01)
+- [x] 30-05-PLAN.md — Parameterized test suite: 5 templates × 2 summary states × 2 surfaces (MERGE-03)
 **UI hint**: yes
 
 ### Phase 31: Base Resume.json Export
