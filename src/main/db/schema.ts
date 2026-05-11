@@ -247,3 +247,8 @@ export const analysisSkillAdditions = sqliteTable('analysis_skill_additions', {
     .notNull()
     .$defaultFn(() => new Date()),
 })
+
+export const appSettings = sqliteTable('app_settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+})
