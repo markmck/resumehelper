@@ -1,0 +1,104 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildBaseResumeJson > matches snapshot for representative full-data fixture 1`] = `
+{
+  "awards": [
+    {
+      "awarder": "Acme",
+      "date": "2022",
+      "summary": "For excellence",
+      "title": "Top Engineer",
+    },
+  ],
+  "basics": {
+    "email": "test@example.com",
+    "location": {
+      "city": "Seattle",
+    },
+    "name": "Test User",
+    "phone": "555-1234",
+    "profiles": [
+      {
+        "url": "https://linkedin.com/in/testuser",
+      },
+    ],
+  },
+  "education": [
+    {
+      "area": "CS",
+      "endDate": "2018",
+      "institution": "University",
+      "startDate": "2014",
+      "studyType": "BS",
+    },
+  ],
+  "interests": [
+    {
+      "keywords": [
+        "oss",
+        "community",
+      ],
+      "name": "Open Source",
+    },
+  ],
+  "languages": [
+    {
+      "fluency": "Native",
+      "language": "English",
+    },
+  ],
+  "projects": [
+    {
+      "highlights": [
+        "Built thing.",
+      ],
+      "name": "Project X",
+    },
+  ],
+  "publications": [
+    {
+      "name": "Paper",
+      "publisher": "IEEE",
+      "releaseDate": "2021",
+      "summary": "A paper.",
+      "url": "https://example.com/paper",
+    },
+  ],
+  "references": [
+    {
+      "name": "Dr. Smith",
+      "reference": "Excellent worker.",
+    },
+  ],
+  "skills": [
+    {
+      "keywords": [
+        "TypeScript",
+      ],
+      "name": "Languages",
+    },
+  ],
+  "volunteer": [
+    {
+      "highlights": [
+        "Organized event",
+      ],
+      "organization": "Charity",
+      "position": "Volunteer",
+      "startDate": "2019",
+      "summary": "Helped out.",
+    },
+  ],
+  "work": [
+    {
+      "endDate": "2023-12",
+      "highlights": [
+        "Shipped a thing.",
+      ],
+      "name": "Acme",
+      "position": "Engineer",
+      "startDate": "2020-01",
+    },
+  ],
+}
+`;
