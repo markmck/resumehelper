@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Portability & Debt Cleanup
-status: ready_to_plan
-stopped_at: Phase 30 context gathered
-last_updated: "2026-04-29T17:01:20.671Z"
-last_activity: 2026-04-29 -- Phase 30 execution started
+status: executing
+stopped_at: Phase 31 context gathered
+last_updated: "2026-05-11T18:55:15.952Z"
+last_activity: 2026-05-11 -- Phase 31 execution started
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 0
-  percent: 20
+  total_plans: 8
+  completed_plans: 5
+  percent: 63
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 30 — merge-helper-reconciliation-docx-showsummary-fix
+**Current focus:** Phase 31 — base-resume-json-export
 
 ## Current Position
 
-Phase: 31
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-11
+Phase: 31 (base-resume-json-export) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 31
+Last activity: 2026-05-11 -- Phase 31 execution started
 
 ## Performance Metrics
 
@@ -73,7 +73,7 @@ Key decisions already scoped for v2.5 (from research):
 ## Session Continuity
 
 Last session: --stopped-at
-Stopped at: Phase 30 context gathered
+Stopped at: Phase 31 context gathered
 Resume file: --resume-file
 
-**Planned Phase:** 30 (Merge-Helper Reconciliation + DOCX showSummary Fix) — 5 plans — 2026-04-24T23:09:03.542Z
+**Planned Phase:** 31 (base-resume-json-export) — 3 plans — 2026-05-11T18:23:19.349Z
