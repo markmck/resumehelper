@@ -57,7 +57,7 @@ function normalizeHex(value: string): string {
 
 function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant, onVariantChanged }: VariantEditorProps): React.JSX.Element {
   const [previewVersion, setPreviewVersion] = useState(0)
-  const [exporting, setExporting] = useState<'pdf' | 'docx' | null>(null)
+  const [exporting, setExporting] = useState<'pdf' | 'docx' | 'json' | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [layoutTemplate, setLayoutTemplate] = useState(
     variant.layoutTemplate && variant.layoutTemplate !== 'traditional' && variant.layoutTemplate !== 'professional'
@@ -243,6 +243,21 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant, onVaria
       const result = await window.api.exportFile.docx(variant.id, filename)
       if (!result.canceled) {
         showToast('Resume exported as DOCX')
+      }
+    } finally {
+      setExporting(null)
+    }
+  }
+
+  const handleExportJson = async (): Promise<void> => {
+    if (exporting) return
+    setExporting('json')
+    try {
+      const profile = await window.api.profile.get()
+      const filename = `${sanitize(profile.name || 'Resume')}_Resume_${sanitize(variant.name)}.json`
+      const result = await window.api.exportFile.variantJson(variant.id, filename)
+      if (!result.canceled) {
+        showToast('Resume exported as JSON')
       }
     } finally {
       setExporting(null)
@@ -585,19 +600,39 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant, onVaria
                 padding: '3px 10px',
                 fontSize: 'var(--font-size-xs)',
                 borderRadius: 'var(--radius-sm)',
-                border: 'none',
-                backgroundColor: 'var(--color-success)',
-                color: 'var(--color-text-on-accent, #fff)',
+                border: '1px solid var(--color-border-default)',
+                backgroundColor: 'transparent',
+                color: 'var(--color-text-secondary)',
                 cursor: exporting ? 'not-allowed' : 'pointer',
                 opacity: exporting ? 0.5 : 1,
                 height: 26,
                 fontFamily: 'var(--font-sans)',
-                fontWeight: 500,
                 display: 'inline-flex',
                 alignItems: 'center',
               }}
             >
               {exporting === 'docx' ? 'Exporting...' : 'DOCX'}
+            </button>
+            <button
+              onClick={handleExportJson}
+              disabled={exporting !== null}
+              title="Exports the final rendered resume. Re-importing creates new base entries — it won't recreate this variant."
+              style={{
+                padding: '3px 10px',
+                fontSize: 'var(--font-size-xs)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border-default)',
+                backgroundColor: 'transparent',
+                color: 'var(--color-text-secondary)',
+                cursor: exporting ? 'not-allowed' : 'pointer',
+                opacity: exporting ? 0.5 : 1,
+                height: 26,
+                fontFamily: 'var(--font-sans)',
+                display: 'inline-flex',
+                alignItems: 'center',
+              }}
+            >
+              {exporting === 'json' ? 'Exporting...' : 'JSON'}
             </button>
           </div>
 
