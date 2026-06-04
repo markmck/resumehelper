@@ -47,7 +47,7 @@ export class ExportValidationError extends Error {
 // Omission helpers (D-04, D-05) — private to module.
 // ---------------------------------------------------------------------------
 
-const isEmpty = (v: unknown): boolean =>
+export const isEmpty = (v: unknown): boolean =>
   v === null ||
   v === undefined ||
   (typeof v === 'string' && v.trim() === '') ||
@@ -57,7 +57,7 @@ const isEmpty = (v: unknown): boolean =>
     !Array.isArray(v) &&
     Object.keys(v).length === 0)
 
-const opt = <K extends string, V>(
+export const opt = <K extends string, V>(
   key: K,
   value: V,
 ): Record<K, V> | Record<string, never> =>
@@ -69,7 +69,7 @@ const opt = <K extends string, V>(
  * Zod can reject them downstream — preserves the validate-or-throw contract
  * even if a non-string sneaks into the DB via raw SQL.
  */
-function trimStr(v: unknown): string | undefined {
+export function trimStr(v: unknown): string | undefined {
   if (v === null || v === undefined) return undefined
   if (typeof v !== 'string') {
     // Force the non-string through into the output object so ResumeJsonSchema
@@ -86,7 +86,7 @@ function trimStr(v: unknown): string | undefined {
  * entries but passes through non-string values unchanged so Zod can reject
  * them downstream — preserves the validate-or-throw contract.
  */
-const parseJsonArray = (raw: unknown): unknown[] => {
+export const parseJsonArray = (raw: unknown): unknown[] => {
   if (typeof raw !== 'string' || raw.trim() === '') return []
   try {
     const parsed: unknown = JSON.parse(raw)
@@ -97,28 +97,28 @@ const parseJsonArray = (raw: unknown): unknown[] => {
   }
 }
 
-const nonEmpty = <T extends object>(o: T): T | undefined =>
+export const nonEmpty = <T extends object>(o: T): T | undefined =>
   Object.keys(o).length === 0 ? undefined : o
 
 // ---------------------------------------------------------------------------
 // Per-entry helpers (D-06)
 // ---------------------------------------------------------------------------
 
-type JobRow = typeof jobs.$inferSelect
-type JobBulletRow = typeof jobBullets.$inferSelect
+export type JobRow = typeof jobs.$inferSelect
+export type JobBulletRow = typeof jobBullets.$inferSelect
 type SkillRow = typeof skills.$inferSelect
 type SkillCategoryRow = typeof skillCategories.$inferSelect
-type ProjectRow = typeof projects.$inferSelect
-type ProjectBulletRow = typeof projectBullets.$inferSelect
-type EducationRow = typeof education.$inferSelect
-type VolunteerRow = typeof volunteer.$inferSelect
-type AwardRow = typeof awards.$inferSelect
-type PublicationRow = typeof publications.$inferSelect
-type LanguageRow = typeof languages.$inferSelect
-type InterestRow = typeof interests.$inferSelect
-type ReferenceRow = typeof referenceEntries.$inferSelect
+export type ProjectRow = typeof projects.$inferSelect
+export type ProjectBulletRow = typeof projectBullets.$inferSelect
+export type EducationRow = typeof education.$inferSelect
+export type VolunteerRow = typeof volunteer.$inferSelect
+export type AwardRow = typeof awards.$inferSelect
+export type PublicationRow = typeof publications.$inferSelect
+export type LanguageRow = typeof languages.$inferSelect
+export type InterestRow = typeof interests.$inferSelect
+export type ReferenceRow = typeof referenceEntries.$inferSelect
 
-function toWorkEntry(job: JobRow, bullets: JobBulletRow[]): NonNullable<ResumeJson['work']>[number] {
+export function toWorkEntry(job: JobRow, bullets: JobBulletRow[]): NonNullable<ResumeJson['work']>[number] {
   const highlights = bullets
     .map((b) => trimStr(b.text))
     .filter((s): s is string => !!s)
@@ -131,7 +131,7 @@ function toWorkEntry(job: JobRow, bullets: JobBulletRow[]): NonNullable<ResumeJs
   }
 }
 
-function toEducationEntry(edu: EducationRow): NonNullable<ResumeJson['education']>[number] {
+export function toEducationEntry(edu: EducationRow): NonNullable<ResumeJson['education']>[number] {
   const courses = parseJsonArray(edu.courses) as string[]
   return {
     ...opt('institution', trimStr(edu.institution)),
@@ -190,7 +190,7 @@ function toSkillEntries(
   return entries
 }
 
-function toProjectEntry(
+export function toProjectEntry(
   proj: ProjectRow,
   bullets: ProjectBulletRow[],
 ): NonNullable<ResumeJson['projects']>[number] {
@@ -203,7 +203,7 @@ function toProjectEntry(
   }
 }
 
-function toVolunteerEntry(v: VolunteerRow): NonNullable<ResumeJson['volunteer']>[number] {
+export function toVolunteerEntry(v: VolunteerRow): NonNullable<ResumeJson['volunteer']>[number] {
   const highlights = parseJsonArray(v.highlights) as string[]
   return {
     ...opt('organization', trimStr(v.organization)),
@@ -215,7 +215,7 @@ function toVolunteerEntry(v: VolunteerRow): NonNullable<ResumeJson['volunteer']>
   }
 }
 
-function toAwardEntry(a: AwardRow): NonNullable<ResumeJson['awards']>[number] {
+export function toAwardEntry(a: AwardRow): NonNullable<ResumeJson['awards']>[number] {
   return {
     ...opt('title', trimStr(a.title)),
     ...opt('date', trimStr(a.date)),
@@ -224,7 +224,7 @@ function toAwardEntry(a: AwardRow): NonNullable<ResumeJson['awards']>[number] {
   }
 }
 
-function toPublicationEntry(p: PublicationRow): NonNullable<ResumeJson['publications']>[number] {
+export function toPublicationEntry(p: PublicationRow): NonNullable<ResumeJson['publications']>[number] {
   return {
     ...opt('name', trimStr(p.name)),
     ...opt('publisher', trimStr(p.publisher)),
@@ -234,14 +234,14 @@ function toPublicationEntry(p: PublicationRow): NonNullable<ResumeJson['publicat
   }
 }
 
-function toLanguageEntry(l: LanguageRow): NonNullable<ResumeJson['languages']>[number] {
+export function toLanguageEntry(l: LanguageRow): NonNullable<ResumeJson['languages']>[number] {
   return {
     ...opt('language', trimStr(l.language)),
     ...opt('fluency', trimStr(l.fluency)),
   }
 }
 
-function toInterestEntry(i: InterestRow): NonNullable<ResumeJson['interests']>[number] {
+export function toInterestEntry(i: InterestRow): NonNullable<ResumeJson['interests']>[number] {
   const keywords = parseJsonArray(i.keywords) as string[]
   return {
     ...opt('name', trimStr(i.name)),
@@ -249,7 +249,7 @@ function toInterestEntry(i: InterestRow): NonNullable<ResumeJson['interests']>[n
   }
 }
 
-function toReferenceEntry(r: ReferenceRow): NonNullable<ResumeJson['references']>[number] {
+export function toReferenceEntry(r: ReferenceRow): NonNullable<ResumeJson['references']>[number] {
   return {
     ...opt('name', trimStr(r.name)),
     ...opt('reference', trimStr(r.reference)),
