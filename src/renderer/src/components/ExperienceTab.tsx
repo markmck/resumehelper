@@ -12,6 +12,7 @@ import InterestList from './InterestList'
 import ReferenceList from './ReferenceList'
 import ImportConfirmModal from './ImportConfirmModal'
 import { useToast } from './Toast'
+import { sanitizeFilename } from '../../../shared/sanitizeFilename'
 
 interface CollapsibleSectionProps {
   title: string
@@ -119,6 +120,15 @@ function ExperienceTab(): React.JSX.Element {
     })
   }
 
+  const handleExportJsonClick = async (): Promise<void> => {
+    const profileData = await window.api.profile.get()
+    const filename = `${sanitizeFilename(profileData?.name || 'Resume')}_Resume.json`
+    const result = await window.api.exportFile.json(filename)
+    if (result.canceled) return
+    if (result.error) return // validation error already shown via dialog.showErrorBox in main
+    showToast('Resume exported as JSON')
+  }
+
   const handleImportPdfClick = async (): Promise<void> => {
     setPdfExtracting(true)
     try {
@@ -206,6 +216,26 @@ function ExperienceTab(): React.JSX.Element {
               }}
             >
               {pdfExtracting ? 'Extracting...' : 'Import PDF'}
+            </button>
+            <button
+              type="button"
+              onClick={handleExportJsonClick}
+              style={{
+                backgroundColor: 'transparent',
+                border: '1px solid var(--color-border-default)',
+                color: 'var(--color-text-secondary)',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--font-size-base)',
+                cursor: 'pointer',
+                height: 36,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                fontFamily: 'var(--font-sans)',
+              }}
+            >
+              Export JSON
             </button>
           </div>
         </div>

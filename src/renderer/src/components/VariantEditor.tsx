@@ -5,6 +5,7 @@ import VariantBuilder from './VariantBuilder'
 import VariantPreview from './VariantPreview'
 import { useToast } from './Toast'
 import { TEMPLATE_DEFAULTS } from './templates/types'
+import { sanitizeFilename as sanitize } from '../../../shared/sanitizeFilename'
 
 interface VariantEditorProps {
   variant: TemplateVariant
@@ -194,9 +195,6 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant, onVaria
       if (latest.analysisId != null) setAnalysisId(latest.analysisId)
     })
   }, [variant.id])
-
-  const sanitize = (s: string): string =>
-    s.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '')
 
   const handleShowSummaryChange = (shown: boolean): void => {
     setShowSummary(shown)
