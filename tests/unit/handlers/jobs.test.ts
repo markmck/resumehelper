@@ -14,9 +14,7 @@ describe('jobs handler', () => {
   it('listJobs returns jobs with nested bullets sorted by sortOrder', async () => {
     const db = createTestDb()
     const { job, bullets } = seedJobWithBullets(db, ['third', 'first', 'second'])
-    // Reorder so sortOrder: 0=first, 1=second, 2=third
-    await db.update(jobBullets).set({ sortOrder: 2 }).where(undefined as any)
-    // Just use the data as-is (they come back in insert order which is sortOrder 0,1,2)
+    // NOTE: This test asserts only count + identity. Bullets are returned in insertion order via seedJobWithBullets — no explicit reorder is exercised here. DEBT-04: removed dead `.where(undefined as any)` UPDATE that previously masqueraded as a reorder step.
     const result = await listJobs(db)
     expect(result).toHaveLength(1)
     expect(result[0].id).toBe(job.id)
