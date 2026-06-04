@@ -117,6 +117,8 @@ const api = {
       ipcRenderer.invoke('export:snapshotPdf', snapshotData, defaultFilename),
     json: (defaultFilename: string) =>
       ipcRenderer.invoke('export:json', defaultFilename),
+    variantJson: (variantId: number, defaultFilename: string, analysisId?: number) =>
+      ipcRenderer.invoke('export:variantJson', variantId, defaultFilename, analysisId),
   },
   projects: {
     list: () => ipcRenderer.invoke('projects:list'),
