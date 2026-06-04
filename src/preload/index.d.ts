@@ -420,6 +420,7 @@ export interface Api {
     pdf: (variantId: number, defaultFilename: string, analysisId?: number) => Promise<{ canceled: boolean; filePath?: string }>
     docx: (variantId: number, defaultFilename: string, analysisId?: number) => Promise<{ canceled: boolean; filePath?: string }>
     snapshotPdf: (snapshotData: SubmissionSnapshot, defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string }>
+    json: (defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string; error?: string }>
   }
   projects: {
     list: () => Promise<ProjectWithBullets[]>

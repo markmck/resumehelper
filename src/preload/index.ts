@@ -115,6 +115,8 @@ const api = {
       ipcRenderer.invoke('export:docx', variantId, defaultFilename, analysisId),
     snapshotPdf: (snapshotData: unknown, defaultFilename: string) =>
       ipcRenderer.invoke('export:snapshotPdf', snapshotData, defaultFilename),
+    json: (defaultFilename: string) =>
+      ipcRenderer.invoke('export:json', defaultFilename),
   },
   projects: {
     list: () => ipcRenderer.invoke('projects:list'),
