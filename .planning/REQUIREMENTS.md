@@ -19,12 +19,17 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Base Resume.json Export
 
-- [ ] **JSON-01**: User can click "Export JSON" in the Experience tab header and save full experience DB as valid resume.json
-- [ ] **JSON-02**: Exported base JSON validates against `ResumeJsonSchema` (Zod) before write — invalid data surfaces user-actionable error
+- [x] **JSON-01
+**: User can click "Export JSON" in the Experience tab header and save full experience DB as valid resume.json
+- [x] **JSON-02
+**: Exported base JSON validates against `ResumeJsonSchema` (Zod) before write — invalid data surfaces user-actionable error
 - [ ] **JSON-03**: Null and empty optional fields are OMITTED from exported JSON, not emitted as `null` or `""` — JSON Resume validators accept the output
-- [ ] **JSON-04**: Filename defaults to `${profileName}_Resume.json` with existing sanitization rules; save dialog opens at last-used export location
-- [ ] **JSON-05**: Existing ImportConfirmModal surfaces append-only semantics: "Re-importing previously exported data creates duplicates — import is append-only."
-- [ ] **JSON-06**: Code comment on `buildBaseResumeJson` + milestone release notes document the "lossy-faithful" fields (profiles[1..], address sub-fields except city, basics.url/label/image, skill level, project description/url/dates)
+- [x] **JSON-04
+**: Filename defaults to `${profileName}_Resume.json` with existing sanitization rules; save dialog opens at last-used export location
+- [x] **JSON-05
+**: Existing ImportConfirmModal surfaces append-only semantics: "Re-importing previously exported data creates duplicates — import is append-only."
+- [x] **JSON-06
+**: Code comment on `buildBaseResumeJson` + milestone release notes document the "lossy-faithful" fields (profiles[1..], address sub-fields except city, basics.url/label/image, skill level, project description/url/dates)
 
 ### Variant-Merged Resume.json Export
 

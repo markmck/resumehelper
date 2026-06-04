@@ -68,7 +68,7 @@ Phases 25-29 covered: Windows NSIS installer with setup wizard, Vitest test infr
 ### v2.5 Portability & Debt Cleanup (Phases 30-34)
 
 - [x] **Phase 30: Merge-Helper Reconciliation + DOCX showSummary Fix** - Unify three parallel merge paths and honor showSummary in DOCX export (completed 2026-05-11)
-- [ ] **Phase 31: Base Resume.json Export** - Export full experience DB as valid resume.json from Experience tab
+- [x] **Phase 31: Base Resume.json Export** - Export full experience DB as valid resume.json from Experience tab (completed 2026-06-03)
 - [ ] **Phase 32: Variant-Merged Resume.json Export** - Export a variant's fully-merged view as resume.json from VariantEditor
 - [ ] **Phase 33: Tech Debt Cleanup** - Remove orphan TEMPLATE_LIST export, vestigial compact prop, dead tests/setup.ts, and fix jobs.test.ts race
 - [ ] **Phase 34: Configurable SQLite DB Location** - User can relocate the SQLite DB via Settings with copy → verify → switch → restart migration
@@ -104,11 +104,11 @@ Plans:
   3. When validation fails the user sees a user-actionable error (not a silent write of bad data, not a stack trace)
   4. User re-opens the save dialog and it defaults to the last-used export directory; filename auto-populates using existing sanitization rules
   5. ImportConfirmModal copy and `buildBaseResumeJson` source both clearly communicate the "lossy-faithful" semantics (append-only on re-import, documented field subset)
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 Plans:
-- [ ] 31-01-PLAN.md — Schema migration (app_settings) + settings.ts k/v helpers + sanitizeFilename promotion (JSON-04)
-- [ ] 31-02-PLAN.md — buildBaseResumeJson pure builder + ExportValidationError + unit tests (JSON-01, JSON-02, JSON-03, JSON-06)
-- [ ] 31-03-PLAN.md — export:json handler + preload + ExperienceTab button + ImportConfirmModal note + PDF/DOCX lastExportDir backfill (JSON-01, JSON-04, JSON-05, JSON-06)
+- [x] 31-01-PLAN.md — Schema migration (app_settings) + settings.ts k/v helpers + sanitizeFilename promotion (JSON-04)
+- [x] 31-02-PLAN.md — buildBaseResumeJson pure builder + ExportValidationError + unit tests (JSON-01, JSON-02, JSON-03, JSON-06)
+- [x] 31-03-PLAN.md — export:json handler + preload + ExperienceTab button + ImportConfirmModal note + PDF/DOCX lastExportDir backfill (JSON-01, JSON-04, JSON-05, JSON-06)
 **UI hint**: yes
 
 ### Phase 32: Variant-Merged Resume.json Export
@@ -171,7 +171,7 @@ Plans:
 | 17-21 | v2.2 | 13/13 | Complete | 2026-04-01 |
 | 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
 | 25-29 | v2.4 | 12/12 | Complete | 2026-04-21 |
-| 30-34 | v2.5 | 0/5+ | Planning | - |
+| 30-34 | v2.5 | 8/8 (phases 30-31) | In progress (32-34 pending) | - |
 
 ## Future (v3.0+)
 

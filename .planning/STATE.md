@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Portability & Debt Cleanup
 status: executing
-stopped_at: Phase 31 context gathered
-last_updated: "2026-05-11T18:55:15.952Z"
-last_activity: 2026-05-11 -- Phase 31 execution started
+stopped_at: Phase 31 complete — ready for verification
+last_updated: "2026-06-03T00:00:00.000Z"
+last_activity: 2026-06-03 -- Phase 31 Plan 03 complete (export wiring shipped)
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 8
-  completed_plans: 5
-  percent: 63
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -25,17 +25,17 @@ See: .planning/PROJECT.md (updated 2026-04-23)
 
 ## Current Position
 
-Phase: 31 (base-resume-json-export) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 31
-Last activity: 2026-05-11 -- Phase 31 execution started
+Phase: 31 (base-resume-json-export) — COMPLETE, awaiting phase verification
+Plan: 3 of 3 — complete
+Status: Phase 31 done; ready to advance to Phase 32 after verifier pass
+Last activity: 2026-06-03 -- Phase 31 Plan 03 complete (export wiring shipped)
 
 ## Performance Metrics
 
 - Total phases in milestone: 5
-- Completed phases: 0
-- Completed plans: 0
-- Completion percent: 0%
+- Completed phases: 2 (Phase 30, Phase 31)
+- Completed plans: 8 (Phase 30: 5/5, Phase 31: 3/3)
+- Completion percent of planned phases: 100%
 
 ## Accumulated Context
 
@@ -58,13 +58,22 @@ Key decisions already scoped for v2.5 (from research):
 - Variant JSON export is export-only (no roundtrip) — contains no `meta` sidecar
 - Network/cloud path heuristic is warn-but-allow, not hard-block
 
+Decisions landed during Phase 31 execution:
+
+- Pure builder `buildBaseResumeJson(db)` validates internally and throws `ExportValidationError` carrying `ZodIssue[]` — handlers cannot accidentally serialize invalid data
+- Conditional-spread omission idiom at every nesting level — no `null` / no `""` artifacts in exported JSON
+- `app_settings` k/v table + `lastExportDir` shared across all four export surfaces (json/pdf/docx/snapshotPdf) — single setting, multiple readers/writers
+- Validation-first IPC handler ordering: builder runs BEFORE `dialog.showSaveDialog`; on failure, native `dialog.showErrorBox` and no file written
+- `sanitizeFilename` promoted to `src/shared/` and consumed via `as sanitize` alias in VariantEditor to preserve call sites
+- ImportConfirmModal append-only italic note rendered unconditionally (both replace AND append modes)
+
 ### Pending Todos
 
-- Phase 30: Merge reconciliation + DOCX showSummary fix
-- Phase 31: Base resume.json export
-- Phase 32: Variant-merged resume.json export
-- Phase 33: Tech debt cleanup (TEMPLATE_LIST, compact prop, tests/setup.ts, jobs.test.ts race)
-- Phase 34: Configurable DB location
+- [x] Phase 30: Merge reconciliation + DOCX showSummary fix
+- [x] Phase 31: Base resume.json export
+- [ ] Phase 32: Variant-merged resume.json export
+- [ ] Phase 33: Tech debt cleanup (TEMPLATE_LIST, compact prop, tests/setup.ts, jobs.test.ts race)
+- [ ] Phase 34: Configurable DB location
 
 ### Blockers/Concerns
 
@@ -72,8 +81,9 @@ Key decisions already scoped for v2.5 (from research):
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 31 context gathered
+Last session: 2026-06-03
+Stopped at: Phase 31 Plan 03 complete — ready for phase verification
 Resume file: --resume-file
 
-**Planned Phase:** 31 (base-resume-json-export) — 3 plans — 2026-05-11T18:23:19.349Z
+**Completed Phase:** 31 (base-resume-json-export) — 3/3 plans landed — 2026-06-03
+**Next Phase:** 32 (variant-merged-resume-json-export) — pending plan-phase
