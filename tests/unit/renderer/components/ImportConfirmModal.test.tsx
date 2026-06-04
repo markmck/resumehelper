@@ -16,10 +16,9 @@ const baseProps = {
 }
 
 describe('ImportConfirmModal append-only note', () => {
-  test('renders the append-only italic note in replace mode', () => {
+  test('does NOT render the append-only italic note in replace mode', () => {
     const html = renderToString(<ImportConfirmModal {...baseProps} mode="replace" />)
-    expect(html).toContain(APPEND_ONLY_COPY)
-    expect(html).toContain('font-style:italic')
+    expect(html).not.toContain(APPEND_ONLY_COPY)
   })
 
   test('renders the append-only italic note in append mode', () => {
