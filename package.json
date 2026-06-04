@@ -34,7 +34,7 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "ai": "^6.0.136",
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "^12.10.0",
     "docx": "^9.6.1",
     "drizzle-orm": "^0.45.1",
     "electron-updater": "^6.3.9",
