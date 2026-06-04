@@ -9,6 +9,7 @@ import { profile, templateVariants } from '../db/schema'
 import { eq } from 'drizzle-orm'
 import { buildMergedBuilderData } from '../lib/mergeHelper'
 import { buildBaseResumeJson, ExportValidationError } from '../lib/baseResumeBuilder'
+import { buildVariantResumeJson } from '../lib/variantResumeBuilder'
 import { getSetting, setSetting } from '../lib/settings'
 
 export function registerExportHandlers(): void {
@@ -257,4 +258,44 @@ export function registerExportHandlers(): void {
     setSetting(db, 'lastExportDir', dirname(filePath))
     return { canceled: false, filePath }
   })
+
+  ipcMain.handle(
+    'export:variantJson',
+    async (_, variantId: number, defaultFilename: string, analysisId?: number) => {
+      // D-19 step 1: validate-first — build BEFORE save dialog
+      let resumeJson
+      try {
+        resumeJson = await buildVariantResumeJson(db, variantId, analysisId)
+      } catch (err) {
+        if (err instanceof ExportValidationError) {
+          const issues = err.issues
+          const preview = issues
+            .slice(0, 5)
+            .map((i) => `  • ${i.path.join('.') || '(root)'}: ${i.message}`)
+            .join('\n')
+          dialog.showErrorBox(
+            'Export Failed: Invalid Resume Data',
+            `Your resume contains fields that don't match the required format.\n\nIssues:\n${preview}\n\n(Showing first ${Math.min(5, issues.length)} of ${issues.length} issues. See application logs for the complete list.)`
+          )
+          console.error('[export:variantJson] validation failed:', issues)
+          return { canceled: true, error: 'validation' as const }
+        }
+        throw err
+      }
+
+      // D-19 step 2-3: lastExportDir + save dialog
+      const lastDir = getSetting(db, 'lastExportDir')
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: 'Export Resume as JSON',
+        defaultPath: lastDir ? join(lastDir, defaultFilename) : defaultFilename,
+        filters: [{ name: 'JSON Files', extensions: ['json'] }],
+      })
+      if (canceled || !filePath) return { canceled: true }
+
+      // D-19 step 4: write + persist lastExportDir
+      await fs.writeFile(filePath, JSON.stringify(resumeJson, null, 2))
+      setSetting(db, 'lastExportDir', dirname(filePath))
+      return { canceled: false, filePath }
+    }
+  )
 }
