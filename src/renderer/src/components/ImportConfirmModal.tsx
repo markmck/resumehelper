@@ -91,6 +91,18 @@ function ImportConfirmModal({
           </ul>
         </div>
 
+        <p
+          style={{
+            fontStyle: 'italic',
+            color: 'var(--color-text-tertiary)',
+            fontSize: 'var(--font-size-sm)',
+            marginBottom: 'var(--space-2)',
+            marginTop: 0,
+          }}
+        >
+          Re-importing previously exported data creates duplicates — import is append-only.
+        </p>
+
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button
             type="button"
