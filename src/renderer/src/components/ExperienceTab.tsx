@@ -102,6 +102,7 @@ function ExperienceTab(): React.JSX.Element {
   const [importData, setImportData] = useState<ImportData | null>(null)
   const [importLoading, setImportLoading] = useState(false)
   const [pdfExtracting, setPdfExtracting] = useState(false)
+  const [exportingJson, setExportingJson] = useState(false)
   const [importMode, setImportMode] = useState<'replace' | 'append'>('replace')
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -121,12 +122,20 @@ function ExperienceTab(): React.JSX.Element {
   }
 
   const handleExportJsonClick = async (): Promise<void> => {
-    const profileData = await window.api.profile.get()
-    const filename = `${sanitizeFilename(profileData?.name || 'Resume')}_Resume.json`
-    const result = await window.api.exportFile.json(filename)
-    if (result.canceled) return
-    if (result.error) return // validation error already shown via dialog.showErrorBox in main
-    showToast('Resume exported as JSON')
+    if (exportingJson) return
+    setExportingJson(true)
+    try {
+      const profileData = await window.api.profile.get()
+      const filename = `${sanitizeFilename(profileData?.name || 'Resume')}_Resume.json`
+      const result = await window.api.exportFile.json(filename)
+      if (result.canceled) return
+      if (result.error) return // validation error already shown via dialog.showErrorBox in main
+      showToast('Resume exported as JSON')
+    } catch (err) {
+      showToast('Export failed: ' + (err as Error).message)
+    } finally {
+      setExportingJson(false)
+    }
   }
 
   const handleImportPdfClick = async (): Promise<void> => {
@@ -220,6 +229,7 @@ function ExperienceTab(): React.JSX.Element {
             <button
               type="button"
               onClick={handleExportJsonClick}
+              disabled={exportingJson}
               style={{
                 backgroundColor: 'transparent',
                 border: '1px solid var(--color-border-default)',
@@ -227,15 +237,16 @@ function ExperienceTab(): React.JSX.Element {
                 padding: '8px 16px',
                 borderRadius: 'var(--radius-md)',
                 fontSize: 'var(--font-size-base)',
-                cursor: 'pointer',
+                cursor: exportingJson ? 'wait' : 'pointer',
                 height: 36,
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 'var(--space-2)',
                 fontFamily: 'var(--font-sans)',
+                opacity: exportingJson ? 0.6 : 1,
               }}
             >
-              Export JSON
+              {exportingJson ? 'Exporting...' : 'Export JSON'}
             </button>
           </div>
         </div>
