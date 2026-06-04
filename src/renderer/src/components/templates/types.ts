@@ -25,7 +25,6 @@ export interface ResumeTemplateProps {
   interests?: BuilderInterest[]
   references?: BuilderReference[]
   accentColor?: string
-  compact?: boolean
   skillsDisplay?: 'grouped' | 'inline'
   showSummary?: boolean
   marginTop?: number    // inches (e.g. 1.0)
