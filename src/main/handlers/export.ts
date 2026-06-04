@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow, dialog } from 'electron'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { promises as fs } from 'fs'
 import { Packer } from 'docx'
@@ -8,13 +8,16 @@ import { db } from '../db'
 import { profile, templateVariants } from '../db/schema'
 import { eq } from 'drizzle-orm'
 import { buildMergedBuilderData } from '../lib/mergeHelper'
+import { buildBaseResumeJson, ExportValidationError } from '../lib/baseResumeBuilder'
+import { getSetting, setSetting } from '../lib/settings'
 
 export function registerExportHandlers(): void {
   ipcMain.handle('export:pdf', async (_, variantId: number, defaultFilename: string, analysisId?: number) => {
     // 1. Show Save As dialog
+    const lastDir = getSetting(db, 'lastExportDir')
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: 'Export Resume as PDF',
-      defaultPath: defaultFilename,
+      defaultPath: lastDir ? join(lastDir, defaultFilename) : defaultFilename,
       filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
     })
     if (canceled || !filePath) return { canceled: true }
@@ -73,13 +76,15 @@ export function registerExportHandlers(): void {
     })
     win.destroy()
     await fs.writeFile(filePath, pdfBuffer)
+    setSetting(db, 'lastExportDir', dirname(filePath))
     return { canceled: false, filePath }
   })
 
   ipcMain.handle('export:docx', async (_, variantId: number, defaultFilename: string, analysisId?: number) => {
+    const lastDir = getSetting(db, 'lastExportDir')
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: 'Export Resume as DOCX',
-      defaultPath: defaultFilename,
+      defaultPath: lastDir ? join(lastDir, defaultFilename) : defaultFilename,
       filters: [{ name: 'Word Document', extensions: ['docx'] }],
     })
     if (canceled || !filePath) return { canceled: true }
@@ -103,6 +108,7 @@ export function registerExportHandlers(): void {
     const doc = buildResumeDocx(builderData, profileRow, layoutTemplate, templateOptions, showSummary)
     const buffer = await Packer.toBuffer(doc)
     await fs.writeFile(filePath, buffer)
+    setSetting(db, 'lastExportDir', dirname(filePath))
     return { canceled: false, filePath }
   })
 
@@ -124,9 +130,11 @@ export function registerExportHandlers(): void {
     references?: unknown[]
   }, defaultFilename: string) => {
     // 1. Show Save As dialog
+    const lastDir = getSetting(db, 'lastExportDir')
+    const fallbackName = defaultFilename ?? 'resume-snapshot.pdf'
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: 'Export Snapshot as PDF',
-      defaultPath: defaultFilename ?? 'resume-snapshot.pdf',
+      defaultPath: lastDir ? join(lastDir, fallbackName) : fallbackName,
       filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
     })
     if (canceled || !filePath) return { canceled: true }
@@ -213,6 +221,40 @@ export function registerExportHandlers(): void {
     })
     win.destroy()
     await fs.writeFile(filePath, pdfBuffer)
+    setSetting(db, 'lastExportDir', dirname(filePath))
+    return { canceled: false, filePath }
+  })
+
+  ipcMain.handle('export:json', async (_, defaultFilename: string) => {
+    let resumeJson
+    try {
+      resumeJson = buildBaseResumeJson(db)
+    } catch (err) {
+      if (err instanceof ExportValidationError) {
+        const issues = err.issues
+        const preview = issues.slice(0, 5)
+          .map((i) => `  • ${i.path.join('.') || '(root)'}: ${i.message}`)
+          .join('\n')
+        dialog.showErrorBox(
+          'Export Failed: Invalid Resume Data',
+          `Your resume contains fields that don't match the required format.\n\nIssues:\n${preview}\n\n(Showing first ${Math.min(5, issues.length)} of ${issues.length} issues. See application logs for the complete list.)`
+        )
+        console.error('[export:json] validation failed:', issues)
+        return { canceled: true, error: 'validation' as const }
+      }
+      throw err
+    }
+
+    const lastDir = getSetting(db, 'lastExportDir')
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'Export Resume as JSON',
+      defaultPath: lastDir ? join(lastDir, defaultFilename) : defaultFilename,
+      filters: [{ name: 'JSON Files', extensions: ['json'] }],
+    })
+    if (canceled || !filePath) return { canceled: true }
+
+    await fs.writeFile(filePath, JSON.stringify(resumeJson, null, 2))
+    setSetting(db, 'lastExportDir', dirname(filePath))
     return { canceled: false, filePath }
   })
 }
