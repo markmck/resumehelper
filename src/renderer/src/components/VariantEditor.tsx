@@ -616,7 +616,6 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant, onVaria
             <button
               onClick={handleExportJson}
               disabled={exporting !== null}
-              title="Exports the final rendered resume. Re-importing creates new base entries — it won't recreate this variant."
               style={{
                 padding: '3px 10px',
                 fontSize: 'var(--font-size-xs)',
