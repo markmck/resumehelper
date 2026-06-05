@@ -178,6 +178,49 @@
 
 ---
 
+## Milestone: v2.5 — Portability & Debt Cleanup
+
+**Shipped:** 2026-06-05
+**Phases:** 5 | **Plans:** 19 | **Timeline:** ~37 days (2026-04-29 → 2026-06-05)
+
+### What Was Built
+- Unified merge pipeline: a single `buildMergedBuilderData(db, variantId, analysisId?)` feeds HTML preview, PDF, DOCX, and snapshot — replacing 3 parallel merge implementations — and DOCX export now honors the per-variant `showSummary` toggle
+- Base resume.json export: full experience DB → Zod-validated resume.json with validation-first errors (`ExportValidationError`), shared `ResumeJson` schema in `src/shared/`, null/empty-field omission
+- Variant-merged resume.json export: a variant's full three-layer merge exported as resume.json matching PDF/DOCX — export-only, no `meta` sidecar, with a re-import tooltip
+- Configurable SQLite DB location: Settings card with safe relocate (WAL checkpoint → copy → integrity-verify → bootstrap → backup → restart), clean rollback, UNC/cloud-path warning, delete-old-backup; `db/index.ts` refactored to a lazy bootstrap-resolved Proxy singleton untouching all 20 handler call-sites
+- Tech debt cleanup: removed `TEMPLATE_LIST` export, vestigial `compact` prop (all 5 templates), dead `tests/setup.ts`; fixed the `jobs.test.ts` `.where(undefined as any)` race. Test suite grew to 247
+
+### What Worked
+- **Merge reconciliation first** — landing the unified merge helper (Phase 30) before the two JSON exporters meant Phases 31/32 built on one validated path. The variant exporter reused the merge helper and the base exporter's mappers directly.
+- **Validation-first export ordering** — running the builder (and throwing `ExportValidationError`) *before* `showSaveDialog` made "no silent write of bad data" structural rather than a code-review checklist item.
+- **Proxy DB singleton** — forwarding `db`/`sqlite` per-call let DB relocation land without editing 20+ handler imports. The blast-radius grep confirmed zero module-scope captures.
+- **Tech debt as its own phase** — isolating the 4 cleanup items (Phase 33) kept them from being silently entangled with feature work.
+
+### What Was Inefficient
+- **Planning docs went stale during execution** — ROADMAP.md Phase 32/33 kept unchecked boxes and copy-pasted "31-01" placeholder plan stubs; REQUIREMENTS.md JSON-03/07-11 + DEBT-01-04 stayed `[ ]` and traceability read "Pending". All flagged as W-01 in verification and reconciled only at milestone close. **This is the same drift noted in v2.3 and v2.4 — now three milestones running.**
+- **Open artifacts never closed out** — 3 diagnosis-only debug sessions (from v2.1), 1 todo, and 7 human-smoke UAT/verification scenarios sat in interim status (`diagnosed`/`partial`/`human_needed`) and blocked the pre-close audit until manually flipped to terminal status. The work was done; only the status fields lagged.
+- **Unplanned dependency bump** — better-sqlite3 12.8.0 → 12.10.0 was forced mid-Phase-33 (Node 26 prebuilts; host lacked the MSVC C++ workload to compile 12.8.0). Committed separately; Electron rebuild path unaffected.
+- **Variant builder dual-maintenance** — 6 sections (work/projects/education/skills/volunteer/interests) are inline-mapped in the variant exporter rather than reusing all base mappers, due to a Builder* (parsed `string[]`) vs Row (JSON-text) column-shape difference. Future resume.json field additions must touch two places. Flagged for v2.6.
+
+### Patterns Established
+- **One merge path for all surfaces** — `buildMergedBuilderData()` is the single authority; HTML/PDF/DOCX/snapshot + both JSON exporters consume it. Surface drift is structurally impossible.
+- **Validate-or-throw before any dialog/write** — pure builders own validation and throw typed errors carrying `ZodIssue[]`; handlers can't serialize invalid output.
+- **Lazy bootstrap-resolved Proxy singleton** — module-level DB swaps without touching consumers; bootstrap config lives outside the DB it configures (`userData/db-location.json`).
+- **Conditional-spread omission** — optional fields omitted (not `null`/`""`) at every nesting level so strict spec validators accept the output.
+
+### Key Lessons
+1. **The doc-drift lesson from v2.3/v2.4 did not stick** — checkboxes and traceability drifted again. The real fix is automation: `phase complete` should check requirement boxes and update plan stubs, because relying on discipline has now failed three milestones in a row.
+2. **Close artifacts at phase end, not milestone end** — debug sessions, todos, and human-UAT scenarios should be driven to terminal status when the work lands. Interim status that means "done but unmarked" is indistinguishable from "actually open" to the close audit.
+3. **Reconcile-before-archive is mandatory** — the milestone archive copies ROADMAP/REQUIREMENTS verbatim, so stale docs must be fixed *before* delegating archival or the historical record inherits the rot.
+4. **Reuse-vs-shape tradeoff is real** — when two layers carry the same data in different column shapes (parsed arrays vs JSON text), full mapper reuse isn't free. Document the dual-maintenance burden explicitly when you accept it.
+
+### Cost Observations
+- Model mix: opus for orchestration/planning/close, sonnet for research/execution/verification
+- Sessions: multiple across ~5 weeks (merge → base JSON → variant JSON → debt → DB location → audit/close)
+- Notable: the milestone audit (`gsd:audit-milestone`) correctly classified all stale checkboxes as documentation-only and passed 29/29 on code evidence — the 247-test suite carried the verification weight that doc hygiene didn't.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -188,6 +231,7 @@
 | v2.2 | 6 days | 5 | UI-SPEC design contracts, @dnd-kit integration, three-layer data model |
 | v2.3 | 19 days | 3 | generateObject pattern reuse, fastest per-plan execution (~4 min avg) |
 | v2.4 | 37 days | 5 | First milestone with automated test coverage, handler extraction pattern, parallel worktree execution |
+| v2.5 | ~37 days | 5 | Architecture reconciliation (single merge path), resume.json portability, configurable DB location, dedicated tech-debt phase |
 
 ### Cumulative Quality
 
@@ -197,6 +241,7 @@
 | v2.2 | 0 automated | manual only | 0 (@dnd-kit already installed) |
 | v2.3 | 0 automated | manual only | 1 (pdf-parse) |
 | v2.4 | 143 automated | data layer + AI + export pipeline | 2 (fflate, jsdom as devDeps) |
+| v2.5 | 247 automated | + merge parity, JSON export builders, DB relocation core | 0 new (better-sqlite3 bumped 12.8.0→12.10.0) |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -208,3 +253,5 @@
 6. Pre-check config/prerequisites before opening file dialogs or starting async operations — avoid dialog-then-fail UX
 7. Extract inline code into pure functions before writing tests — composition-based testing is cleaner than module mocking
 8. Assert against the contract consumers use (XML for DOCX, HTML for templates) — not internal library representations
+9. **Planning-doc drift is chronic (v2.3 → v2.4 → v2.5)** — requirement checkboxes, traceability status, and plan stubs go stale during execution every milestone. Discipline has failed three times; the durable fix is automation in `phase complete`, not reminders. Always reconcile docs *before* milestone archival.
+10. Drive open artifacts (debug sessions, todos, human-UAT) to terminal status at phase end — interim status ("done but unmarked") is indistinguishable from genuinely-open to the close audit

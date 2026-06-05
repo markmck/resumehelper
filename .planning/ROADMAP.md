@@ -9,7 +9,7 @@
 - ✅ **v2.2 Three Layer Data** - Phases 17-21 (shipped 2026-04-01)
 - ✅ **v2.3 Job Hunt Accelerator** - Phases 22-24 (shipped 2026-04-03)
 - ✅ **v2.4 Polish & Reliability** - Phases 25-29 (shipped 2026-04-21)
-- 🚧 **v2.5 Portability & Debt Cleanup** - Phases 30-34 (in progress)
+- ✅ **v2.5 Portability & Debt Cleanup** - Phases 30-34 (shipped 2026-06-05)
 
 ## Phases
 
@@ -65,102 +65,14 @@ Phases 25-29 covered: Windows NSIS installer with setup wizard, Vitest test infr
 
 </details>
 
-### v2.5 Portability & Debt Cleanup (Phases 30-34)
+<details>
+<summary>✅ v2.5 Portability & Debt Cleanup (Phases 30-34) - SHIPPED 2026-06-05</summary>
 
-- [x] **Phase 30: Merge-Helper Reconciliation + DOCX showSummary Fix** - Unify three parallel merge paths and honor showSummary in DOCX export (completed 2026-05-11)
-- [x] **Phase 31: Base Resume.json Export** - Export full experience DB as valid resume.json from Experience tab (completed 2026-06-03)
-- [ ] **Phase 32: Variant-Merged Resume.json Export** - Export a variant's fully-merged view as resume.json from VariantEditor
-- [ ] **Phase 33: Tech Debt Cleanup** - Remove orphan TEMPLATE_LIST export, vestigial compact prop, dead tests/setup.ts, and fix jobs.test.ts race
-- [x] **Phase 34: Configurable SQLite DB Location** - User can relocate the SQLite DB via Settings with copy → verify → switch → restart migration (completed 2026-06-04)
+Phases 30-34 covered: unified `buildMergedBuilderData()` merge path feeding HTML/PDF/DOCX/snapshot with DOCX showSummary honored; base resume.json export (Zod-validated, validation-first errors, shared `ResumeJson` schema in `src/shared/`); variant-merged resume.json export (full three-layer merge, export-only, no `meta` sidecar, re-import tooltip); configurable SQLite DB location (checkpoint → copy → integrity-verify → bootstrap → backup → restart, with clean rollback, UNC/cloud-path warning, and delete-old-backup); tech debt cleanup (TEMPLATE_LIST, compact prop, dead tests/setup.ts, jobs.test.ts race). Cross-surface lastExportDir shared across all 5 export surfaces.
 
-## Phase Details
+5 phases, 19 plans, 29 requirements. Full details in `.planning/milestones/v2.5-ROADMAP.md`.
 
-### Phase 30: Merge-Helper Reconciliation + DOCX showSummary Fix
-**Goal**: A single authoritative merge path feeds HTML, PDF, and DOCX — and the user's showSummary toggle is honored consistently across all three
-**Depends on**: Nothing (first phase of v2.5)
-**Requirements**: MERGE-01, MERGE-02, MERGE-03, DOCX-01
-**Success Criteria** (what must be TRUE):
-  1. User toggles `showSummary` off on a variant and the summary paragraph is omitted from DOCX export (matching PDF/HTML behavior)
-  2. HTML preview, PDF export, and DOCX export of the same variant produce identical bullet sets, skill additions, and summary/job inclusions
-  3. `buildMergedBuilderData(db, variantId, analysisId?)` is the single function called by PDF/DOCX/snapshot/preview paths — grep shows no remaining parallel merge implementations
-  4. A parameterized test suite exercises HTML + PDF + DOCX × summary on/off × all 5 templates and fails loudly if any surface drifts
-  5. `ResumeJson` interface lives at `src/shared/resumeJson.ts` and is imported by both import.ts and (eventually) the new export builders
-**Plans:** 5/5 plans complete
-Plans:
-- [x] 30-01-PLAN.md — Lift ResumeJson interface + Zod scaffold to src/shared/resumeJson.ts (MERGE-02)
-- [x] 30-02-PLAN.md — Create src/main/lib/mergeHelper.ts with buildMergedBuilderData (MERGE-01)
-- [x] 30-03-PLAN.md — Update buildResumeDocx signature to accept showSummary 5th arg + gate summary paragraph (DOCX-01)
-- [x] 30-04-PLAN.md — Rewire callsites, delete 3 legacy merge paths, flip BuilderData type to showSummary (MERGE-01, DOCX-01)
-- [x] 30-05-PLAN.md — Parameterized test suite: 5 templates × 2 summary states × 2 surfaces (MERGE-03)
-**UI hint**: yes
-
-### Phase 31: Base Resume.json Export
-**Goal**: User can export the full experience DB as a valid resume.json file that downstream JSON Resume validators accept
-**Depends on**: Phase 30 (ResumeJson interface lifted to shared)
-**Requirements**: JSON-01, JSON-02, JSON-03, JSON-04, JSON-05, JSON-06
-**Success Criteria** (what must be TRUE):
-  1. User clicks "Export JSON" in the Experience tab header, picks a location, and saves `${profileName}_Resume.json` containing their full experience DB
-  2. Exported file passes `ResumeJsonSchema.parse` (Zod) and is accepted by strict JSON Resume validators — null/empty optional fields are omitted, not emitted as `null` or `""`
-  3. When validation fails the user sees a user-actionable error (not a silent write of bad data, not a stack trace)
-  4. User re-opens the save dialog and it defaults to the last-used export directory; filename auto-populates using existing sanitization rules
-  5. ImportConfirmModal copy and `buildBaseResumeJson` source both clearly communicate the "lossy-faithful" semantics (append-only on re-import, documented field subset)
-**Plans:** 3/3 plans complete
-Plans:
-- [x] 31-01-PLAN.md — Schema migration (app_settings) + settings.ts k/v helpers + sanitizeFilename promotion (JSON-04)
-- [x] 31-02-PLAN.md — buildBaseResumeJson pure builder + ExportValidationError + unit tests (JSON-01, JSON-02, JSON-03, JSON-06)
-- [x] 31-03-PLAN.md — export:json handler + preload + ExperienceTab button + ImportConfirmModal note + PDF/DOCX lastExportDir backfill (JSON-01, JSON-04, JSON-05, JSON-06)
-**UI hint**: yes
-
-### Phase 32: Variant-Merged Resume.json Export
-**Goal**: User can export any variant's fully-rendered, three-layer-merged view as resume.json matching its PDF/DOCX output
-**Depends on**: Phase 30 (unified merge helper), Phase 31 (validated ResumeJson shape and writer)
-**Requirements**: JSON-07, JSON-08, JSON-09, JSON-10, JSON-11
-**Success Criteria** (what must be TRUE):
-  1. User clicks the "JSON" button (peer of PDF / DOCX) in the VariantEditor preview toolbar and saves `${profileName}_Resume_${variantName}.json`
-  2. The exported JSON reflects the full three-layer merge — base + variant selection + accepted skill additions + bullet overrides — matching what the same variant's PDF/DOCX produce
-  3. Excluded items (summary off, excluded jobs, excluded bullets) do not appear in the exported JSON
-  4. Exported JSON contains no `meta` sidecar field — it is pure resume.json output only
-  5. Hovering the JSON button reveals a tooltip explaining export-only semantics: re-importing creates new base entries, it will not recreate this variant
-**Plans:** 3 plans
-Plans:
-- [ ] 31-01-PLAN.md — Schema migration (app_settings) + settings.ts k/v helpers + sanitizeFilename promotion (JSON-04)
-- [ ] 31-02-PLAN.md — buildBaseResumeJson pure builder + ExportValidationError + unit tests (JSON-01, JSON-02, JSON-03, JSON-06)
-- [ ] 31-03-PLAN.md — export:json handler + preload + ExperienceTab button + ImportConfirmModal note + PDF/DOCX lastExportDir backfill (JSON-01, JSON-04, JSON-05, JSON-06)
-**UI hint**: yes
-
-### Phase 33: Tech Debt Cleanup
-**Goal**: Four long-standing debt items are removed without breaking tests, types, or rendered output
-**Depends on**: Phase 30 (merge reconciliation lands first to avoid touching the same files twice)
-**Requirements**: DEBT-01, DEBT-02, DEBT-03, DEBT-04
-**Success Criteria** (what must be TRUE):
-  1. `TEMPLATE_LIST` export is gone from `resolveTemplate.ts` and a full-workspace grep (including `.claude/`, `dist/`, `scripts/`) finds no remaining readers
-  2. The vestigial `compact` prop is removed from `ResumeTemplateProps` and all 5 template components — `tsc` and `vitest` both pass, and a manual render of all 5 templates shows no regressions
-  3. `tests/setup.ts` is deleted; the full test suite runs 3× consecutively before and after deletion with identical pass counts
-  4. `jobs.test.ts` no longer contains `.where(undefined as any)` (replaced with a correct filter or removed with documented intent), and the full suite runs 10× consecutively under the default thread pool with zero race failures
-**Plans:** 3 plans
-Plans:
-- [ ] 31-01-PLAN.md — Schema migration (app_settings) + settings.ts k/v helpers + sanitizeFilename promotion (JSON-04)
-- [ ] 31-02-PLAN.md — buildBaseResumeJson pure builder + ExportValidationError + unit tests (JSON-01, JSON-02, JSON-03, JSON-06)
-- [ ] 31-03-PLAN.md — export:json handler + preload + ExperienceTab button + ImportConfirmModal note + PDF/DOCX lastExportDir backfill (JSON-01, JSON-04, JSON-05, JSON-06)
-
-### Phase 34: Configurable SQLite DB Location
-**Goal**: User can safely relocate the SQLite database to any folder they choose, with integrity verification, rollback on failure, and a cloud-storage warning
-**Depends on**: Phases 30, 31, 32, 33 (last — touches module-level DB singletons imported by 20+ handlers)
-**Requirements**: DB-01, DB-02, DB-03, DB-04, DB-05, DB-06, DB-07, DB-08, DB-09, DB-10
-**Success Criteria** (what must be TRUE):
-  1. User opens Settings, sees a `Database Location` card with the current DB path, "Reveal in Explorer" button, and "Change location" button
-  2. User picks a folder, confirms the 5-step plan modal, and the DB is checkpoint-closed, copied, integrity-verified, bootstrap-written, and renamed `.bak` — then prompted to restart (Restart now / Later)
-  3. On restart, the app resolves the DB via `userData/db-location.json` bootstrap override before opening the database — the new location is in use
-  4. When the user picks a UNC path or a well-known cloud folder (OneDrive / Dropbox / iCloud Drive), a non-blocking warning modal explains the WAL-over-network risk and lets them proceed
-  5. Any failure during the change sequence rolls back cleanly — the source DB remains accessible, no partial state is left on disk, and the error is surfaced to the user
-  6. After a successful relocation, a "Delete old backup" button appears in the Database Location card and only deletes the `.bak` file on explicit user click
-**Plans:** 4/4 plans complete
-Plans:
-- [x] 34-01-PLAN.md — Bootstrap db-location.json reader + app startup wiring (DB-03, DB-07, DB-10)
-- [x] 34-02-PLAN.md — relocate() main-process handler + IPC bridge (DB-02, DB-03, DB-04, DB-05)
-- [x] 34-03-PLAN.md — window.api.dbLocation preload namespace (DB-01, DB-06, DB-08, DB-09)
-- [x] 34-04-PLAN.md — DatabaseLocationCard + 3 modals + SettingsTab mount + manual smoke (DB-01, DB-02, DB-05, DB-06, DB-08, DB-09)
-**UI hint**: yes
+</details>
 
 ## Progress
 
@@ -172,7 +84,7 @@ Plans:
 | 17-21 | v2.2 | 13/13 | Complete | 2026-04-01 |
 | 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
 | 25-29 | v2.4 | 12/12 | Complete | 2026-04-21 |
-| 30-34 | v2.5 | 19/19 | Complete | 2026-06-04 |
+| 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
 
 ## Future (v3.0+)
 

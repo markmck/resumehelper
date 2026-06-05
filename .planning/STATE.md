@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Portability & Debt Cleanup
-status: milestone_complete
-stopped_at: Milestone complete (Phase 34 was final phase)
-last_updated: 2026-06-05T15:07:24.565Z
-last_activity: 2026-06-04
+status: Awaiting next milestone
+stopped_at: Phase 34 Plan 04 complete — ready for phase verification
+last_updated: "2026-06-05T17:27:50.769Z"
+last_activity: 2026-06-05 — Milestone v2.5 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -21,21 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Milestone complete
+**Current focus:** Planning next milestone (v2.5 shipped 2026-06-05)
 
 ## Current Position
 
-Phase: 34
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-06-05
+Phase: Milestone v2.5 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-05 — Milestone v2.5 completed and archived
 
 ## Performance Metrics
 
-- Total phases in milestone: 5
-- Completed phases: 2 (Phase 30, Phase 31)
-- Completed plans: 8 (Phase 30: 5/5, Phase 31: 3/3)
+- Total phases in milestone: 5 (Phases 30–34)
+- Completed phases: 5 (all)
+- Completed plans: 19 (30: 5/5, 31: 3/3, 32: 3/3, 33: 4/4, 34: 4/4)
 - Completion percent of planned phases: 100%
+- Test suite: 247 tests passing
 
 ## Accumulated Context
 
@@ -71,19 +72,23 @@ Decisions landed during Phase 31 execution:
 
 - [x] Phase 30: Merge reconciliation + DOCX showSummary fix
 - [x] Phase 31: Base resume.json export
-- [ ] Phase 32: Variant-merged resume.json export
-- [ ] Phase 33: Tech debt cleanup (TEMPLATE_LIST, compact prop, tests/setup.ts, jobs.test.ts race)
+- [x] Phase 32: Variant-merged resume.json export
+- [x] Phase 33: Tech debt cleanup (TEMPLATE_LIST, compact prop, tests/setup.ts, jobs.test.ts race)
 - [x] Phase 34: Configurable DB location
 
 ### Blockers/Concerns
 
-(None — roadmap established, coverage validated)
+(None — v2.5 shipped, all 29 requirements validated, all open artifacts reconciled)
 
 ## Session Continuity
 
-Last session: 2026-06-04T00:00:00.000Z
-Stopped at: Phase 34 Plan 04 complete — ready for phase verification
+Last session: 2026-06-05 — v2.5 milestone close
+Stopped at: Milestone v2.5 completed and archived
 Resume file: None
 
-**Completed Phase:** 34 (configurable-sqlite-db-location) — 4/4 plans landed — 2026-06-04
-**Next Phase:** Phase verification for v2.5 milestone close
+**Completed Milestone:** v2.5 Portability & Debt Cleanup — 5 phases, 19 plans — shipped 2026-06-05
+**Next:** Start the next milestone with `/gsd:new-milestone`
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

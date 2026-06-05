@@ -1,5 +1,24 @@
 # Milestones
 
+## v2.5 Portability & Debt Cleanup (Shipped: 2026-06-05)
+
+**Phases completed:** 5 phases, 19 plans
+**Git range:** feat(30-01) → phase-34 complete | 79 files changed, +8,838 / -1,819
+**Test suite:** 247 tests, all passing
+
+**Key accomplishments:**
+
+- Unified merge pipeline: a single `buildMergedBuilderData()` feeds HTML preview, PDF, DOCX, and snapshot — eliminating 3 parallel merge paths — and DOCX export now honors the per-variant `showSummary` toggle, matching PDF/HTML
+- Base resume.json export: full experience DB → Zod-validated resume.json with validation-first error handling (`ExportValidationError`), a shared `ResumeJson` schema in `src/shared/`, and null/empty-field omission accepted by strict JSON Resume validators
+- Variant-merged resume.json export: a variant's full three-layer merge (base + selection + accepted skill additions + bullet overrides) exported as resume.json matching its PDF/DOCX output — export-only, no `meta` sidecar, with a tooltip clarifying re-import semantics
+- Configurable SQLite DB location: Settings card with a safe relocate flow (WAL checkpoint → copy → integrity-verify → bootstrap JSON → backup → restart), clean rollback on failure, UNC/cloud-path warning, and delete-old-backup; `db/index.ts` refactored to a lazy bootstrap-resolved Proxy singleton without touching any of the 20 handler call-sites
+- Tech debt cleanup: removed orphan `TEMPLATE_LIST` export, vestigial `compact` prop (all 5 templates), and dead `tests/setup.ts`; fixed the `jobs.test.ts` `.where(undefined as any)` race
+- Cross-surface `lastExportDir` persistence shared across all 5 export surfaces (PDF / DOCX / snapshotPdf / base JSON / variant JSON)
+
+**Known deferred items at close:** 0 — all 8 open artifacts were reconciled during close (3 diagnosis-only debug sessions marked resolved, 1 todo moved to done, 7 human-smoke UAT/verification scenarios across Phases 32 & 34 confirmed passing by the user).
+
+---
+
 ## v2.4 Polish & Reliability (Shipped: 2026-04-21)
 
 **Phases completed:** 5 phases, 12 plans, 26 tasks

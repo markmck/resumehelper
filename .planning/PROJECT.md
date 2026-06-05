@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A desktop application (Electron) for managing, versioning, and submitting tailored resumes with AI-powered job analysis. It stores all professional experience in a SQLite database (full resume.json spec coverage), lets users create template variants with 5 purpose-built resume templates, and tracks every job submission with full pipeline visibility — including immutable snapshots of the exact resume sent. Users paste job postings for LLM-powered analysis — match scoring, keyword coverage, gap identification, and bullet rewrite suggestions — turning resume tailoring from a 30-minute manual process into a few minutes of guided review.
+A desktop application (Electron) for managing, versioning, and submitting tailored resumes with AI-powered job analysis. It stores all professional experience in a SQLite database (full resume.json spec coverage), lets users create template variants with 5 purpose-built resume templates, and tracks every job submission with full pipeline visibility — including immutable snapshots of the exact resume sent. Users paste job postings for LLM-powered analysis — match scoring, keyword coverage, gap identification, and bullet rewrite suggestions — turning resume tailoring from a 30-minute manual process into a few minutes of guided review. Resume data is portable: the full experience DB or any fully-merged variant exports as standards-compliant resume.json, and the SQLite store can be relocated to any folder with integrity-verified migration.
 
 ## Core Value
 
@@ -72,36 +72,27 @@ Full visibility into job applications — which resume version was sent to which
 - ✓ Data layer test coverage: handler extraction to pure functions, applyOverrides, three-layer merge — v2.4
 - ✓ AI integration test coverage: Zod schemas, score derivation, MockLanguageModelV3, runAnalysis — v2.4
 - ✓ Export pipeline test coverage: DOCX XML assertions, snapshot shape, template rendering — v2.4
+- ✓ Unified merge pipeline — single `buildMergedBuilderData()` feeds HTML/PDF/DOCX/snapshot; DOCX honors showSummary toggle — v2.5
+- ✓ Base resume.json export — full experience DB as Zod-validated resume.json with validation-first errors — v2.5
+- ✓ Variant-merged resume.json export — three-layer merge matching PDF/DOCX, export-only, no meta sidecar — v2.5
+- ✓ Configurable SQLite DB location — Settings relocate with checkpoint → copy → verify → bootstrap → backup → restart, rollback, cloud-path warning — v2.5
+- ✓ Tech debt cleanup — removed TEMPLATE_LIST export, vestigial compact prop, dead tests/setup.ts; fixed jobs.test.ts race — v2.5
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] User can export full experience DB as resume.json (base export)
-- [ ] User can export a variant's merged view as resume.json (three-layer merge matches preview/PDF)
-- [ ] User can configure SQLite DB location via Settings with copy → verify → switch migration
-- [ ] DOCX export honors the variant's showSummary toggle
-- [ ] Orphan TEMPLATE_LIST export removed from resolveTemplate.ts
-- [ ] Vestigial compact prop removed from ResumeTemplateProps
-- [ ] Dead tests/setup.ts deleted (or properly wired into vitest)
-- [ ] Race condition in jobs.test.ts under concurrent thread pool fixed
-
-## Current Milestone: v2.5 Portability & Debt Cleanup
-
-**Goal:** Make resume data portable via JSON export and settle all outstanding tech debt.
-
-**Target features:**
-- Resume.json export (base) — full experience DB as valid resume.json
-- Resume.json export (variant-merged) — per-variant three-layer merge, export-only (no roundtrip guarantee)
-- Configurable SQLite DB location with copy → verify → switch migration
-- DOCX showSummary toggle honored
-- Tech debt cleanup: TEMPLATE_LIST, compact prop, tests/setup.ts, jobs.test.ts race
+- (None yet — next milestone requirements defined via `/gsd:new-milestone`)
 
 ## Current State
 
-**Latest shipped:** v2.4 Polish & Reliability (2026-04-21)
+**Latest shipped:** v2.5 Portability & Debt Cleanup (2026-06-05)
 
-The app is a fully functional resume management tool with AI analysis, three-layer data model, skills chip grid, submission tracking, 5 professional templates, ATS score thresholds, PDF resume import, and job posting URL scraping. Now installable via Windows NSIS installer with 143 tests across 16 files covering data layer, AI integration, and export pipeline.
+The app is a fully functional resume management tool with AI analysis, three-layer data model, skills chip grid, submission tracking, 5 professional templates, ATS score thresholds, PDF resume import, and job posting URL scraping. Resume data is now portable — base and variant-merged resume.json export — and the SQLite store is relocatable via Settings with integrity-verified migration. A single `buildMergedBuilderData()` feeds all render/export surfaces (HTML/PDF/DOCX/snapshot). Installable via Windows NSIS installer, with 247 tests passing.
+
+### Next Milestone Goals
+
+Next milestone is not yet scoped. Candidate from the v3.0+ horizon: **Answer Bank for Application Questions** — leverage the structured experience DB beyond resumes (interview prep, LinkedIn summaries, application-form answers). Define via `/gsd:new-milestone`.
 
 ### Out of Scope
 
@@ -126,9 +117,11 @@ The app is a fully functional resume management tool with AI analysis, three-lay
 - v2.2 shipped: Three-layer data model, skills chip grid, analysis submission flow, variant UX cleanup
 - v2.3 shipped: ATS score thresholds, PDF resume import with AI extraction, job posting URL scraping
 - v2.4 shipped: Windows installer, Vitest test infrastructure, 143 tests across data layer/AI/export pipeline
+- v2.5 shipped: unified merge pipeline (single buildMergedBuilderData), base + variant-merged resume.json export, configurable SQLite DB location, DOCX showSummary fix, tech debt cleanup; test suite grown to 247
 - Stack: Electron + React 19 + TypeScript + Drizzle ORM + SQLite + @dnd-kit + Vitest + design system tokens (CSS custom properties)
-- 26,816 lines of TypeScript/TSX across 90+ source files (including 16 test files)
+- 30,427 lines of TypeScript/TSX across 90+ source files
 - Single rendering pipeline: print.html + PrintApp + postMessage for all preview/export/snapshot paths
+- Single merge pipeline: buildMergedBuilderData(db, variantId, analysisId?) feeds HTML/PDF/DOCX/snapshot and both resume.json exporters
 - Three-layer data: base experience → variant selection → analysis-scoped overrides (merge at render)
 
 ## Constraints
@@ -183,6 +176,11 @@ The app is a fully functional resume management tool with AI analysis, three-lay
 | DOCX XML assertions over in-memory object tree | docx library internals are unstable across versions; word/document.xml is the contract Word consumes. fflate unzip + string assertions. | ✓ Good |
 | Per-file jsdom via vitest docblock | Global env stays node; .tsx test files opt in with `/** @vitest-environment jsdom */`. No global DOM pollution. | ✓ Good |
 | renderToString over Testing Library for template tests | No @testing-library/react dependency; pure string assertions on HTML output. Sufficient for structure verification. | ✓ Good |
+| Single buildMergedBuilderData() merge path | One authoritative merge feeds HTML/PDF/DOCX/snapshot + both JSON exporters; eliminates 3 parallel implementations so data/surface drift is structurally impossible | ✓ Good |
+| Validation-first export (builder throws before dialog) | buildBaseResumeJson/buildVariantResumeJson validate internally and throw ExportValidationError(ZodIssue[]) before showSaveDialog — no silent writes of invalid resume.json | ✓ Good |
+| resume.json export is lossy-faithful, append-only, no meta sidecar | Pure JSON Resume spec output; re-import creates new base entries (won't recreate a variant). Conditional-spread omits null/empty fields | ✓ Good |
+| Lazy bootstrap-resolved Proxy DB singleton | db/index.ts forwards db/sqlite per-call via Proxy; enables relocation + resetDbCache() without touching any of 20 handler call-sites. db-location.json bootstrap lives in userData, outside SQLite | ✓ Good |
+| Warn-but-allow on network/cloud DB paths | UNC + OneDrive/Dropbox/iCloud heuristic shows non-blocking WAL-over-network warning; user knows their storage best — hard-block too restrictive | ✓ Good |
 
 ## Evolution
 
@@ -202,4 +200,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-23 after v2.5 milestone started*
+*Last updated: 2026-06-05 after v2.5 milestone completed*
