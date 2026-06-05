@@ -82,17 +82,29 @@ Full visibility into job applications — which resume version was sent to which
 
 <!-- Current scope. Building toward these. -->
 
-- (None yet — next milestone requirements defined via `/gsd:new-milestone`)
+**Milestone v2.6: Per-Variant Text Overrides**
+
+- [ ] Variant-tier text overrides for summary, job title/company line, project title, project description, and bullet text
+- [ ] Unified polymorphic override table with merge precedence analysis → variant → base
+- [ ] Migrate existing analysis bullet overrides into the unified override table
+- [ ] Inline reword UI affordance at the variant tier
+- [ ] Excluded-bullet suggestions during job analysis — surface relevant base bullets the variant omits, accept re-includes them at the analysis tier
+
+## Current Milestone: v2.6 Per-Variant Text Overrides
+
+**Goal:** Let users reword (not just include/exclude) text at the variant tier — treating variants like git-style branches (base = master, variant = role-family curation + reword, analysis = job-specific final tweak) — and surface base experience the active variant is missing when a job asks for it.
+
+**Target features:**
+- Per-variant text overrides across summary, titles/company line, project blurbs, and bullet text
+- A single polymorphic `overrides` table reconciling variant-tier and analysis-tier overrides with precedence analysis → variant → base
+- Migration of existing `analysisBulletOverrides` rows into the unified table
+- Excluded-bullet suggestions during job refining: the analysis sees base bullets the variant excludes, recommends relevant ones against JD gaps, and accepting re-includes them for that analysis only
 
 ## Current State
 
 **Latest shipped:** v2.5 Portability & Debt Cleanup (2026-06-05)
 
 The app is a fully functional resume management tool with AI analysis, three-layer data model, skills chip grid, submission tracking, 5 professional templates, ATS score thresholds, PDF resume import, and job posting URL scraping. Resume data is now portable — base and variant-merged resume.json export — and the SQLite store is relocatable via Settings with integrity-verified migration. A single `buildMergedBuilderData()` feeds all render/export surfaces (HTML/PDF/DOCX/snapshot). Installable via Windows NSIS installer, with 247 tests passing.
-
-### Next Milestone Goals
-
-Next milestone is not yet scoped. Candidate from the v3.0+ horizon: **Answer Bank for Application Questions** — leverage the structured experience DB beyond resumes (interview prep, LinkedIn summaries, application-form answers). Define via `/gsd:new-milestone`.
 
 ### Out of Scope
 
@@ -181,6 +193,7 @@ Next milestone is not yet scoped. Candidate from the v3.0+ horizon: **Answer Ban
 | resume.json export is lossy-faithful, append-only, no meta sidecar | Pure JSON Resume spec output; re-import creates new base entries (won't recreate a variant). Conditional-spread omits null/empty fields | ✓ Good |
 | Lazy bootstrap-resolved Proxy DB singleton | db/index.ts forwards db/sqlite per-call via Proxy; enables relocation + resetDbCache() without touching any of 20 handler call-sites. db-location.json bootstrap lives in userData, outside SQLite | ✓ Good |
 | Warn-but-allow on network/cloud DB paths | UNC + OneDrive/Dropbox/iCloud heuristic shows non-blocking WAL-over-network warning; user knows their storage best — hard-block too restrictive | ✓ Good |
+| entity_overrides uses per-entity nullable FK columns (bullet_id, project_id, job_id, project_bullet_id) + entity_type/field discriminators, NOT a generic entity_id | Matches template_variant_items precedent; only shape where SQLite ON DELETE CASCADE fires per parent table — a generic entity_id would orphan override rows on parent delete | — Phase 35 |
 
 ## Evolution
 
@@ -200,4 +213,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-05 after v2.5 milestone completed*
+*Last updated: 2026-06-05 after v2.6 milestone started*
