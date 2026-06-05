@@ -41,12 +41,12 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Configurable DB Location
 
-- [ ] **DB-01**: `Database Location` card appears in Settings below AI Configuration with current DB path label, "Reveal in Explorer" button, and "Change location" button
+- [x] **DB-01**: `Database Location` card appears in Settings below AI Configuration with current DB path label, "Reveal in Explorer" button, and "Change location" button
 - [x] **DB-02**: User can pick a folder via OS folder picker; app validates write permission before proceeding
 - [x] **DB-03**: Change flow sequence: WAL checkpoint → close DB → copy file → verify integrity (readonly open + `integrity_check`) → write bootstrap JSON → rename old → `.bak` → prompt restart
 - [x] **DB-04**: Any failure during the sequence rolls back cleanly — source DB remains accessible, no partial state, error surfaced to user
-- [ ] **DB-05**: Confirmation modal before Change enumerates the 5-step plan (Copy → Verify → Switch → Backup → Restart)
-- [ ] **DB-06**: After successful relocation, restart-required modal offers "Restart now" / "Later" buttons; choosing Restart Now calls `app.relaunch(); app.exit(0)`
+- [x] **DB-05**: Confirmation modal before Change enumerates the 5-step plan (Copy → Verify → Switch → Backup → Restart)
+- [x] **DB-06**: After successful relocation, restart-required modal offers "Restart now" / "Later" buttons; choosing Restart Now calls `app.relaunch(); app.exit(0)`
 - [x] **DB-07**: On first boot after restart, app resolves DB path via `userData/db-location.json` bootstrap override before opening the DB
 - [x] **DB-08**: Heuristic detects UNC paths (`\\server\share`) and well-known cloud folder names (OneDrive, Dropbox, iCloud Drive) — non-blocking warning modal explains WAL-over-network risk, user can proceed
 - [x] **DB-09**: After successful relocation, a "Delete old backup" button appears in the Database Location card — deletes the `.bak` file on explicit user click
@@ -100,12 +100,12 @@ Which phases cover which requirements. Populated during roadmap creation.
 | DEBT-02 | Phase 33 | Pending |
 | DEBT-03 | Phase 33 | Pending |
 | DEBT-04 | Phase 33 | Pending |
-| DB-01 | Phase 34 | Pending |
+| DB-01 | Phase 34 | Complete |
 | DB-02 | Phase 34 | Complete |
 | DB-03 | Phase 34 | Complete |
 | DB-04 | Phase 34 | Complete |
-| DB-05 | Phase 34 | Pending |
-| DB-06 | Phase 34 | Pending |
+| DB-05 | Phase 34 | Complete |
+| DB-06 | Phase 34 | Complete |
 | DB-07 | Phase 34 | Complete |
 | DB-08 | Phase 34 | Complete |
 | DB-09 | Phase 34 | Complete |
