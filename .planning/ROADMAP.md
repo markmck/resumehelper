@@ -71,7 +71,7 @@ Phases 25-29 covered: Windows NSIS installer with setup wizard, Vitest test infr
 - [x] **Phase 31: Base Resume.json Export** - Export full experience DB as valid resume.json from Experience tab (completed 2026-06-03)
 - [ ] **Phase 32: Variant-Merged Resume.json Export** - Export a variant's fully-merged view as resume.json from VariantEditor
 - [ ] **Phase 33: Tech Debt Cleanup** - Remove orphan TEMPLATE_LIST export, vestigial compact prop, dead tests/setup.ts, and fix jobs.test.ts race
-- [ ] **Phase 34: Configurable SQLite DB Location** - User can relocate the SQLite DB via Settings with copy → verify → switch → restart migration
+- [x] **Phase 34: Configurable SQLite DB Location** - User can relocate the SQLite DB via Settings with copy → verify → switch → restart migration (completed 2026-06-04)
 
 ## Phase Details
 
@@ -154,11 +154,12 @@ Plans:
   4. When the user picks a UNC path or a well-known cloud folder (OneDrive / Dropbox / iCloud Drive), a non-blocking warning modal explains the WAL-over-network risk and lets them proceed
   5. Any failure during the change sequence rolls back cleanly — the source DB remains accessible, no partial state is left on disk, and the error is surfaced to the user
   6. After a successful relocation, a "Delete old backup" button appears in the Database Location card and only deletes the `.bak` file on explicit user click
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 Plans:
-- [ ] 31-01-PLAN.md — Schema migration (app_settings) + settings.ts k/v helpers + sanitizeFilename promotion (JSON-04)
-- [ ] 31-02-PLAN.md — buildBaseResumeJson pure builder + ExportValidationError + unit tests (JSON-01, JSON-02, JSON-03, JSON-06)
-- [ ] 31-03-PLAN.md — export:json handler + preload + ExperienceTab button + ImportConfirmModal note + PDF/DOCX lastExportDir backfill (JSON-01, JSON-04, JSON-05, JSON-06)
+- [x] 34-01-PLAN.md — Bootstrap db-location.json reader + app startup wiring (DB-03, DB-07, DB-10)
+- [x] 34-02-PLAN.md — relocate() main-process handler + IPC bridge (DB-02, DB-03, DB-04, DB-05)
+- [x] 34-03-PLAN.md — window.api.dbLocation preload namespace (DB-01, DB-06, DB-08, DB-09)
+- [x] 34-04-PLAN.md — DatabaseLocationCard + 3 modals + SettingsTab mount + manual smoke (DB-01, DB-02, DB-05, DB-06, DB-08, DB-09)
 **UI hint**: yes
 
 ## Progress
@@ -171,7 +172,7 @@ Plans:
 | 17-21 | v2.2 | 13/13 | Complete | 2026-04-01 |
 | 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
 | 25-29 | v2.4 | 12/12 | Complete | 2026-04-21 |
-| 30-34 | v2.5 | 8/8 (phases 30-31) | In progress (32-34 pending) | - |
+| 30-34 | v2.5 | 19/19 | Complete | 2026-06-04 |
 
 ## Future (v3.0+)
 

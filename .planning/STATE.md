@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Portability & Debt Cleanup
 status: verifying
-stopped_at: Phase 31 Plan 03 complete — ready for phase verification
-last_updated: "2026-06-05T01:59:54.714Z"
-last_activity: 2026-06-05
+stopped_at: Phase 34 Plan 04 complete — ready for phase verification
+last_updated: "2026-06-04T00:00:00.000Z"
+last_activity: 2026-06-04
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 19
-  completed_plans: 18
-  percent: 80
+  completed_plans: 19
+  percent: 100
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 31 — base-resume-json-export
+**Current focus:** Phase 34 — configurable-sqlite-db-location (COMPLETE)
 
 ## Current Position
 
-Phase: 31 (base-resume-json-export) — COMPLETE, awaiting phase verification
-Plan: 3 of 3 — complete
+Phase: 34 (configurable-sqlite-db-location) — COMPLETE, awaiting phase verification
+Plan: 4 of 4 — complete
 Status: Phase complete — ready for verification
-Last activity: 2026-06-05
+Last activity: 2026-06-04
 
 ## Performance Metrics
 
@@ -73,7 +73,7 @@ Decisions landed during Phase 31 execution:
 - [x] Phase 31: Base resume.json export
 - [ ] Phase 32: Variant-merged resume.json export
 - [ ] Phase 33: Tech debt cleanup (TEMPLATE_LIST, compact prop, tests/setup.ts, jobs.test.ts race)
-- [ ] Phase 34: Configurable DB location
+- [x] Phase 34: Configurable DB location
 
 ### Blockers/Concerns
 
@@ -81,9 +81,9 @@ Decisions landed during Phase 31 execution:
 
 ## Session Continuity
 
-Last session: 2026-06-05T01:59:54.704Z
-Stopped at: Phase 31 Plan 03 complete — ready for phase verification
+Last session: 2026-06-04T00:00:00.000Z
+Stopped at: Phase 34 Plan 04 complete — ready for phase verification
 Resume file: None
 
-**Completed Phase:** 31 (base-resume-json-export) — 3/3 plans landed — 2026-06-03
-**Next Phase:** 32 (variant-merged-resume-json-export) — pending plan-phase
+**Completed Phase:** 34 (configurable-sqlite-db-location) — 4/4 plans landed — 2026-06-04
+**Next Phase:** Phase verification for v2.5 milestone close
