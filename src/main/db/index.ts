@@ -4,19 +4,65 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import path from 'path'
 import * as schema from './schema'
+import { resolveDbPath } from './bootstrap'
 
-const dbPath = path.join(app.getPath('userData'), 'app.db')
-const sqlite = new Database(dbPath)
+// Module-scoped lazy state — nothing is opened at module load
+let _sqlite: Database.Database | null = null
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null
+let _resolvedPath: string | null = null
 
-sqlite.pragma('journal_mode = WAL')
+export function getSqlite(): Database.Database {
+  if (!_sqlite) {
+    _resolvedPath = resolveDbPath().path
+    _sqlite = new Database(_resolvedPath)
+    _sqlite.pragma('journal_mode = WAL')
+    ensureSchema(_sqlite)
+  }
+  return _sqlite
+}
 
-export const db = drizzle(sqlite, { schema })
-export { sqlite }
+export function getDb(): ReturnType<typeof drizzle<typeof schema>> {
+  if (!_db) _db = drizzle(getSqlite(), { schema })
+  return _db
+}
+
+export function getCurrentDbPath(): string {
+  if (!_resolvedPath) getSqlite() // force resolution
+  return _resolvedPath!
+}
+
+/** WAL-checkpoint and close; clears handle caches. Used by relocate flow. */
+export function closeDb(): void {
+  if (_sqlite) {
+    _sqlite.pragma('wal_checkpoint(TRUNCATE)')
+    _sqlite.close()
+    _sqlite = null
+    _db = null
+  }
+}
+
+/** closeDb() + clear resolved path so next access re-reads bootstrap. */
+export function resetDbCache(): void {
+  closeDb()
+  _resolvedPath = null
+}
+
+// Backwards-compatible Proxy exports — preserves `import { db, sqlite } from '../db'`
+// for all 20 handler files with zero call-site migration required.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const sqlite: Database.Database = new Proxy({} as any, {
+  get: (_, prop) => Reflect.get(getSqlite(), prop, getSqlite()),
+}) as Database.Database
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const db: ReturnType<typeof getDb> = new Proxy({} as any, {
+  get: (_, prop) => Reflect.get(getDb(), prop, getDb()),
+}) as ReturnType<typeof getDb>
 
 // Ensure all tables exist using CREATE TABLE IF NOT EXISTS
 // This is more reliable than file-based migrations for a local desktop app
 // where the DB may be in any state (fresh, partial, or fully migrated)
-function ensureSchema(): void {
+function ensureSchema(sqlite: Database.Database): void {
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS \`jobs\` (
       \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -302,11 +348,9 @@ function ensureSchema(): void {
     : path.join(__dirname, '../../drizzle')
 
   try {
-    migrate(db, { migrationsFolder })
+    migrate(getDb(), { migrationsFolder })
   } catch {
     // Migrations may fail if tables were created by ensureSchema above
     // and Drizzle's migration journal doesn't know about them — that's fine
   }
 }
-
-ensureSchema()
