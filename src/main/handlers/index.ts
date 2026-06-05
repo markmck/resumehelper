@@ -18,6 +18,7 @@ import { registerImportHandlers } from './import'
 import { registerSettingsHandlers } from './settings'
 import { registerAiHandlers } from './ai'
 import { registerJobPostingHandlers } from './jobPostings'
+import { registerDbLocationHandlers } from './dbLocation'
 
 export function registerAllHandlers(): void {
   registerJobHandlers()
@@ -40,4 +41,5 @@ export function registerAllHandlers(): void {
   registerSettingsHandlers()
   registerAiHandlers()
   registerJobPostingHandlers()
+  registerDbLocationHandlers()
 }

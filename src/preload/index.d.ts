@@ -1,5 +1,9 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 
+export type CloudPathResult =
+  | { match: true; reason: string }
+  | { match: false }
+
 export interface Job {
   id: number
   company: string
@@ -585,6 +589,27 @@ export interface Api {
       company: string
       jobDescriptionText: string
     } | { error: string }>
+  }
+  dbLocation: {
+    getCurrentPath: () => Promise<string>
+    revealInExplorer: () => Promise<void>
+    pickFolder: () => Promise<
+      | { canceled: true }
+      | {
+          canceled: false
+          folder: string
+          cloudWarning: CloudPathResult
+          writable: boolean
+          probeError?: string
+        }
+    >
+    relocate: (targetDir: string) => Promise<
+      | { ok: true; newPath: string; backupPath: string }
+      | { ok: false; error: string; stage: 'collision' | 'copy' | 'verify' | 'bootstrap' | 'rename' }
+    >
+    listBackups: () => Promise<Array<{ path: string; mtime: number }>>
+    deleteOldestBackup: () => Promise<{ deleted: string } | { deleted: null }>
+    restart: () => Promise<void>
   }
 }
 

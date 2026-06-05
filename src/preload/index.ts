@@ -281,6 +281,15 @@ const api = {
       ipcRenderer.invoke('jobPostings:updateAnalysisStatus', analysisId, status),
     fetchUrl: (url: string) => ipcRenderer.invoke('jobPostings:fetchUrl', url),
   },
+  dbLocation: {
+    getCurrentPath: () => ipcRenderer.invoke('db:getCurrentPath'),
+    revealInExplorer: () => ipcRenderer.invoke('db:revealInExplorer'),
+    pickFolder: () => ipcRenderer.invoke('db:pickFolder'),
+    relocate: (targetDir: string) => ipcRenderer.invoke('db:relocate', targetDir),
+    listBackups: () => ipcRenderer.invoke('db:listBackups'),
+    deleteOldestBackup: () => ipcRenderer.invoke('db:deleteOldestBackup'),
+    restart: () => ipcRenderer.invoke('db:restart'),
+  },
 }
 
 // Print URL base for iframe src in both dev and prod.
