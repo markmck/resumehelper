@@ -3,8 +3,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-// Hoist the app mock so we can control getPath per test
-const mockGetPath = vi.fn()
+// vi.mock is hoisted to top of file — factory must not reference variables defined below.
+// Use vi.hoisted() to declare the mock fn in a way that's available at hoist time.
+const { mockGetPath } = vi.hoisted(() => {
+  return { mockGetPath: vi.fn() }
+})
+
 vi.mock('electron', () => ({
   app: { getPath: mockGetPath },
 }))
@@ -102,8 +106,7 @@ describe('resolveDbPath', () => {
 
   describe('never throws', () => {
     it('does not throw on unreadable bootstrap (DB-07, D-06)', () => {
-      // Test fallback behavior — valid JSON but missing file already covered above.
-      // Simulate a read error by writing garbage:
+      // Write malformed bytes to force a parse failure
       fs.writeFileSync(bootstrapFile(), Buffer.from([0xff, 0xfe, 0x00]))
       expect(() => resolveDbPath()).not.toThrow()
     })
