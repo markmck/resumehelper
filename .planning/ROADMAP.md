@@ -170,7 +170,7 @@ Plans:
 | 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
 | 25-29 | v2.4 | 12/12 | Complete | 2026-04-21 |
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
-| 35. Unified Override Table + Migration | v2.6 | 3/3 | Complete   | 2026-06-05 |
+| 35. Unified Override Table + Migration | v2.6 | 3/3 | Complete    | 2026-06-05 |
 | 36. Merge Precedence + Snapshot Threading | v2.6 | 0/? | Not started | - |
 | 37. Variant Reword UI | v2.6 | 0/? | Not started | - |
 | 38. Excluded-Bullet Suggestions | v2.6 | 0/? | Not started | - |

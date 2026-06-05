@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Per-Variant Text Overrides
-status: verifying
-stopped_at: Phase 35 context gathered
-last_updated: "2026-06-05T20:26:08.559Z"
+status: ready_to_plan
+stopped_at: Phase 35 complete (3/3) — ready to discuss Phase 36
+last_updated: 2026-06-05T20:37:00.776Z
 last_activity: 2026-06-05
 progress:
   total_phases: 4
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-05)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 35 — unified-override-table-migration
+**Current focus:** Phase 36 — merge precedence + snapshot threading
 
 ## Current Position
 
-Phase: 35 (unified-override-table-migration) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 36
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-06-05
 
 Progress: [██████████] 100%
