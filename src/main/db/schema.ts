@@ -248,6 +248,23 @@ export const analysisSkillAdditions = sqliteTable('analysis_skill_additions', {
     .$defaultFn(() => new Date()),
 })
 
+export const entityOverrides = sqliteTable('entity_overrides', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  variantId: integer('variant_id').references(() => templateVariants.id, { onDelete: 'cascade' }),
+  analysisId: integer('analysis_id').references(() => analysisResults.id, { onDelete: 'cascade' }),
+  entityType: text('entity_type').notNull(),
+  bulletId: integer('bullet_id').references(() => jobBullets.id, { onDelete: 'cascade' }),
+  projectId: integer('project_id').references(() => projects.id, { onDelete: 'cascade' }),
+  jobId: integer('job_id').references(() => jobs.id, { onDelete: 'cascade' }),
+  projectBulletId: integer('project_bullet_id').references(() => projectBullets.id, { onDelete: 'cascade' }),
+  field: text('field').notNull(),
+  overrideText: text('override_text').notNull(),
+  source: text('source').notNull().default('user'),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
 export const appSettings = sqliteTable('app_settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
