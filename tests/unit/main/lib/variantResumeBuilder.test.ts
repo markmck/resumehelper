@@ -22,7 +22,7 @@ import {
   templateVariantItems,
   jobPostings,
   analysisResults,
-  analysisBulletOverrides,
+  entityOverrides,
   analysisSkillAdditions,
 } from '../../../../src/main/db/schema'
 
@@ -307,12 +307,14 @@ describe('buildVariantResumeJson', () => {
     const fx = seedFullData(db)
     const analysisId = seedAnalysis(db, fx.variantId)
 
-    db.insert(analysisBulletOverrides).values({
+    db.insert(entityOverrides).values({
       analysisId,
+      variantId: fx.variantId,
+      entityType: 'job_bullet',
+      field: 'text',
       bulletId: fx.bulletId,
       overrideText: 'Overridden text',
       source: 'ai_suggestion',
-      suggestionId: null,
     }).run()
 
     const result = await buildVariantResumeJson(db, fx.variantId, analysisId)

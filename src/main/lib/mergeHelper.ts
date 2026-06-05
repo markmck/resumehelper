@@ -14,7 +14,7 @@
  *
  * Pure function — no IPC, BrowserWindow, dialog, or fs touches. Per Phase 30 D-01.
  */
-import { eq, asc, desc } from 'drizzle-orm'
+import { eq, and, asc, desc } from 'drizzle-orm'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type * as schema from '../db/schema'
 import {
@@ -32,8 +32,8 @@ import {
   languages,
   interests,
   referenceEntries,
-  analysisBulletOverrides,
   analysisSkillAdditions,
+  entityOverrides,
 } from '../db/schema'
 import { applyOverrides } from '../../shared/overrides'
 import type {
@@ -273,27 +273,37 @@ export async function buildMergedBuilderData(
 
   // ----------------------------------------------------------------
   // Layer 3: Analysis-level overrides (bullet text overrides)
-  // Copied verbatim from templates.ts:299-313
+  // Reads from entity_overrides (Phase 35 cutover — scoped to job_bullet entity type).
+  // Phase 36 will generalize to variant-tier, summary, project, and other field types.
   // ----------------------------------------------------------------
   if (analysisId != null) {
     const overrideRows = db
       .select({
-        bulletId: analysisBulletOverrides.bulletId,
-        overrideText: analysisBulletOverrides.overrideText,
-        source: analysisBulletOverrides.source,
-        suggestionId: analysisBulletOverrides.suggestionId,
+        bulletId: entityOverrides.bulletId,
+        overrideText: entityOverrides.overrideText,
+        source: entityOverrides.source,
       })
-      .from(analysisBulletOverrides)
-      .where(eq(analysisBulletOverrides.analysisId, analysisId))
+      .from(entityOverrides)
+      .where(
+        and(
+          eq(entityOverrides.analysisId, analysisId),
+          eq(entityOverrides.entityType, 'job_bullet')
+        )
+      )
       .all() as Array<{
         bulletId: number
         overrideText: string
         source: 'ai_suggestion' | 'manual_edit'
-        suggestionId: string | null
       }>
 
+    // Map to BulletOverride shape that applyOverrides consumes
+    const bulletOverrides = overrideRows.map((r) => ({
+      ...r,
+      suggestionId: null as null,
+    }))
+
     for (const job of jobsWithBullets) {
-      job.bullets = applyOverrides(job.bullets, overrideRows) as typeof job.bullets
+      job.bullets = applyOverrides(job.bullets, bulletOverrides) as typeof job.bullets
     }
   }
 

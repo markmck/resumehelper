@@ -7,8 +7,8 @@ import {
   seedSkill,
   seedJobPosting,
   seedAnalysis,
-  seedBulletOverride,
 } from '../../helpers/factories'
+import { acceptSuggestion } from '../../../src/main/handlers/ai'
 import {
   listVariants,
   createVariant,
@@ -186,7 +186,7 @@ describe('three-layer integration (D-07)', () => {
     // Layer 3: analysis overrides Bullet A text
     const posting = seedJobPosting(db)
     const analysis = seedAnalysis(db, posting.id)
-    seedBulletOverride(db, analysis.id, bulletA.id, { overrideText: 'AI-enhanced Bullet A' })
+    acceptSuggestion(db, analysis.id, bulletA.id, 'AI-enhanced Bullet A')
 
     // Call getBuilderData with both variantId and analysisId
     const result = await getBuilderData(db, variant.id, analysis.id)

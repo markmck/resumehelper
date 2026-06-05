@@ -6,11 +6,11 @@ import {
   seedVariant,
   seedJobPosting,
   seedAnalysis,
-  seedBulletOverride,
   seedSubmission,
   seedSkill,
   updateProfile,
 } from '../../helpers/factories'
+import { acceptSuggestion } from '../../../src/main/handlers/ai'
 import {
   buildSnapshotForVariant,
   listSubmissions,
@@ -87,7 +87,7 @@ describe('buildSnapshotForVariant', () => {
     const { bullets } = seedJobWithBullets(db, ['Original text'])
     const posting = seedJobPosting(db)
     const analysis = seedAnalysis(db, posting.id)
-    seedBulletOverride(db, analysis.id, bullets[0].id, { overrideText: 'Enhanced text' })
+    acceptSuggestion(db, analysis.id, bullets[0].id, 'Enhanced text')
     const snapshot = await buildSnapshotForVariant(db, variant.id, analysis.id)
     expect(snapshot.jobs[0].bullets[0].text).toBe('Enhanced text')
   })
