@@ -79,7 +79,7 @@ Phases 30-34 covered: unified `buildMergedBuilderData()` merge path feeding HTML
 
 **Milestone Goal:** Extend the three-layer data model so users can reword text at the variant tier (not just include/exclude), with a unified `entityOverrides` table replacing the old `analysisBulletOverrides`, correct three-tier merge precedence across all render surfaces, and AI-powered surfacing of excluded bullets that match a job's gaps.
 
-- [ ] **Phase 35: Unified Override Table + Migration** - New `entityOverrides` schema, data migration from `analysisBulletOverrides`, `acceptSuggestion` cutover, `createTestDb` sync
+- [x] **Phase 35: Unified Override Table + Migration** - New `entityOverrides` schema, data migration from `analysisBulletOverrides`, `acceptSuggestion` cutover, `createTestDb` sync (completed 2026-06-05)
 - [ ] **Phase 36: Merge Precedence + Snapshot Threading** - Extend `buildMergedBuilderData` with Layer 2.5 variant-tier overrides, `summaryOverride` through snapshots, variant override handlers, inclusion un-exclusion logic
 - [ ] **Phase 37: Variant Reword UI** - Inline reword (InlineEdit) for bullets/summary/project title, override visual indicator, reset-to-base, duplicate copies overrides
 - [ ] **Phase 38: Excluded-Bullet Suggestions** - Scorer prompt extension, new Zod field, `analysisExcludedBulletSuggestions` table, accept/dismiss handlers with bulletId validation, OptimizeVariant panel
@@ -111,7 +111,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 35-03-PLAN.md — acceptSuggestion/dismissSuggestion/getOverrides + mergeHelper Layer 3 cutover to entity_overrides; record D-01 in PROJECT.md
+- [x] 35-03-PLAN.md — acceptSuggestion/dismissSuggestion/getOverrides + mergeHelper Layer 3 cutover to entity_overrides; record D-01 in PROJECT.md
 
 ### Phase 36: Merge Precedence + Snapshot Threading
 
@@ -170,7 +170,7 @@ Plans:
 | 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
 | 25-29 | v2.4 | 12/12 | Complete | 2026-04-21 |
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
-| 35. Unified Override Table + Migration | v2.6 | 2/3 | In Progress|  |
+| 35. Unified Override Table + Migration | v2.6 | 3/3 | Complete   | 2026-06-05 |
 | 36. Merge Precedence + Snapshot Threading | v2.6 | 0/? | Not started | - |
 | 37. Variant Reword UI | v2.6 | 0/? | Not started | - |
 | 38. Excluded-Bullet Suggestions | v2.6 | 0/? | Not started | - |

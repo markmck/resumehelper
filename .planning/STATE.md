@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Per-Variant Text Overrides
-status: executing
+status: verifying
 stopped_at: Phase 35 context gathered
-last_updated: "2026-06-05T20:14:20.381Z"
+last_updated: "2026-06-05T20:26:08.559Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 0
+  completed_plans: 3
+  percent: 25
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-06-05)
 
 Phase: 35 (unified-override-table-migration) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-05
 
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -53,23 +53,30 @@ Key decisions scoped for v2.6 (from research):
 - `projects.description` column and project-description reword explicitly deferred (out of scope for v2.6)
 - `createTestDb()` in `tests/helpers/db.ts` must be updated in lockstep with every `ensureSchema()` table addition
 
+Phase 35 decisions (Plans 01-03):
+
+- Manual delete+insert upsert for `acceptSuggestion` — SQLite partial unique indexes with nullable FK columns do not fire ON CONFLICT when all nullable FK columns are NULL (NULLs are distinct per SQLite UNIQUE semantics); `onConflictDoUpdate` with `targetWhere` generates correct SQL but constraint never trips
+- `getOverrides` accesses raw sqlite via `db.session.client.prepare(...)` for testability with `createTestDb()` — falls back to module-level `sqlite` singleton in production
+- D-01 recorded in PROJECT.md Key Decisions — satisfies ROADMAP #5 and clears Phase 35 blocker
+
 ### Pending Todos
 
-- [ ] Phase 35: Unified override table + migration
+- [x] Phase 35: Unified override table + migration — COMPLETE
 - [ ] Phase 36: Merge precedence + snapshot threading
 - [ ] Phase 37: Variant reword UI
 - [ ] Phase 38: Excluded-bullet suggestions
 
 ### Blockers/Concerns
 
-- Phase 35 must commit the FK design decision (per-entity nullable FK columns) before any DDL is written — research resolves this in favor of per-entity columns but it must be recorded in PROJECT.md Key Decisions at end of Phase 35
 - Phases 37 and 38 are parallelizable once Phase 36 ships — plan-phase should note this
+- Phase 35 blocker (D-01 not recorded) is now RESOLVED — D-01 committed in PROJECT.md Key Decisions
 
 ## Session Continuity
 
-Last session: 2026-06-05T20:14:20.376Z
+Last session: 2026-06-05T20:26:08.554Z
 Stopped at: Phase 35 context gathered
 Resume file: None
 
 **Completed Milestone:** v2.5 Portability & Debt Cleanup — 5 phases, 19 plans — shipped 2026-06-05
-**Next:** `/gsd:plan-phase 35`
+**Phase 35 complete:** entity_overrides table + migration + acceptSuggestion cutover + mergeHelper Layer 3 redirect + D-01 decision recorded. 264 tests passing.
+**Next:** `/gsd:transition` or `/gsd:plan-phase 36`
