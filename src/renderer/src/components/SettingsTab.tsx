@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import DatabaseLocationCard from './DatabaseLocationCard'
 
 type Provider = 'openai' | 'anthropic'
 type TestStatus = 'idle' | 'loading' | 'success' | 'error'
@@ -401,6 +402,9 @@ export function SettingsTab(): React.JSX.Element {
           </p>
         )}
       </div>
+
+      {/* Card 2: Database Location */}
+      <DatabaseLocationCard />
 
     </div>
   )
