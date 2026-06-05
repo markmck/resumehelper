@@ -281,6 +281,35 @@ function ensureSchema(sqlite: Database.Database): void {
       \`created_at\` integer NOT NULL DEFAULT (unixepoch()),
       FOREIGN KEY (\`analysis_id\`) REFERENCES \`analysis_results\`(\`id\`) ON DELETE cascade
     );
+
+    CREATE TABLE IF NOT EXISTS \`entity_overrides\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`variant_id\` integer,
+      \`analysis_id\` integer,
+      \`entity_type\` text NOT NULL,
+      \`bullet_id\` integer,
+      \`project_id\` integer,
+      \`job_id\` integer,
+      \`project_bullet_id\` integer,
+      \`field\` text NOT NULL,
+      \`override_text\` text NOT NULL,
+      \`source\` text NOT NULL DEFAULT 'user',
+      \`created_at\` integer NOT NULL DEFAULT (unixepoch()),
+      FOREIGN KEY (\`variant_id\`) REFERENCES \`template_variants\`(\`id\`) ON DELETE cascade,
+      FOREIGN KEY (\`analysis_id\`) REFERENCES \`analysis_results\`(\`id\`) ON DELETE cascade,
+      FOREIGN KEY (\`bullet_id\`) REFERENCES \`job_bullets\`(\`id\`) ON DELETE cascade,
+      FOREIGN KEY (\`project_id\`) REFERENCES \`projects\`(\`id\`) ON DELETE cascade,
+      FOREIGN KEY (\`job_id\`) REFERENCES \`jobs\`(\`id\`) ON DELETE cascade,
+      FOREIGN KEY (\`project_bullet_id\`) REFERENCES \`project_bullets\`(\`id\`) ON DELETE cascade
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS \`entity_overrides_variant_tier_uidx\`
+      ON \`entity_overrides\` (\`variant_id\`, \`entity_type\`, \`bullet_id\`, \`project_id\`, \`job_id\`, \`project_bullet_id\`, \`field\`)
+      WHERE \`analysis_id\` IS NULL;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS \`entity_overrides_analysis_tier_uidx\`
+      ON \`entity_overrides\` (\`analysis_id\`, \`entity_type\`, \`bullet_id\`, \`project_id\`, \`job_id\`, \`project_bullet_id\`, \`field\`)
+      WHERE \`analysis_id\` IS NOT NULL;
   `)
 
   // Add columns that may be missing on existing databases
