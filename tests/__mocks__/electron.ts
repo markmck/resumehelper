@@ -7,10 +7,13 @@ export const app = {
   quit: vi.fn(),
   on: vi.fn(),
   whenReady: vi.fn().mockResolvedValue(undefined),
+  relaunch: vi.fn(),
+  exit: vi.fn(),
 }
 
 export const shell = {
   openExternal: vi.fn(),
+  showItemInFolder: vi.fn(),
 }
 
 export const BrowserWindow = vi.fn().mockImplementation(() => ({
