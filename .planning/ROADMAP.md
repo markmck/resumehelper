@@ -107,7 +107,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 35-02-PLAN.md — no-data-loss migration (transactional, idempotent) + startup row-count assertion, extracted + unit-tested
+- [x] 35-02-PLAN.md — no-data-loss migration (transactional, idempotent) + startup row-count assertion, extracted + unit-tested
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -170,7 +170,7 @@ Plans:
 | 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
 | 25-29 | v2.4 | 12/12 | Complete | 2026-04-21 |
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
-| 35. Unified Override Table + Migration | v2.6 | 1/3 | In Progress|  |
+| 35. Unified Override Table + Migration | v2.6 | 2/3 | In Progress|  |
 | 36. Merge Precedence + Snapshot Threading | v2.6 | 0/? | Not started | - |
 | 37. Variant Reword UI | v2.6 | 0/? | Not started | - |
 | 38. Excluded-Bullet Suggestions | v2.6 | 0/? | Not started | - |
