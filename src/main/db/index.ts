@@ -5,6 +5,7 @@ import { app } from 'electron'
 import path from 'path'
 import * as schema from './schema'
 import { resolveDbPath } from './bootstrap'
+import { migrateBulletOverrides, assertOverrideRowCounts } from './migrateOverrides'
 
 // Module-scoped lazy state — nothing is opened at module load
 let _sqlite: Database.Database | null = null
@@ -369,6 +370,19 @@ function ensureSchema(sqlite: Database.Database): void {
       migrateTx()
     }
   } catch { /* migration already complete or no skills to migrate */ }
+
+  // Migrate analysis_bullet_overrides rows into entity_overrides (idempotent, all-or-nothing)
+  // D-05: runs inside sqlite.transaction(); old table untouched (D-07)
+  migrateBulletOverrides(sqlite)
+  // Startup row-count assertion: warns-but-allows on mismatch (D-05, never throws)
+  const assertResult = assertOverrideRowCounts(sqlite)
+  if (!assertResult.ok) {
+    console.warn(
+      `[ensureSchema] Override row-count assertion mismatch — ` +
+      `src=${assertResult.srcCount}, dst=${assertResult.dstCount}, skipped=${assertResult.skippedNullVariant}. ` +
+      `Launch continues.`
+    )
+  }
 
   // Also run file-based migrations for any ALTER TABLE statements
   // that add columns to existing tables
