@@ -112,7 +112,7 @@ export function DatabaseLocationCard(): React.JSX.Element {
 
   async function handleConfirm(): Promise<void> {
     setRelocating(true)
-    setActiveStep('Step 1 of 5: Copying database…')
+    setActiveStep('Moving database…')
 
     try {
       const result = await window.api.dbLocation.relocate(pendingFolder)
@@ -121,15 +121,22 @@ export function DatabaseLocationCard(): React.JSX.Element {
         setRelocating(false)
         setActiveStep(undefined)
         setModalOpen(false)
+        setPendingFolder('')
         setStatus('error')
         setStatusMessage(`Relocation failed (${result.stage}): ${result.error}`)
         return
       }
 
-      // Success — update current path and open restart modal
+      // Success — update current path and open restart modal.
+      // If rename to .bak failed the move still committed; surface as a non-fatal notice.
       setCurrentPath(result.newPath)
       setRelocating(false)
       setActiveStep(undefined)
+      setPendingFolder('')
+      if (result.warning) {
+        setStatus('success')
+        setStatusMessage(result.warning)
+      }
       setModalOpen('restart')
 
       // Refresh backup list
@@ -139,6 +146,7 @@ export function DatabaseLocationCard(): React.JSX.Element {
       setRelocating(false)
       setActiveStep(undefined)
       setModalOpen(false)
+      setPendingFolder('')
       setStatus('error')
       setStatusMessage(err instanceof Error ? err.message : 'Relocation failed')
     }
@@ -264,8 +272,7 @@ export function DatabaseLocationCard(): React.JSX.Element {
             className="bg-yellow-950/50 border-yellow-800/50 text-yellow-300 border rounded-md text-sm"
             style={{ padding: '10px 14px', marginBottom: 'var(--space-4)' }}
           >
-            Restart required to use the new location — changes you make before restarting may not
-            carry over.
+            Restart recommended to fully reload the app.
           </div>
         )}
 

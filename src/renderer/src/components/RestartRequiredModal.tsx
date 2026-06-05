@@ -40,13 +40,12 @@ function RestartRequiredModal({
         </h2>
 
         <p className="text-sm text-zinc-300" style={{ marginBottom: '8px' }}>
-          The database has been moved successfully. ResumeHelper needs to restart to use the new
-          location.
+          Your database has been moved and is now active at the new location.
         </p>
 
         <p className="text-sm text-zinc-400" style={{ marginBottom: '20px' }}>
-          You can restart now or continue working and restart later. Until you restart, the app
-          continues using the old database location.
+          A restart is recommended to ensure all features reload cleanly. You can restart now or
+          continue working and restart later.
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
