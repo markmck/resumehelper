@@ -87,55 +87,75 @@ Phases 30-34 covered: unified `buildMergedBuilderData()` merge path feeding HTML
 ## Phase Details
 
 ### Phase 35: Unified Override Table + Migration
+
 **Goal**: The new `entityOverrides` table exists, all existing analysis bullet overrides are migrated in with no data loss, and the `acceptSuggestion` write path uses the unified table — unblocking every subsequent phase
 **Depends on**: Phase 34 (v2.5 complete)
 **Requirements**: OVR-01
 **Success Criteria** (what must be TRUE):
+
   1. Every row previously in `analysisBulletOverrides` is present in `entityOverrides` with correct entity type, field, and override text — verified by a post-migration row-count assertion that runs at app startup
   2. The old `analysisBulletOverrides` table remains intact and read-only — it is not dropped
   3. Accepting a bullet rewrite suggestion in OptimizeVariant writes to `entityOverrides`, not the old table, and the accepted text appears in preview without regression
   4. `createTestDb()` in `tests/helpers/db.ts` includes the new `entityOverrides` table definition, and all existing tests continue to pass
   5. The schema design decision (per-entity nullable FK columns, consistent with `template_variant_items`) is committed and recorded
+
 **Plans**: 3 plans
 Plans:
-- [ ] 35-01-PLAN.md — entityOverrides schema + raw DDL + partial unique indexes, mirrored in createTestDb()
+**Wave 1**
+
+- [x] 35-01-PLAN.md — entityOverrides schema + raw DDL + partial unique indexes, mirrored in createTestDb()
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 35-02-PLAN.md — no-data-loss migration (transactional, idempotent) + startup row-count assertion, extracted + unit-tested
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 35-03-PLAN.md — acceptSuggestion/dismissSuggestion/getOverrides + mergeHelper Layer 3 cutover to entity_overrides; record D-01 in PROJECT.md
 
 ### Phase 36: Merge Precedence + Snapshot Threading
+
 **Goal**: `buildMergedBuilderData()` applies overrides in strict precedence order (analysis tier wins over variant tier wins over base), summary overrides thread into submission snapshots, and the IPC handlers for writing/reading/clearing variant-tier overrides are implemented and tested
 **Depends on**: Phase 35
 **Requirements**: OVR-02, OVR-03
 **Success Criteria** (what must be TRUE):
+
   1. PDF, DOCX, preview, and resume.json export all display the analysis-tier override text when both a variant-tier and analysis-tier override exist for the same field — the analysis tier always wins
   2. A submission snapshot freezes the variant-tier summary reword (if present) in `frozenProfile.summary` — re-opening the submission shows the overridden summary, not the base text
   3. `getVariantOverrides`, `setVariantOverride`, and `clearVariantOverride` IPC handlers are registered and callable from the renderer — unit tests verify the round-trip and merge correctness
   4. An excluded bullet accepted at the analysis tier is un-excluded in the merged output for that analysis — it appears in preview for that analysis but not for the base variant view
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 37: Variant Reword UI
+
 **Goal**: Users can inline-edit bullet text, summary, and project title at the variant tier directly in the Variant Builder, see a visual indicator on overridden fields, reset any field back to its base text, and have overrides copied when duplicating a variant
 **Depends on**: Phase 36
 **Requirements**: RWD-01, RWD-02, RWD-03, RWD-04, RWD-05, RWD-06
 **Success Criteria** (what must be TRUE):
+
   1. Hovering a bullet row, the summary section, or a project title in the Variant Builder reveals a pencil icon; clicking it opens an inline text editor pre-populated with the current effective text
   2. Saving an inline edit immediately updates the preview pane with the reworded text; no full-page reload or separate save button is required
   3. Overridden fields display an accent visual indicator (left-border or dot) that clearly distinguishes them from base (unmodified) text — strikethrough is NOT used (that means excluded)
   4. A "Reset" affordance on each overridden field clears the override and restores the base text in the preview
   5. Duplicating a variant copies all its variant-tier overrides to the new variant — the duplicate starts with the same rewording as the original
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 38: Excluded-Bullet Suggestions
+
 **Goal**: When running job analysis, the AI surfaces relevant base bullets the active variant excludes, users can accept a suggestion to include that bullet for the current analysis only (without changing the variant), and accepted bullets appear in preview/export/snapshot
 **Depends on**: Phase 36
 **Requirements**: SUG-01, SUG-02, SUG-03, SUG-04
 **Success Criteria** (what must be TRUE):
+
   1. After running analysis, the OptimizeVariant screen shows a "Bullets you excluded that match this job" panel — cards display the bullet text, the AI's reason, and matched JD keywords
   2. Accepting a suggestion re-includes that bullet in the preview and export for the current analysis — it does not change which bullets are included in the variant itself
   3. Dismissing a suggestion removes the card from the panel; the bullet remains excluded from the variant
   4. `acceptExcludedBulletSuggestion` validates that the bullet ID exists in `job_bullets` AND is currently excluded from the active variant before writing to `entityOverrides` — a hallucinated or invalid bullet ID is rejected with a logged error, not silently accepted
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -150,7 +170,7 @@ Plans:
 | 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
 | 25-29 | v2.4 | 12/12 | Complete | 2026-04-21 |
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
-| 35. Unified Override Table + Migration | v2.6 | 0/3 | Planned | - |
+| 35. Unified Override Table + Migration | v2.6 | 1/3 | In Progress|  |
 | 36. Merge Precedence + Snapshot Threading | v2.6 | 0/? | Not started | - |
 | 37. Variant Reword UI | v2.6 | 0/? | Not started | - |
 | 38. Excluded-Bullet Suggestions | v2.6 | 0/? | Not started | - |
