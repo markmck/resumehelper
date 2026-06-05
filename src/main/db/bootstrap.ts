@@ -58,9 +58,17 @@ export function resolveDbPath(): { path: string; source: ResolveDbPathSource } {
     return { path: defaultPath, source: 'fallback-corrupt' }
   }
 
-  // Step 4: validate target exists on disk (D-06 spirit — see RESEARCH Pitfall 7)
-  if (!fs.existsSync(parsed.dbPath)) {
-    console.warn('[db.bootstrap] dbPath missing on disk, falling back to default', parsed.dbPath)
+  // Step 4: validate target exists on disk AND is a regular file (D-06 spirit — see RESEARCH Pitfall 7)
+  // IN-02: also check isFile() so a directory or non-SQLite path at dbPath doesn't pass
+  // existence check only to fail with a less clear error when getSqlite() tries to open it.
+  try {
+    if (!fs.existsSync(parsed.dbPath) || !fs.statSync(parsed.dbPath).isFile()) {
+      console.warn('[db.bootstrap] dbPath missing or not a file, falling back to default', parsed.dbPath)
+      return { path: defaultPath, source: 'fallback-missing' }
+    }
+  } catch {
+    // statSync can throw on permission errors etc — treat as missing
+    console.warn('[db.bootstrap] dbPath stat error, falling back to default', parsed.dbPath)
     return { path: defaultPath, source: 'fallback-missing' }
   }
 

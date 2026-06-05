@@ -106,11 +106,11 @@ export function SettingsTab(): React.JSX.Element {
   function handleProviderChange(newProvider: Provider): void {
     setProvider(newProvider)
     setModels(FALLBACK_MODELS[newProvider])
-    setModel(FALLBACK_MODELS[newProvider][0])
+    setModel(FALLBACK_MODELS[newProvider][0] ?? '')
     setTestStatus('idle')
     setTestMessage('')
     // Auto-save provider change to DB (empty apiKey = keep existing key)
-    window.api.settings.setAi({ provider: newProvider, model: FALLBACK_MODELS[newProvider][0], apiKey: '' })
+    window.api.settings.setAi({ provider: newProvider, model: FALLBACK_MODELS[newProvider][0] ?? '', apiKey: '' })
     if (hasKey) {
       fetchModels(newProvider)
     }
