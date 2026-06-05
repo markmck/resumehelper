@@ -12,7 +12,7 @@ export type RelocateStage = 'collision' | 'copy' | 'verify' | 'bootstrap' | 'ren
 // By the time targetDir reaches relocateDb(), it is already known-writable.
 
 export type RelocateResult =
-  | { ok: true; newPath: string; backupPath: string }
+  | { ok: true; newPath: string; backupPath: string | null; warning?: string }
   | { ok: false; error: string; stage: RelocateStage }
 
 /**
@@ -45,6 +45,18 @@ export function relocateDb(args: {
       ok: false,
       stage: 'collision',
       error: `A database already exists at ${targetPath}. Choose a different folder or remove the existing file.`,
+    }
+  }
+  // WR-01: also treat stale SQLite sidecars at the target as collisions.
+  // A pre-existing -wal/-shm (e.g. from a prior crashed relocate) would be
+  // applied against the freshly copied app.db by SQLite, potentially corrupting it.
+  for (const sidecar of ['-wal', '-shm'] as const) {
+    if (fs.existsSync(targetPath + sidecar)) {
+      return {
+        ok: false,
+        stage: 'collision',
+        error: `A leftover SQLite sidecar (${path.basename(targetPath) + sidecar}) exists at the target. Remove it and retry.`,
+      }
     }
   }
 
@@ -123,13 +135,22 @@ export function relocateDb(args: {
   try {
     fs.renameSync(sourcePath, bakPath)
   } catch (err) {
-    // Bootstrap already written; the orphan source file at the old path is a soft failure.
-    // Next launch will correctly use the new location via bootstrap JSON.
+    // WR-03: Bootstrap is already written (commit point passed), so the move has effectively
+    // succeeded — only the cosmetic .bak rename failed. Treat as success-with-warning so
+    // the UI correctly transitions to the restart step rather than showing a hard failure.
     return {
-      ok: false,
-      stage: 'rename',
-      error: `Backup rename failed: ${(err as Error).message}`,
+      ok: true,
+      newPath: targetPath,
+      backupPath: null,
+      warning: `Could not rename the original file to .bak; please delete it manually. (${(err as Error).message})`,
     }
+  }
+
+  // WR-02: Best-effort removal of source sidecars left after a successful move.
+  // A stale -wal/-shm next to the renamed .bak is a corruption footgun if the app
+  // ever falls back to the default path and SQLite opens a new app.db there.
+  for (const sidecar of ['-wal', '-shm'] as const) {
+    try { fs.unlinkSync(sourcePath + sidecar) } catch { /* may not exist — best effort */ }
   }
 
   return { ok: true, newPath: targetPath, backupPath: bakPath }

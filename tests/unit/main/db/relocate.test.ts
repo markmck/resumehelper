@@ -236,6 +236,70 @@ describe('relocateDb', () => {
     })
   })
 
+  describe('WR-01: stale sidecar collision at target', () => {
+    it('returns ok:false stage:collision when target app.db-wal exists', () => {
+      fs.writeFileSync(targetPath() + '-wal', 'stale-wal')
+      const result = relocateDb({
+        sourcePath: srcTmp.path,
+        targetDir: targetBaseDir,
+        userDataDir,
+        closeCurrentDb,
+      })
+      expect(result.ok).toBe(false)
+      if (result.ok) return
+      expect(result.stage).toBe('collision')
+      expect(result.error).toMatch(/-wal/)
+    })
+
+    it('returns ok:false stage:collision when target app.db-shm exists', () => {
+      fs.writeFileSync(targetPath() + '-shm', 'stale-shm')
+      const result = relocateDb({
+        sourcePath: srcTmp.path,
+        targetDir: targetBaseDir,
+        userDataDir,
+        closeCurrentDb,
+      })
+      expect(result.ok).toBe(false)
+      if (result.ok) return
+      expect(result.stage).toBe('collision')
+      expect(result.error).toMatch(/-shm/)
+    })
+  })
+
+  describe('WR-03: rename failure is a success-with-warning (bootstrap already committed)', () => {
+    it('returns ok:true with warning and backupPath:null when rename fails', () => {
+      // Make source read-only to force rename to fail on rename but allow copy+verify+bootstrap
+      // Strategy: use vi.spyOn to make renameSync throw after bootstrap is written
+      const { renameSync: origRename } = fs
+      let renameCount = 0
+      const renameSpy = vi.spyOn(fs, 'renameSync').mockImplementation((src, dest) => {
+        renameCount++
+        if (renameCount === 1) {
+          throw new Error('EPERM: rename failed (test-injected)')
+        }
+        origRename(src, dest)
+      })
+
+      const result = relocateDb({
+        sourcePath: srcTmp.path,
+        targetDir: targetBaseDir,
+        userDataDir,
+        closeCurrentDb,
+      })
+
+      renameSpy.mockRestore()
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.backupPath).toBeNull()
+      expect(result.warning).toMatch(/\.bak/)
+      // Bootstrap was written (the move committed)
+      expect(fs.existsSync(bootstrapPath())).toBe(true)
+      // Source file still exists (rename failed — not removed)
+      expect(fs.existsSync(srcTmp.path)).toBe(true)
+    })
+  })
+
   describe('stage union excludes probe', () => {
     it('only returns valid stage values (no probe stage)', () => {
       // Test collision stage

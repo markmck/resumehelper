@@ -604,7 +604,7 @@ export interface Api {
         }
     >
     relocate: (targetDir: string) => Promise<
-      | { ok: true; newPath: string; backupPath: string }
+      | { ok: true; newPath: string; backupPath: string | null; warning?: string }
       | { ok: false; error: string; stage: 'collision' | 'copy' | 'verify' | 'bootstrap' | 'rename' }
     >
     listBackups: () => Promise<Array<{ path: string; mtime: number }>>
