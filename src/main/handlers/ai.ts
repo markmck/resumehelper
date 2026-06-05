@@ -1,7 +1,7 @@
 import { ipcMain, safeStorage } from 'electron'
 import { eq, and } from 'drizzle-orm'
 import { db, sqlite } from '../db'
-import { aiSettings, jobPostings, analysisResults, profile, analysisBulletOverrides, analysisSkillAdditions } from '../db/schema'
+import { aiSettings, jobPostings, analysisResults, profile, analysisSkillAdditions, entityOverrides } from '../db/schema'
 import { callJobParser, callResumeScorer, deriveOverallScore, getModel } from '../lib/aiProvider'
 import { buildResumeTextForLlm } from '../lib/analysisPrompts'
 import { buildMergedBuilderData } from '../lib/mergeHelper'
@@ -133,18 +133,43 @@ export async function runAnalysis(db: Db, event: Electron.IpcMainInvokeEvent, jo
 
 export function acceptSuggestion(db: Db, analysisId: number, bulletId: number, text: string) {
   try {
-    db.insert(analysisBulletOverrides)
+    // Resolve variantId from the analysis row
+    const analysisRow = db
+      .select({ variantId: analysisResults.variantId })
+      .from(analysisResults)
+      .where(eq(analysisResults.id, analysisId))
+      .get()
+    const variantId = analysisRow?.variantId ?? null
+
+    // Manual upsert: SQLite partial unique indexes with multiple nullable FK columns
+    // do not prevent duplicate rows when NULL values are present (SQLite treats NULLs as
+    // distinct in UNIQUE constraints). For job_bullet overrides where project_id, job_id,
+    // and project_bullet_id are all NULL, onConflictDoUpdate would insert a duplicate.
+    // Instead: delete any existing row for this analysis+bullet, then insert fresh.
+    // This is safe — only one override per (analysis_id, entity_type='job_bullet', bullet_id)
+    // is semantically valid (D-06 single source of truth). T-35-07: parameterized Drizzle — no SQL injection.
+    db.delete(entityOverrides)
+      .where(
+        and(
+          eq(entityOverrides.analysisId, analysisId),
+          eq(entityOverrides.entityType, 'job_bullet'),
+          eq(entityOverrides.bulletId, bulletId)
+        )
+      )
+      .run()
+
+    db.insert(entityOverrides)
       .values({
+        variantId,
         analysisId,
+        entityType: 'job_bullet',
+        field: 'text',
         bulletId,
         overrideText: text,
         source: 'ai_suggestion',
       })
-      .onConflictDoUpdate({
-        target: [analysisBulletOverrides.analysisId, analysisBulletOverrides.bulletId],
-        set: { overrideText: text, source: 'ai_suggestion' },
-      })
       .run()
+
     return { success: true }
   } catch (err) {
     console.error('ai:acceptSuggestion error', err)
@@ -154,11 +179,12 @@ export function acceptSuggestion(db: Db, analysisId: number, bulletId: number, t
 
 export function dismissSuggestion(db: Db, analysisId: number, bulletId: number) {
   try {
-    db.delete(analysisBulletOverrides)
+    db.delete(entityOverrides)
       .where(
         and(
-          eq(analysisBulletOverrides.analysisId, analysisId),
-          eq(analysisBulletOverrides.bulletId, bulletId)
+          eq(entityOverrides.analysisId, analysisId),
+          eq(entityOverrides.entityType, 'job_bullet'),
+          eq(entityOverrides.bulletId, bulletId)
         )
       )
       .run()
@@ -169,20 +195,29 @@ export function dismissSuggestion(db: Db, analysisId: number, bulletId: number) 
   }
 }
 
-export function getOverrides(_db: Db, analysisId: number) {
+export function getOverrides(db: Db, analysisId: number) {
   try {
-    const rows = sqlite.prepare(`
-      SELECT abo.bullet_id AS bulletId, abo.override_text AS overrideText,
-             abo.source, abo.suggestion_id AS suggestionId,
+    // Read job_bullet overrides from entity_overrides.
+    // Use the raw sqlite session from the drizzle db instance for parameterized SQL
+    // (needed for LEFT JOIN isOrphaned check). T-35-07: parameterized — no string interpolation.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const session = (db as any).session
+    const prepare = session
+      ? (sql: string) => session.client.prepare(sql)
+      : (sql: string) => sqlite.prepare(sql)
+    const rows = prepare(`
+      SELECT eo.bullet_id AS bulletId, eo.override_text AS overrideText,
+             eo.source,
+             NULL AS suggestionId,
              CASE WHEN jb.id IS NULL THEN 1 ELSE 0 END AS isOrphaned
-      FROM analysis_bullet_overrides abo
-      LEFT JOIN job_bullets jb ON jb.id = abo.bullet_id
-      WHERE abo.analysis_id = ?
+      FROM entity_overrides eo
+      LEFT JOIN job_bullets jb ON jb.id = eo.bullet_id
+      WHERE eo.analysis_id = ? AND eo.entity_type = 'job_bullet'
     `).all(analysisId) as Array<{
       bulletId: number
       overrideText: string
       source: string
-      suggestionId: string | null
+      suggestionId: null
       isOrphaned: 0 | 1
     }>
     return rows.map(r => ({
