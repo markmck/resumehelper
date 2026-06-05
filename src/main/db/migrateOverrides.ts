@@ -62,8 +62,13 @@ export function migrateBulletOverrides(sqlite: Database.Database): MigrateBullet
       return { migrated: 0, skippedNullVariant }
     }
 
+    // Per-row NOT EXISTS guard is the real idempotency mechanism. INSERT OR IGNORE
+    // cannot dedupe here: migrated job_bullet rows leave project_id/job_id/project_bullet_id
+    // NULL, and SQLite treats NULLs as distinct in the partial unique index, so the index
+    // never fires. Under a partial-migration state (unmigrated.cnt > 0 but some rows already
+    // present) a bare INSERT-SELECT would re-insert the already-migrated rows as duplicates.
     const migrateTx = sqlite.transaction(() => {
-      sqlite.prepare(`
+      return sqlite.prepare(`
         INSERT OR IGNORE INTO entity_overrides
           (variant_id, analysis_id, entity_type, bullet_id, field, override_text, source, created_at)
         SELECT
@@ -78,17 +83,19 @@ export function migrateBulletOverrides(sqlite: Database.Database): MigrateBullet
         FROM analysis_bullet_overrides abo
         JOIN analysis_results ar ON ar.id = abo.analysis_id
         WHERE ar.variant_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM entity_overrides eo
+            WHERE eo.analysis_id = abo.analysis_id
+              AND eo.bullet_id   = abo.bullet_id
+              AND eo.entity_type = 'job_bullet'
+          )
       `).run()
     })
 
-    migrateTx()
+    // Report rows actually inserted this run (not the total table count) — WR-01.
+    const insertResult = migrateTx()
 
-    // Count what was actually inserted
-    const afterCount = sqlite.prepare(`
-      SELECT COUNT(*) as cnt FROM entity_overrides WHERE entity_type = 'job_bullet'
-    `).get() as { cnt: number }
-
-    return { migrated: afterCount.cnt, skippedNullVariant }
+    return { migrated: insertResult.changes, skippedNullVariant }
   } catch (err) {
     console.error('[migrateOverrides] Migration failed — entity_overrides may be empty:', err)
     return { migrated: 0, skippedNullVariant: 0 }

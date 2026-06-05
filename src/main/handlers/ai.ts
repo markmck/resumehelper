@@ -148,27 +148,32 @@ export function acceptSuggestion(db: Db, analysisId: number, bulletId: number, t
     // Instead: delete any existing row for this analysis+bullet, then insert fresh.
     // This is safe — only one override per (analysis_id, entity_type='job_bullet', bullet_id)
     // is semantically valid (D-06 single source of truth). T-35-07: parameterized Drizzle — no SQL injection.
-    db.delete(entityOverrides)
-      .where(
-        and(
-          eq(entityOverrides.analysisId, analysisId),
-          eq(entityOverrides.entityType, 'job_bullet'),
-          eq(entityOverrides.bulletId, bulletId)
+    // Wrapped in a single transaction so a failed insert cannot leave the prior override
+    // deleted-but-not-replaced (atomic upsert — restores the guarantee onConflictDoUpdate gave).
+    // db and sqlite share one connection, so the raw transaction is atomic over the Drizzle calls.
+    sqlite.transaction(() => {
+      db.delete(entityOverrides)
+        .where(
+          and(
+            eq(entityOverrides.analysisId, analysisId),
+            eq(entityOverrides.entityType, 'job_bullet'),
+            eq(entityOverrides.bulletId, bulletId)
+          )
         )
-      )
-      .run()
+        .run()
 
-    db.insert(entityOverrides)
-      .values({
-        variantId,
-        analysisId,
-        entityType: 'job_bullet',
-        field: 'text',
-        bulletId,
-        overrideText: text,
-        source: 'ai_suggestion',
-      })
-      .run()
+      db.insert(entityOverrides)
+        .values({
+          variantId,
+          analysisId,
+          entityType: 'job_bullet',
+          field: 'text',
+          bulletId,
+          overrideText: text,
+          source: 'ai_suggestion',
+        })
+        .run()
+    })()
 
     return { success: true }
   } catch (err) {

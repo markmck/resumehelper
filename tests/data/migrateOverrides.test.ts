@@ -259,6 +259,44 @@ describe('migrateBulletOverrides', () => {
     expect(cnt).toBe(1)
   })
 
+  it('Test 3b (partial-migration idempotency): a second migrate with new rows does not duplicate already-migrated rows', () => {
+    // Regression for CR-02: INSERT OR IGNORE cannot dedupe migrated job_bullet rows
+    // (project_id/job_id/project_bullet_id NULL → unique index treats them as distinct).
+    // The per-row NOT EXISTS guard is what keeps a partial-migration re-run from re-inserting.
+    const jobId = seedJob(sqlite)
+    const variantId = seedVariant(sqlite)
+    const jobPostingId = seedJobPosting(sqlite)
+    const analysisId = seedAnalysis(sqlite, jobPostingId, variantId)
+
+    const bulletId1 = seedBullet(sqlite, jobId)
+    seedOverride(sqlite, analysisId, bulletId1, 'First')
+
+    // First migration: row 1 lands in entity_overrides.
+    const first = migrateBulletOverrides(sqlite)
+    expect(first.migrated).toBe(1)
+
+    // Now add a SECOND source override — this puts the table in a partial-migration state
+    // (unmigrated.cnt > 0, but row 1 is already present).
+    const bulletId2 = seedBullet(sqlite, jobId)
+    seedOverride(sqlite, analysisId, bulletId2, 'Second')
+
+    const second = migrateBulletOverrides(sqlite)
+    // Only the new row should be inserted, not row 1 again.
+    expect(second.migrated).toBe(1)
+
+    const { cnt } = sqlite.prepare(
+      `SELECT COUNT(*) as cnt FROM entity_overrides WHERE entity_type='job_bullet'`
+    ).get() as { cnt: number }
+    expect(cnt).toBe(2)
+
+    // Row 1 must appear exactly once (no duplicate).
+    const { dup } = sqlite.prepare(
+      `SELECT COUNT(*) as dup FROM entity_overrides
+       WHERE entity_type='job_bullet' AND analysis_id=? AND bullet_id=?`
+    ).get(analysisId, bulletId1) as { dup: number }
+    expect(dup).toBe(1)
+  })
+
   it('Test 4 (NULL variant skip): rows with NULL variant_id are not inserted', () => {
     const jobId = seedJob(sqlite)
     const jobPostingId = seedJobPosting(sqlite)
