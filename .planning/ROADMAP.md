@@ -154,7 +154,7 @@ Plans:
   4. When the user picks a UNC path or a well-known cloud folder (OneDrive / Dropbox / iCloud Drive), a non-blocking warning modal explains the WAL-over-network risk and lets them proceed
   5. Any failure during the change sequence rolls back cleanly — the source DB remains accessible, no partial state is left on disk, and the error is surfaced to the user
   6. After a successful relocation, a "Delete old backup" button appears in the Database Location card and only deletes the `.bak` file on explicit user click
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 Plans:
 - [ ] 31-01-PLAN.md — Schema migration (app_settings) + settings.ts k/v helpers + sanitizeFilename promotion (JSON-04)
 - [ ] 31-02-PLAN.md — buildBaseResumeJson pure builder + ExportValidationError + unit tests (JSON-01, JSON-02, JSON-03, JSON-06)
