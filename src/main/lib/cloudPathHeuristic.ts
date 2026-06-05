@@ -24,8 +24,10 @@ export function detectCloudPath(p: string): CloudPathResult {
   const segments = p.split(/[\\/]+/).filter(Boolean)
 
   for (const seg of segments) {
-    // OneDrive — personal or tenant variants (e.g. "OneDrive - Slalom", "OneDrive - Personal")
-    if (seg.startsWith('OneDrive')) {
+    // OneDrive — exact segment name ("OneDrive") or tenant variants ("OneDrive - Slalom",
+    // "OneDrive - Personal"). startsWith('OneDrive') alone is too broad and would flag
+    // unrelated folders like "OneDriveBackups" (WR-06).
+    if (seg === 'OneDrive' || seg.startsWith('OneDrive - ')) {
       return { match: true, reason: 'OneDrive folder' }
     }
 
@@ -42,8 +44,10 @@ export function detectCloudPath(p: string): CloudPathResult {
       return { match: true, reason: 'iCloud Drive (Mobile Documents)' }
     }
 
-    // Google Drive — segment starts with "Google Drive" to cover "Google Drive (Mark)" variants
-    if (seg.startsWith('Google Drive')) {
+    // Google Drive — exact segment name ("Google Drive") or account variants
+    // ("Google Drive (Mark)"). startsWith('Google Drive') alone would flag folders like
+    // "Google Drive Exports" (WR-06).
+    if (seg === 'Google Drive' || seg.startsWith('Google Drive (')) {
       return { match: true, reason: 'Google Drive folder' }
     }
 

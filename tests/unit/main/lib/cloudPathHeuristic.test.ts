@@ -96,10 +96,20 @@ describe('detectCloudPath', () => {
       expect(result.match).toBe(false)
     })
 
+    it('clears C:\\OneDriveBackups (segment is OneDriveBackups, not OneDrive or OneDrive - *)', () => {
+      // WR-06: tightened heuristic — "OneDriveBackups" is not a cloud segment
+      const result = detectCloudPath('C:\\OneDriveBackups\\data')
+      expect(result.match).toBe(false)
+    })
+
     it('clears a path with OneDrive only in the value, not segment', () => {
-      // C:\OneDriveBackups would match because startsWith('OneDrive') — that is accepted D-17 noise
-      // but a path where "OneDrive" does not appear as a segment is clear
       const result = detectCloudPath('C:\\Users\\Mark\\Documents\\backup')
+      expect(result.match).toBe(false)
+    })
+
+    it('clears Google Drive Exports (not a cloud segment)', () => {
+      // WR-06: "Google Drive Exports" should not match
+      const result = detectCloudPath('C:\\Users\\Mark\\Google Drive Exports\\data')
       expect(result.match).toBe(false)
     })
   })
