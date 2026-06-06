@@ -125,7 +125,11 @@ Plans:
   3. `getVariantOverrides`, `setVariantOverride`, and `clearVariantOverride` IPC handlers are registered and callable from the renderer — unit tests verify the round-trip and merge correctness
   4. An excluded bullet accepted at the analysis tier is un-excluded in the merged output for that analysis — it appears in preview for that analysis but not for the base variant view
 
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 36-01-PLAN.md — Wave 0: failing OVR-02/OVR-03 correctness-contract tests (2 new files + 2 extended)
+- [ ] 36-02-PLAN.md — Two-pass override map in buildMergedBuilderData (precedence analysis → variant → base) + inclusion un-exclusion + summaryOverride
+- [ ] 36-03-PLAN.md — Variant-tier override IPC handlers (get/set/clear) in templates.ts
+- [ ] 36-04-PLAN.md — Thread summaryOverride into snapshot freeze (OVR-03), scoring (D-05), and live DOCX export
 **UI hint**: yes
 
 ### Phase 37: Variant Reword UI
@@ -181,4 +185,4 @@ Plans:
 
 ## Backlog
 
-(Empty)
+- **Live re-score-on-accept** — re-run the ATS scorer when an analysis-tier override is accepted/cleared so the displayed score live-updates with accepted rewrites (new LLM call + progress UX). Deferred from Phase 36 (which threads overrides into initial-run scoring only). Its own future phase.
