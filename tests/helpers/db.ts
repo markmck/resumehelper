@@ -5,6 +5,13 @@ import * as schema from '../../src/main/db/schema'
 export function createTestDb() {
   const sqlite = new Database(':memory:')
   sqlite.pragma('journal_mode = WAL')
+  // Match production posture: the app never enables foreign_keys (src/main/db/index.ts
+  // sets no such pragma), relying on application-level integrity instead. Some
+  // better-sqlite3 builds default this pragma ON, which diverges from production and
+  // breaks fixtures that deliberately insert dangling-FK rows (e.g. a variant-scoped
+  // override carrying a synthetic analysis_id to assert cross-tier read isolation).
+  // Pin it OFF so the test connection behaves like the production connection.
+  sqlite.pragma('foreign_keys = OFF')
 
   // Apply full schema — copied verbatim from src/main/db/index.ts ensureSchema()
   // CRITICAL: Keep this in sync with production ensureSchema()

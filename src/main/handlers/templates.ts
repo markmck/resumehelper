@@ -522,6 +522,58 @@ export function clearVariantOverride(
   return { success: true }
 }
 
+/**
+ * D-02 write: empty/whitespace text deletes; non-empty text is stored verbatim
+ * as a single variant-tier row (analysis_id NULL, source='user') via an atomic
+ * delete+insert (mirrors ai.ts acceptSuggestion). No onConflictDoUpdate
+ * (Phase 35 D-01: partial unique index over nullable FKs is unreliable).
+ * No compare-to-base — the trimmed value is used only to detect the empty case.
+ */
+export function setVariantOverride(
+  db: Db,
+  variantId: number,
+  entityType: string,
+  field: string,
+  entityId: EntityId,
+  text: string,
+) {
+  assertEntityType(entityType)
+  const trimmed = text.trim()
+  if (!trimmed) {
+    return clearVariantOverride(db, variantId, entityType, field, entityId)
+  }
+  const fk = fkCondition(entityId)
+  // db and sqlite share one connection, so the raw transaction is atomic over
+  // the Drizzle calls — a failed insert cannot leave the prior override deleted.
+  sqlite.transaction(() => {
+    db.delete(entityOverrides)
+      .where(
+        and(
+          eq(entityOverrides.variantId, variantId),
+          isNull(entityOverrides.analysisId),
+          eq(entityOverrides.entityType, entityType),
+          eq(entityOverrides.field, field),
+          ...(fk ? [fk] : []),
+        ),
+      )
+      .run()
+
+    db.insert(entityOverrides)
+      .values({
+        variantId,
+        analysisId: null, // T-36-09: hardcoded — renderer cannot supply analysisId
+        entityType,
+        field,
+        bulletId: entityId.bulletId ?? null,
+        projectId: entityId.projectId ?? null,
+        overrideText: trimmed,
+        source: 'user',
+      })
+      .run()
+  })()
+  return { success: true }
+}
+
 export function registerTemplateHandlers(): void {
   ipcMain.handle('templates:list', () => listVariants(db))
   ipcMain.handle('templates:create', (_, data) => createVariant(db, data))
@@ -535,4 +587,11 @@ export function registerTemplateHandlers(): void {
   ipcMain.handle('templates:setItemExcluded', (_, variantId, itemType, itemId, excluded) => setItemExcluded(db, variantId, itemType, itemId, excluded))
   ipcMain.handle('templates:setThreshold', (_, variantId, threshold) => setThreshold(db, variantId, threshold))
   ipcMain.handle('templates:getThreshold', (_, variantId) => getThreshold(db, variantId))
+  ipcMain.handle('templates:getVariantOverrides', (_, variantId) => getVariantOverrides(db, variantId))
+  ipcMain.handle('templates:setVariantOverride', (_, variantId, entityType, field, entityId, text) =>
+    setVariantOverride(db, variantId, entityType, field, entityId, text),
+  )
+  ipcMain.handle('templates:clearVariantOverride', (_, variantId, entityType, field, entityId) =>
+    clearVariantOverride(db, variantId, entityType, field, entityId),
+  )
 }
