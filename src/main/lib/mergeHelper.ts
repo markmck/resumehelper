@@ -14,7 +14,7 @@
  *
  * Pure function — no IPC, BrowserWindow, dialog, or fs touches. Per Phase 30 D-01.
  */
-import { eq, and, asc, desc } from 'drizzle-orm'
+import { eq, and, asc, desc, or, isNull } from 'drizzle-orm'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type * as schema from '../db/schema'
 import {
@@ -63,6 +63,7 @@ export type MergedBuilderData = {
   interests: BuilderInterest[]
   references: BuilderReference[]
   showSummary: boolean
+  summaryOverride?: string // absent = use profileRow.summary
 }
 
 export async function buildMergedBuilderData(
@@ -146,6 +147,72 @@ export async function buildMergedBuilderData(
     if (item.itemType === 'reference' && item.referenceId != null)
       excludedReferenceIds.add(item.referenceId)
   }
+
+  // ----------------------------------------------------------------
+  // Layer 2.5: Two-pass override map (OVR-02 precedence: analysis → variant → base)
+  //
+  // This block is intentionally placed BEFORE the jobs/projects maps so that
+  // getOverrideText() can be called inline during those maps' construction.
+  //
+  // Text-substitution concern: getOverrideText(entityType, id, field) resolves
+  //   the effective override text for a field, with analysis-tier winning over
+  //   variant-tier (pass 2 overwrites pass 1).
+  // Inclusion concern (D-01): analysisInclusionBulletIds re-includes bullets that
+  //   the variant excluded, scoped to the active analysis only.
+  // ----------------------------------------------------------------
+  const overrideCondition =
+    analysisId != null
+      ? or(
+          and(eq(entityOverrides.variantId, variantId), isNull(entityOverrides.analysisId)),
+          and(eq(entityOverrides.variantId, variantId), eq(entityOverrides.analysisId, analysisId)),
+        )
+      : and(eq(entityOverrides.variantId, variantId), isNull(entityOverrides.analysisId))
+
+  const overrideRows = await db
+    .select({
+      analysisId: entityOverrides.analysisId,
+      entityType: entityOverrides.entityType,
+      bulletId: entityOverrides.bulletId,
+      projectId: entityOverrides.projectId,
+      field: entityOverrides.field,
+      overrideText: entityOverrides.overrideText,
+      source: entityOverrides.source,
+    })
+    .from(entityOverrides)
+    .where(overrideCondition)
+
+  const mkKey = (entityType: string, id: number | null, field: string): string =>
+    `${entityType}:${id ?? null}:${field}`
+
+  const overrideMap = new Map<string, string>()
+  // Pass 1: variant-tier rows (analysisId null) — lower precedence
+  for (const row of overrideRows) {
+    if (row.analysisId != null) continue
+    const id = row.bulletId ?? row.projectId ?? null
+    overrideMap.set(mkKey(row.entityType, id, row.field), row.overrideText)
+  }
+  // Pass 2: analysis-tier rows — higher precedence, overwrite variant-tier
+  for (const row of overrideRows) {
+    if (row.analysisId == null) continue
+    const id = row.bulletId ?? row.projectId ?? null
+    overrideMap.set(mkKey(row.entityType, id, row.field), row.overrideText)
+  }
+
+  const getOverrideText = (
+    entityType: string,
+    id: number | null,
+    field: string,
+  ): string | undefined => overrideMap.get(mkKey(entityType, id, field))
+
+  // D-01 inclusion set: analysis-tier source='inclusion' rows re-include bullets
+  const analysisInclusionBulletIds = new Set<number>()
+  for (const row of overrideRows) {
+    if (row.analysisId != null && row.source === 'inclusion' && row.bulletId != null) {
+      analysisInclusionBulletIds.add(row.bulletId)
+    }
+  }
+
+  const summaryOverride = getOverrideText('summary', null, 'text')
 
   // ----------------------------------------------------------------
   // Build jobs → attach bullets, apply exclusions
