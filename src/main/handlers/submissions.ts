@@ -40,7 +40,7 @@ export async function buildSnapshotForVariant(db: Db, variantId: number, analysi
   } catch { /* keep undefined */ }
 
   const merged = await buildMergedBuilderData(db, variantId, analysisId)
-  const { showSummary, ...builderArrays } = merged
+  const { showSummary, summaryOverride, ...builderArrays } = merged
 
   // Freeze showSummary into snapshot's templateOptions for immutability (D-06, D-07).
   if (templateOptions) {
@@ -52,7 +52,7 @@ export async function buildSnapshotForVariant(db: Db, variantId: number, analysi
   // Freeze profile at submission time
   const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
   const frozenProfile = profileRow
-    ? { name: profileRow.name, email: profileRow.email, phone: profileRow.phone, location: profileRow.location, linkedin: profileRow.linkedin, summary: profileRow.summary ?? undefined }
+    ? { name: profileRow.name, email: profileRow.email, phone: profileRow.phone, location: profileRow.location, linkedin: profileRow.linkedin, summary: summaryOverride ?? profileRow.summary ?? undefined }
     : undefined
 
   return {
