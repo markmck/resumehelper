@@ -52,7 +52,11 @@ export async function buildVariantResumeJson(
   }
   const linkedinUrl = trimStr(profileRow?.linkedin)
   const profilesArr = linkedinUrl ? [{ url: linkedinUrl }] : []
-  const summaryStr = merged.showSummary ? trimStr(profileRow?.summary) : undefined
+  // OVR-02 single-merge-path: honor a variant-tier summary override (frozen into
+  // merged.summaryOverride by buildMergedBuilderData) before falling back to base.
+  const summaryStr = merged.showSummary
+    ? trimStr(merged.summaryOverride ?? profileRow?.summary)
+    : undefined
   const basics = {
     ...opt('name', trimStr(profileRow?.name)),
     ...opt('email', trimStr(profileRow?.email)),

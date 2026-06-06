@@ -282,6 +282,25 @@ describe('buildVariantResumeJson', () => {
     expect(result.basics?.name).toBe('Test User')
   })
 
+  it('(c2) variant-tier summary override is emitted in basics.summary (OVR-02 resume.json surface)', async () => {
+    const db = createTestDb()
+    const fx = seedFullData(db)
+
+    // Locked token table: summary → entity_type 'summary', field 'text', FK cols null,
+    // variant-tier (analysis_id null literal — never eq(col, null)).
+    db.insert(entityOverrides).values({
+      variantId: fx.variantId,
+      analysisId: null,
+      entityType: 'summary',
+      field: 'text',
+      overrideText: 'Variant-authored summary.',
+      source: 'user',
+    }).run()
+
+    const result = await buildVariantResumeJson(db, fx.variantId)
+    expect(result.basics?.summary).toBe('Variant-authored summary.')
+  })
+
   it('(d) accepted analysis skill additions appear grouped by categoryName alongside base skills', async () => {
     const db = createTestDb()
     const fx = seedFullData(db)
