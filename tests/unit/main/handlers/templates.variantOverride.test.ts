@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createTestDb } from '../../../helpers/db'
-import { seedVariant, seedJob, seedBullet } from '../../../helpers/factories'
+import { seedVariant, seedJob, seedBullet, seedJobPosting, seedAnalysis } from '../../../helpers/factories'
 import {
   getVariantOverrides,
   setVariantOverride,
@@ -92,11 +92,13 @@ describe('variant-override handlers (D-02/D-03)', () => {
     await setVariantOverride(db, variant.id, 'job_bullet', 'text', { bulletId: bullet.id }, 'Variant text')
 
     // Directly insert an analysis-tier row for the SAME variant — must NOT be returned.
-    // analysisId set literally (we do not seed a real analysis FK here because the read
-    // path filters on analysis_id IS NULL; the row is asserted to be excluded, not joined).
+    // Reference a real analysis_results FK (foreign_keys is ON, matching production); the
+    // row is asserted to be excluded by the analysis_id IS NULL read, not joined.
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
     db.insert(entityOverrides).values({
       variantId: variant.id,
-      analysisId: 999,
+      analysisId: analysis.id,
       entityType: 'job_bullet',
       field: 'text',
       bulletId: bullet.id,

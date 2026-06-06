@@ -162,8 +162,14 @@ export async function buildMergedBuilderData(
   const overrideCondition =
     analysisId != null
       ? or(
+          // Variant-tier rows are scoped by variantId (analysis_id IS NULL).
           and(eq(entityOverrides.variantId, variantId), isNull(entityOverrides.analysisId)),
-          and(eq(entityOverrides.variantId, variantId), eq(entityOverrides.analysisId, analysisId)),
+          // Analysis-tier rows are identified by analysisId alone — it is globally unique
+          // and already implies its variant. Do NOT additionally pin variantId here:
+          // acceptSuggestion() mirrors the analysis's variantId onto the override row, which
+          // is NULL when the analysis has no variant association, and an added eq(variantId)
+          // would silently drop those rows (the override would vanish from the merge).
+          eq(entityOverrides.analysisId, analysisId),
         )
       : and(eq(entityOverrides.variantId, variantId), isNull(entityOverrides.analysisId))
 

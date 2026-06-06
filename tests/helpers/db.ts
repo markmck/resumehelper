@@ -5,13 +5,12 @@ import * as schema from '../../src/main/db/schema'
 export function createTestDb() {
   const sqlite = new Database(':memory:')
   sqlite.pragma('journal_mode = WAL')
-  // Match production posture: the app never enables foreign_keys (src/main/db/index.ts
-  // sets no such pragma), relying on application-level integrity instead. Some
-  // better-sqlite3 builds default this pragma ON, which diverges from production and
-  // breaks fixtures that deliberately insert dangling-FK rows (e.g. a variant-scoped
-  // override carrying a synthetic analysis_id to assert cross-tier read isolation).
-  // Pin it OFF so the test connection behaves like the production connection.
-  sqlite.pragma('foreign_keys = OFF')
+  // Do NOT override the foreign_keys pragma here. Production (src/main/db/index.ts) sets
+  // no foreign_keys pragma and runs on the same better-sqlite3 build, whose default is ON
+  // in this environment — the ON DELETE CASCADE definitions in schema.ts depend on it
+  // (e.g. deleteJob → bullets, deleteVariant → items). Forcing it OFF diverges from
+  // production and silently disables those cascades. Fixtures must reference real FK rows
+  // rather than synthetic dangling ids.
 
   // Apply full schema — copied verbatim from src/main/db/index.ts ensureSchema()
   // CRITICAL: Keep this in sync with production ensureSchema()
