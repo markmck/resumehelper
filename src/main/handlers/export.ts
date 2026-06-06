@@ -104,9 +104,10 @@ export function registerExportHandlers(): void {
     }
     const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
     const merged = await buildMergedBuilderData(db, variantId, analysisId)
-    const { showSummary, ...builderData } = merged
+    const { showSummary, summaryOverride, ...builderData } = merged
+    const effectiveProfile = profileRow && summaryOverride ? { ...profileRow, summary: summaryOverride } : profileRow
 
-    const doc = buildResumeDocx(builderData, profileRow, layoutTemplate, templateOptions, showSummary)
+    const doc = buildResumeDocx(builderData, effectiveProfile, layoutTemplate, templateOptions, showSummary)
     const buffer = await Packer.toBuffer(doc)
     await fs.writeFile(filePath, buffer)
     setSetting(db, 'lastExportDir', dirname(filePath))

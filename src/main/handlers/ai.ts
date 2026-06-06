@@ -81,9 +81,14 @@ export async function runAnalysis(db: Db, event: Electron.IpcMainInvokeEvent, jo
 
     // 4. Build resume text from the specified variant
     const merged = await buildMergedBuilderData(db, variantId)
-    const { showSummary: _showSummary, ...builderData } = merged
+    const { showSummary: _showSummary, summaryOverride, ...builderData } = merged
     const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
-    const resumeJson = buildResumeJson(profileRow, builderData)
+    // Thread variant-tier summary override into the scored profile (D-05).
+    // Forward-compat: buildResumeTextForLlm does not currently render basics.summary,
+    // so this has no effect on scorer text today, but keeps the merge path the single
+    // source of truth for when summary is added to the LLM text.
+    const effectiveProfile = profileRow && summaryOverride ? { ...profileRow, summary: summaryOverride } : profileRow
+    const resumeJson = buildResumeJson(effectiveProfile, builderData)
     const resumeText = buildResumeTextForLlm(resumeJson)
 
     // 5. Call 2 — score resume
