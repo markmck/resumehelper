@@ -11,7 +11,7 @@ import {
   updateProfile,
 } from '../../../helpers/factories'
 import { buildSnapshotForVariant } from '../../../../src/main/handlers/submissions'
-import { templateVariantItems, education } from '../../../../src/main/db/schema'
+import { templateVariantItems, education, entityOverrides } from '../../../../src/main/db/schema'
 
 describe('buildSnapshotForVariant', () => {
   test('snapshot contains all required shape fields', async () => {
@@ -122,5 +122,101 @@ describe('buildSnapshotForVariant', () => {
 
     expect(keepCoJob).toBeDefined()
     expect(keepCoJob!.excluded).toBe(false)
+  })
+})
+
+// Phase 36 Wave-0 RED — OVR-03: snapshots freeze the variant-tier override, not base text.
+// These cases are RED until Plan 02/04 thread summaryOverride + bullet overrides through
+// buildMergedBuilderData / buildSnapshotForVariant. All fixtures set analysisId literally
+// to null for variant-tier rows; never eq(col, null).
+describe('buildSnapshotForVariant — OVR-03 override freezing', () => {
+  test('OVR-03 (a): snapshot.profile.summary equals a variant-tier summary override (not profile.summary)', async () => {
+    const db = createTestDb()
+
+    updateProfile(db, {
+      name: 'Jane Doe',
+      email: 'jane@test.com',
+      phone: '555-1234',
+      location: 'NYC',
+      linkedin: 'janedoe',
+      summary: 'Base profile summary',
+    })
+
+    const job = seedJob(db, { company: 'TestCo', role: 'Dev', startDate: '2024-01' })
+    seedBullet(db, job.id, { text: 'Built features' })
+
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+
+    db.insert(entityOverrides).values({
+      variantId: variant.id,
+      analysisId: null, // variant-tier
+      entityType: 'summary',
+      field: 'text',
+      overrideText: 'Variant summary override',
+      source: 'user',
+    }).run()
+
+    const snapshot = await buildSnapshotForVariant(db, variant.id)
+
+    expect(snapshot.profile).toBeDefined()
+    expect(snapshot.profile!.summary).toBe('Variant summary override')
+  })
+
+  test('OVR-03 (b): snapshot freezes a variant-tier job_bullet override text', async () => {
+    const db = createTestDb()
+
+    updateProfile(db, {
+      name: 'Jane Doe',
+      email: 'jane@test.com',
+      phone: '555-1234',
+      location: 'NYC',
+      linkedin: 'janedoe',
+    })
+
+    const job = seedJob(db, { company: 'TestCo', role: 'Dev', startDate: '2024-01' })
+    const bullet = seedBullet(db, job.id, { text: 'Base bullet text' })
+
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+
+    db.insert(entityOverrides).values({
+      variantId: variant.id,
+      analysisId: null, // variant-tier
+      entityType: 'job_bullet',
+      field: 'text',
+      bulletId: bullet.id,
+      overrideText: 'Override bullet text',
+      source: 'user',
+    }).run()
+
+    const snapshot = await buildSnapshotForVariant(db, variant.id)
+
+    const frozenJob = snapshot.jobs.find((j) => j.company === 'TestCo')
+    expect(frozenJob).toBeDefined()
+    const frozenBullet = frozenJob!.bullets.find((b) => b.id === bullet.id)
+    expect(frozenBullet).toBeDefined()
+    expect(frozenBullet!.text).toBe('Override bullet text')
+  })
+
+  test('OVR-03 (c): baseline — no override → snapshot.profile.summary equals profile.summary', async () => {
+    const db = createTestDb()
+
+    updateProfile(db, {
+      name: 'Jane Doe',
+      email: 'jane@test.com',
+      phone: '555-1234',
+      location: 'NYC',
+      linkedin: 'janedoe',
+      summary: 'Base profile summary',
+    })
+
+    const job = seedJob(db, { company: 'TestCo', role: 'Dev', startDate: '2024-01' })
+    seedBullet(db, job.id, { text: 'Built features' })
+
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+
+    const snapshot = await buildSnapshotForVariant(db, variant.id)
+
+    expect(snapshot.profile).toBeDefined()
+    expect(snapshot.profile!.summary).toBe('Base profile summary')
   })
 })

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { MockLanguageModelV3 } from 'ai/test'
 import { runAnalysis } from '../../../../src/main/handlers/ai'
+import { buildMergedBuilderData } from '../../../../src/main/lib/mergeHelper'
 import * as aiProvider from '../../../../src/main/lib/aiProvider'
 import { createTestDb } from '../../../helpers/db'
 import {
@@ -9,7 +10,7 @@ import {
   seedJobWithBullets,
   updateProfile,
 } from '../../../helpers/factories'
-import { aiSettings, jobPostings as jpTable, analysisResults as arTable } from '../../../../src/main/db/schema'
+import { aiSettings, jobPostings as jpTable, analysisResults as arTable, entityOverrides } from '../../../../src/main/db/schema'
 import { eq } from 'drizzle-orm'
 
 // Minimum seed requirements for getBuilderDataForVariant:
@@ -193,5 +194,37 @@ describe('runAnalysis', () => {
     expect(progressStages).toContain('scoring')
     expect(progressStages).toContain('storing')
     expect(progressStages).toContain('done')
+  })
+
+  // Phase 36 Wave-0 RED — D-05: effectiveProfile uses a variant-tier summary override.
+  // Per RESEARCH Pitfall 4, buildResumeTextForLlm does NOT render basics.summary, so we do
+  // NOT assert the scorer's resumeText contains the override. We assert the override row is
+  // recognized as a variant-tier override (a sentinel buildMergedBuilderData must expose as
+  // summaryOverride after Plan 02) and that runAnalysis still completes and returns an
+  // analysisId. This case is RED until summaryOverride threading lands in ai.ts (Plan 04).
+  it('D-05: effectiveProfile uses summaryOverride when a variant-tier summary override exists', async () => {
+    const { posting, variant } = seedRunAnalysisFixtures(db)
+    const { event } = makeEvent()
+
+    db.insert(entityOverrides).values({
+      variantId: variant.id,
+      analysisId: null, // variant-tier
+      entityType: 'summary',
+      field: 'text',
+      overrideText: 'Overridden summary text',
+      source: 'user',
+    }).run()
+
+    const mock = makeSequentialMock([cannedParsed, cannedScore])
+    vi.spyOn(aiProvider, 'getModel').mockReturnValue(mock as any)
+
+    const result = await runAnalysis(db, event, posting.id, variant.id)
+
+    expect(result).toHaveProperty('analysisId')
+
+    // The merged path must surface the variant-tier summary override as summaryOverride so
+    // ai.ts can build effectiveProfile from it. RED until Plan 02 adds the sentinel.
+    const merged = await buildMergedBuilderData(db, variant.id)
+    expect((merged as { summaryOverride?: string }).summaryOverride).toBe('Overridden summary text')
   })
 })
