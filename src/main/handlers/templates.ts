@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
-import { db } from '../db'
-import { templateVariants, templateVariantItems, jobBullets, projectBullets } from '../db/schema'
-import { eq, and, desc, inArray } from 'drizzle-orm'
+import { db, sqlite } from '../db'
+import { templateVariants, templateVariantItems, jobBullets, projectBullets, entityOverrides } from '../db/schema'
+import { eq, and, desc, inArray, isNull } from 'drizzle-orm'
 import { buildMergedBuilderData } from '../lib/mergeHelper'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type * as schema from '../db/schema'
@@ -436,6 +436,90 @@ export function getThreshold(db: Db, variantId: number) {
     .where(eq(templateVariants.id, variantId))
     .get()
   return row?.scoreThreshold ?? 80
+}
+
+// ---------------------------------------------------------------------------
+// Variant-tier overrides (Phase 36, D-02/D-03 / OVR-02)
+// ---------------------------------------------------------------------------
+
+// T-36-06: entityType is renderer-supplied — validate against the locked token set
+// before any write/delete. Reject anything outside this set.
+const VARIANT_OVERRIDE_ENTITY_TYPES = new Set(['job_bullet', 'summary', 'project_name'])
+
+type EntityId = { bulletId?: number; projectId?: number }
+
+function assertEntityType(entityType: string): void {
+  if (!VARIANT_OVERRIDE_ENTITY_TYPES.has(entityType)) {
+    throw new Error(`Invalid override entityType: ${entityType}`)
+  }
+}
+
+// Build the FK condition for the (variant, analysis_id IS NULL, entityType, field) scope.
+// job_bullet → bulletId; project_name → projectId; summary → no FK condition.
+function fkCondition(entityId: EntityId) {
+  if (entityId.bulletId != null) return eq(entityOverrides.bulletId, entityId.bulletId)
+  if (entityId.projectId != null) return eq(entityOverrides.projectId, entityId.projectId)
+  return undefined
+}
+
+/**
+ * D-03 thin raw read: variant-tier override rows only (analysis_id IS NULL).
+ * No base/effective enrichment, no JOIN to base text. T-36-07/T-36-08:
+ * parameterized SQL with a bound variantId; pinned to analysis_id IS NULL.
+ */
+export function getVariantOverrides(db: Db, variantId: number) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const session = (db as any).session
+  const prepare = session
+    ? (sql: string) => session.client.prepare(sql)
+    : (sql: string) => sqlite.prepare(sql)
+  return prepare(`
+    SELECT entity_type AS entityType,
+           field,
+           bullet_id AS bulletId,
+           project_id AS projectId,
+           override_text AS overrideText,
+           source,
+           created_at AS createdAt
+    FROM entity_overrides
+    WHERE variant_id = ? AND analysis_id IS NULL
+  `).all(variantId) as Array<{
+    entityType: string
+    field: string
+    bulletId: number | null
+    projectId: number | null
+    overrideText: string
+    source: string
+    createdAt: number
+  }>
+}
+
+/**
+ * D-02 delete: remove the matching variant-tier row. T-36-08/T-36-09:
+ * pinned to variantId + analysis_id IS NULL so it can never touch an
+ * analysis-tier row or another variant's overrides.
+ */
+export function clearVariantOverride(
+  db: Db,
+  variantId: number,
+  entityType: string,
+  field: string,
+  entityId: EntityId,
+) {
+  assertEntityType(entityType)
+  const fk = fkCondition(entityId)
+  db.delete(entityOverrides)
+    .where(
+      and(
+        eq(entityOverrides.variantId, variantId),
+        isNull(entityOverrides.analysisId),
+        eq(entityOverrides.entityType, entityType),
+        eq(entityOverrides.field, field),
+        ...(fk ? [fk] : []),
+      ),
+    )
+    .run()
+  return { success: true }
 }
 
 export function registerTemplateHandlers(): void {
