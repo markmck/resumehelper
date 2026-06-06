@@ -35,3 +35,4 @@ export function applyOverrides(
     text: overrideMap.get(b.id) ?? b.text,
   }))
 }
+// Retained for renderer/future use — no longer called from mergeHelper after Phase 36.

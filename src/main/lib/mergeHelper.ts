@@ -35,7 +35,6 @@ import {
   analysisSkillAdditions,
   entityOverrides,
 } from '../db/schema'
-import { applyOverrides } from '../../shared/overrides'
 import type {
   BuilderJob,
   BuilderSkill,
@@ -239,9 +238,9 @@ export async function buildMergedBuilderData(
     excluded: excludedJobIds.has(job.id),
     bullets: (bulletsByJobId.get(job.id) ?? []).map((b) => ({
       id: b.id,
-      text: b.text,
+      text: getOverrideText('job_bullet', b.id, 'text') ?? b.text,
       sortOrder: b.sortOrder,
-      excluded: excludedBulletIds.has(b.id),
+      excluded: excludedBulletIds.has(b.id) && !analysisInclusionBulletIds.has(b.id),
     })),
   }))
 
@@ -262,7 +261,7 @@ export async function buildMergedBuilderData(
   // ----------------------------------------------------------------
   const projectsWithBullets: BuilderProject[] = allProjects.map((project) => ({
     id: project.id,
-    name: project.name,
+    name: getOverrideText('project_name', project.id, 'name') ?? project.name,
     excluded: excludedProjectIds.has(project.id),
     bullets: (projectBulletsByProjectId.get(project.id) ?? []).map((b) => ({
       id: b.id,
@@ -339,42 +338,6 @@ export async function buildMergedBuilderData(
   }))
 
   // ----------------------------------------------------------------
-  // Layer 3: Analysis-level overrides (bullet text overrides)
-  // Reads from entity_overrides (Phase 35 cutover — scoped to job_bullet entity type).
-  // Phase 36 will generalize to variant-tier, summary, project, and other field types.
-  // ----------------------------------------------------------------
-  if (analysisId != null) {
-    const overrideRows = db
-      .select({
-        bulletId: entityOverrides.bulletId,
-        overrideText: entityOverrides.overrideText,
-        source: entityOverrides.source,
-      })
-      .from(entityOverrides)
-      .where(
-        and(
-          eq(entityOverrides.analysisId, analysisId),
-          eq(entityOverrides.entityType, 'job_bullet')
-        )
-      )
-      .all() as Array<{
-        bulletId: number
-        overrideText: string
-        source: 'ai_suggestion' | 'manual_edit'
-      }>
-
-    // Map to BulletOverride shape that applyOverrides consumes
-    const bulletOverrides = overrideRows.map((r) => ({
-      ...r,
-      suggestionId: null as null,
-    }))
-
-    for (const job of jobsWithBullets) {
-      job.bullets = applyOverrides(job.bullets, bulletOverrides) as typeof job.bullets
-    }
-  }
-
-  // ----------------------------------------------------------------
   // Layer 3: Analysis-level skill additions (accepted only)
   // Ported from submissions.ts:166-186 per PATTERNS.md landmine 2
   // ----------------------------------------------------------------
@@ -420,5 +383,6 @@ export async function buildMergedBuilderData(
     interests: interestsMapped,
     references: referencesMapped,
     showSummary,
+    summaryOverride,
   }
 }
