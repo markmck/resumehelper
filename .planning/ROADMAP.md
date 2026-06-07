@@ -150,7 +150,7 @@ Plans:
 **Wave 1**
 
 - [x] 37-01-PLAN.md — Preload bridge for variant-override handlers + index.d.ts types (VariantOverrideRow, BuilderData.summaryOverride) + duplicateVariant override-copy (RWD-06); Wave 0 backend tests
-- [ ] 37-02-PLAN.md — Pure deriveOverrideSet indicator helper + unit test (RWD-04) + mergedSurfaces summary/project_name effective-text coverage (SC#1)
+- [x] 37-02-PLAN.md — Pure deriveOverrideSet indicator helper + unit test (RWD-04) + mergedSurfaces summary/project_name effective-text coverage (SC#1)
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -185,7 +185,7 @@ Plans:
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
 | 35. Unified Override Table + Migration | v2.6 | 3/3 | Complete    | 2026-06-05 |
 | 36. Merge Precedence + Snapshot Threading | v2.6 | 4/4 | Complete   | 2026-06-06 |
-| 37. Variant Reword UI | v2.6 | 1/3 | In progress | - |
+| 37. Variant Reword UI | v2.6 | 2/3 | In Progress|  |
 | 38. Excluded-Bullet Suggestions | v2.6 | 0/? | Not started | - |
 
 ## Future (v3.0+)

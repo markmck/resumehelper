@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Per-Variant Text Overrides
 status: executing
-stopped_at: Phase 37 Plan 01 complete
-last_updated: "2026-06-07T02:24:00.000Z"
-last_activity: 2026-06-07 -- Phase 37 Plan 01 executed (variant-override preload bridge + duplicate override-copy)
+stopped_at: Completed 37-01-PLAN.md
+last_updated: "2026-06-07T02:34:30.192Z"
+last_activity: 2026-06-07
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 10
-  completed_plans: 8
-  percent: 60
+  completed_plans: 9
+  percent: 50
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-05)
 ## Current Position
 
 Phase: 37 (Variant Reword UI) — EXECUTING
-Plan: 2 of 3
-Status: Executing Phase 37 (Plan 01 complete)
-Last activity: 2026-06-07 -- Phase 37 Plan 01 executed (variant-override preload bridge + duplicate override-copy)
+Plan: 3 of 3
+Status: Ready to execute
+Last activity: 2026-06-07
 
-Progress: [██████████] 100%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
@@ -45,6 +45,7 @@ Progress: [██████████] 100%
 | Phase | Plan | Duration | Tasks | Files |
 | ----- | ---- | -------- | ----- | ----- |
 | 37    | 01   | ~8 min   | 3     | 5     |
+| Phase 37 P02 | 6min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,7 @@ Phase 35 decisions (Plans 01-03):
 - Manual delete+insert upsert for `acceptSuggestion` — SQLite partial unique indexes with nullable FK columns do not fire ON CONFLICT when all nullable FK columns are NULL (NULLs are distinct per SQLite UNIQUE semantics); `onConflictDoUpdate` with `targetWhere` generates correct SQL but constraint never trips
 - `getOverrides` accesses raw sqlite via `db.session.client.prepare(...)` for testability with `createTestDb()` — falls back to module-level `sqlite` singleton in production
 - D-01 recorded in PROJECT.md Key Decisions — satisfies ROADMAP #5 and clears Phase 35 blocker
+- [Phase 37]: deriveOverrideSet extracted as pure helper (RWD-04 unit-testable; null-FK rows skipped, any summary row = hasSummary)
 
 ### Pending Todos
 
