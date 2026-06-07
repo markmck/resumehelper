@@ -81,7 +81,7 @@ Phases 30-34 covered: unified `buildMergedBuilderData()` merge path feeding HTML
 
 - [x] **Phase 35: Unified Override Table + Migration** - New `entityOverrides` schema, data migration from `analysisBulletOverrides`, `acceptSuggestion` cutover, `createTestDb` sync (completed 2026-06-05)
 - [x] **Phase 36: Merge Precedence + Snapshot Threading** - Extend `buildMergedBuilderData` with Layer 2.5 variant-tier overrides, `summaryOverride` through snapshots, variant override handlers, inclusion un-exclusion logic (completed 2026-06-06)
-- [ ] **Phase 37: Variant Reword UI** - Inline reword (InlineEdit) for bullets/summary/project title, override visual indicator, reset-to-base, duplicate copies overrides
+- [x] **Phase 37: Variant Reword UI** - Inline reword (InlineEdit) for bullets/summary/project title, override visual indicator, reset-to-base, duplicate copies overrides (completed 2026-06-07)
 - [ ] **Phase 38: Excluded-Bullet Suggestions** - Scorer prompt extension, new Zod field, `analysisExcludedBulletSuggestions` table, accept/dismiss handlers with bulletId validation, OptimizeVariant panel
 
 ## Phase Details
@@ -154,7 +154,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 37-03-PLAN.md — VariantBuilder reword UI: pencil + InlineEdit + left-border indicator + revert icon for bullets/summary/project title, D-04 author-from-scratch summary, onReword live preview (RWD-01..05)
+- [x] 37-03-PLAN.md — VariantBuilder reword UI: pencil + InlineEdit + left-border indicator + revert icon for bullets/summary/project title, D-04 author-from-scratch summary, onReword live preview (RWD-01..05)
 **UI hint**: yes
 
 ### Phase 38: Excluded-Bullet Suggestions
@@ -185,7 +185,7 @@ Plans:
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
 | 35. Unified Override Table + Migration | v2.6 | 3/3 | Complete    | 2026-06-05 |
 | 36. Merge Precedence + Snapshot Threading | v2.6 | 4/4 | Complete   | 2026-06-06 |
-| 37. Variant Reword UI | v2.6 | 2/3 | In Progress|  |
+| 37. Variant Reword UI | v2.6 | 3/3 | Complete   | 2026-06-07 |
 | 38. Excluded-Bullet Suggestions | v2.6 | 0/? | Not started | - |
 
 ## Future (v3.0+)
