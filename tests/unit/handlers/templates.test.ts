@@ -18,6 +18,7 @@ import {
   setItemExcluded,
   setThreshold,
   getThreshold,
+  setVariantOverride,
 } from '../../../src/main/handlers/templates'
 import { buildMergedBuilderData as getBuilderData } from '../../../src/main/lib/mergeHelper'
 import * as schema from '../../../src/main/db/schema'
@@ -100,6 +101,44 @@ describe('variant CRUD', () => {
     expect(newItems[0].itemType).toBe('bullet')
     expect(newItems[0].bulletId).toBe(bullets[0].id)
     void job // suppress unused warning
+  })
+
+  it('duplicateVariant copies variant-tier overrides but NOT analysis-tier rows (RWD-06)', async () => {
+    const db = createTestDb()
+    const { job, bullets } = seedJobWithBullets(db, ['Bullet A'])
+    const source = seedVariant(db, { name: 'Original' })
+
+    // Variant-tier override (analysis_id NULL) via the handler.
+    setVariantOverride(db, source.id, 'job_bullet', 'text', { bulletId: bullets[0].id }, 'Variant-tier text')
+
+    // Analysis-tier override (analysis_id NOT NULL) directly — must NOT be copied.
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: source.id })
+    db.insert(schema.entityOverrides).values({
+      variantId: source.id,
+      analysisId: analysis.id,
+      entityType: 'job_bullet',
+      field: 'text',
+      bulletId: bullets[0].id,
+      overrideText: 'Analysis-tier text',
+      source: 'ai_suggestion',
+    }).run()
+
+    const newVariant = duplicateVariant(db, source.id)
+
+    const newOverrides = db
+      .select()
+      .from(schema.entityOverrides)
+      .all()
+      .filter((r: typeof schema.entityOverrides.$inferSelect) => r.variantId === newVariant.id)
+
+    expect(newOverrides).toHaveLength(1)
+    expect(newOverrides[0].entityType).toBe('job_bullet')
+    expect(newOverrides[0].overrideText).toBe('Variant-tier text')
+    expect(newOverrides[0].analysisId).toBeNull()
+    // Analysis-tier row must not have been copied under the new variant.
+    expect(newOverrides.every((r) => r.overrideText !== 'Analysis-tier text')).toBe(true)
+    void job
   })
 })
 

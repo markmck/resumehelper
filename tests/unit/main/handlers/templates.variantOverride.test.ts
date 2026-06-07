@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createTestDb } from '../../../helpers/db'
-import { seedVariant, seedJob, seedBullet, seedJobPosting, seedAnalysis } from '../../../helpers/factories'
+import { seedVariant, seedJob, seedBullet, seedJobPosting, seedAnalysis, seedProject } from '../../../helpers/factories'
 import {
   getVariantOverrides,
   setVariantOverride,
@@ -110,5 +110,34 @@ describe('variant-override handlers (D-02/D-03)', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].overrideText).toBe('Variant text')
     expect(rows.every((r) => r.overrideText !== 'Analysis text')).toBe(true)
+  })
+
+  it('case 6: setVariantOverride stores a summary override with no FK columns (bulletId/projectId NULL)', async () => {
+    const variant = seedVariant(db)
+
+    await setVariantOverride(db, variant.id, 'summary', 'text', {}, 'Authored summary')
+
+    const rows = await getVariantOverrides(db, variant.id)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].entityType).toBe('summary')
+    expect(rows[0].field).toBe('text')
+    expect(rows[0].bulletId).toBeNull()
+    expect(rows[0].projectId).toBeNull()
+    expect(rows[0].overrideText).toBe('Authored summary')
+  })
+
+  it('case 7: setVariantOverride stores a project_name override keyed on projectId', async () => {
+    const project = seedProject(db)
+    const variant = seedVariant(db)
+
+    await setVariantOverride(db, variant.id, 'project_name', 'name', { projectId: project.id }, 'Renamed project')
+
+    const rows = await getVariantOverrides(db, variant.id)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].entityType).toBe('project_name')
+    expect(rows[0].field).toBe('name')
+    expect(rows[0].projectId).toBe(project.id)
+    expect(rows[0].bulletId).toBeNull()
+    expect(rows[0].overrideText).toBe('Renamed project')
   })
 })
