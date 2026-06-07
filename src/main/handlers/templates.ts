@@ -111,6 +111,34 @@ export function duplicateVariant(db: Db, id: number) {
       .run()
   }
 
+  // RWD-06: copy variant-tier override rows (analysis_id IS NULL) to the new
+  // variant. MUST use isNull() — eq(col, null) is always false in SQL → zero
+  // rows. Analysis-tier rows (analysis_id NOT NULL) are intentionally excluded.
+  const sourceOverrides = db
+    .select()
+    .from(entityOverrides)
+    .where(and(eq(entityOverrides.variantId, id), isNull(entityOverrides.analysisId)))
+    .all()
+
+  if (sourceOverrides.length > 0) {
+    db.insert(entityOverrides)
+      .values(
+        sourceOverrides.map((row) => ({
+          variantId: newVariant.id,
+          analysisId: null,
+          entityType: row.entityType,
+          field: row.field,
+          bulletId: row.bulletId,
+          projectId: row.projectId,
+          jobId: row.jobId,
+          projectBulletId: row.projectBulletId,
+          overrideText: row.overrideText,
+          source: row.source,
+        })),
+      )
+      .run()
+  }
+
   return newVariant
 }
 
