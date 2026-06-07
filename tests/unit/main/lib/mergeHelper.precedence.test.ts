@@ -176,4 +176,20 @@ describe('buildMergedBuilderData — override precedence (OVR-02) + inclusion (D
     expect(excludedBullet).toBeDefined()
     expect(excludedBullet!.excluded).toBe(true)
   })
+
+  it('case 6: rejects a (variantId, analysisId) pair that belong to different variants (WR-01 fail-closed)', async () => {
+    const db = createTestDb()
+
+    const variantA = seedVariant(db)
+    const variantB = seedVariant(db)
+    const posting = seedJobPosting(db)
+    // Analysis owned by variant B.
+    const analysisB = seedAnalysis(db, posting.id, { variantId: variantB.id })
+
+    // Requesting variant A's merge with variant B's analysis must fail closed, not
+    // silently leak B's analysis-tier overrides into A's render.
+    await expect(
+      buildMergedBuilderData(db, variantA.id, analysisB.id),
+    ).rejects.toThrow(/cross-variant/i)
+  })
 })

@@ -33,6 +33,7 @@ import {
   interests,
   referenceEntries,
   analysisSkillAdditions,
+  analysisResults,
   entityOverrides,
 } from '../db/schema'
 import type {
@@ -159,6 +160,29 @@ export async function buildMergedBuilderData(
   // Inclusion concern (D-01): analysisInclusionBulletIds re-includes bullets that
   //   the variant excluded, scoped to the active analysis only.
   // ----------------------------------------------------------------
+  // Fail-closed consistency guard (WR-01): the analysis-tier branch below matches
+  // override rows by analysisId alone (bullets are global), so a caller passing a
+  // (variantId, analysisId) pair that belong to DIFFERENT variants would otherwise
+  // leak another variant's analysis-tier overrides + inclusion set into this render.
+  // buildMergedBuilderData is a public export forwarded from the getBuilderData IPC
+  // handler, so we cannot assume the pair is consistent. Resolve the analysis's owning
+  // variant and reject a concrete mismatch. A NULL owner is allowed — acceptSuggestion
+  // mirrors a NULL analysisResults.variantId onto its override rows (analysis run with
+  // no variant association), and those are legitimately scoped by analysisId.
+  if (analysisId != null) {
+    const analysisOwner = db
+      .select({ variantId: analysisResults.variantId })
+      .from(analysisResults)
+      .where(eq(analysisResults.id, analysisId))
+      .get()
+    if (analysisOwner?.variantId != null && analysisOwner.variantId !== variantId) {
+      throw new Error(
+        `buildMergedBuilderData: analysis ${analysisId} belongs to variant ${analysisOwner.variantId}, ` +
+          `not the requested variant ${variantId} — refusing to apply cross-variant overrides.`,
+      )
+    }
+  }
+
   const overrideCondition =
     analysisId != null
       ? or(
