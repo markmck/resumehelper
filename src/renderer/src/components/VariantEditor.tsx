@@ -388,6 +388,7 @@ function VariantEditor({ variant, onRename, onDelete, onOptimizeVariant, onVaria
             <VariantBuilder
               variantId={variant.id}
               onToggle={() => setPreviewVersion((v) => v + 1)}
+              onReword={() => setPreviewVersion((v) => v + 1)}
               showSummary={showSummary}
               onShowSummaryChange={handleShowSummaryChange}
               marginTop={effectiveMarginTop}
