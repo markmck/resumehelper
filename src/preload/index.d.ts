@@ -164,6 +164,17 @@ export interface BuilderData {
   interests?: BuilderInterest[]
   references?: BuilderReference[]
   showSummary?: boolean
+  summaryOverride?: string
+}
+
+export interface VariantOverrideRow {
+  entityType: string
+  field: string
+  bulletId: number | null
+  projectId: number | null
+  overrideText: string
+  source: string
+  createdAt: number
 }
 
 export interface SubmissionSnapshot {
@@ -367,6 +378,20 @@ export interface Api {
     setOptions: (variantId: number, options: TemplateOptions) => Promise<void>
     setThreshold: (id: number, threshold: number) => Promise<void>
     getThreshold: (id: number) => Promise<number>
+    getVariantOverrides: (variantId: number) => Promise<VariantOverrideRow[]>
+    setVariantOverride: (
+      variantId: number,
+      entityType: string,
+      field: string,
+      entityId: { bulletId?: number; projectId?: number },
+      text: string,
+    ) => Promise<{ success: boolean }>
+    clearVariantOverride: (
+      variantId: number,
+      entityType: string,
+      field: string,
+      entityId: { bulletId?: number; projectId?: number },
+    ) => Promise<{ success: boolean }>
   }
   submissions: {
     list: () => Promise<Submission[]>

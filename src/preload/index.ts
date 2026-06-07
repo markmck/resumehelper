@@ -60,6 +60,23 @@ const api = {
       ipcRenderer.invoke('templates:setThreshold', id, threshold),
     getThreshold: (id: number) =>
       ipcRenderer.invoke('templates:getThreshold', id),
+    getVariantOverrides: (variantId: number) =>
+      ipcRenderer.invoke('templates:getVariantOverrides', variantId),
+    setVariantOverride: (
+      variantId: number,
+      entityType: string,
+      field: string,
+      entityId: { bulletId?: number; projectId?: number },
+      text: string,
+    ) =>
+      ipcRenderer.invoke('templates:setVariantOverride', variantId, entityType, field, entityId, text),
+    clearVariantOverride: (
+      variantId: number,
+      entityType: string,
+      field: string,
+      entityId: { bulletId?: number; projectId?: number },
+    ) =>
+      ipcRenderer.invoke('templates:clearVariantOverride', variantId, entityType, field, entityId),
   },
   submissions: {
     list: () => ipcRenderer.invoke('submissions:list'),
