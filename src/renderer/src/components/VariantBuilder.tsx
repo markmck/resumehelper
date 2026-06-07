@@ -9,12 +9,16 @@ import {
   BuilderLanguage,
   BuilderInterest,
   BuilderReference,
+  VariantOverrideRow,
 } from '../../../preload/index.d'
 import { TEMPLATE_DEFAULTS } from './templates/types'
+import { deriveOverrideSet } from './overrideIndicator'
+import InlineEdit from './InlineEdit'
 
 interface VariantBuilderProps {
   variantId: number
   onToggle?: () => void
+  onReword?: () => void
   // showSummary controls
   showSummary: boolean
   onShowSummaryChange: (shown: boolean) => void
@@ -70,9 +74,30 @@ const companyStyle: React.CSSProperties = {
   color: 'var(--color-text-tertiary)',
 }
 
+// Left accent border marking an overridden (reworded) field — D-01/D-01a.
+// Applied REGARDLESS of excluded state so an excluded+overridden field shows
+// strikethrough/dim AND the gutter mark simultaneously.
+const overrideBorderStyle = (overridden: boolean): React.CSSProperties =>
+  overridden
+    ? { borderLeft: '3px solid var(--color-accent)', paddingLeft: 'var(--space-2)' }
+    : { borderLeft: '3px solid transparent', paddingLeft: 'var(--space-2)' }
+
+// Small hover-revealed icon button (pencil / revert) — D-02.
+const iconButtonStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  cursor: 'pointer',
+  fontSize: 'var(--font-size-sm)',
+  lineHeight: 1,
+  color: 'var(--color-text-muted)',
+  flexShrink: 0,
+}
+
 function VariantBuilder({
   variantId,
   onToggle,
+  onReword,
   showSummary,
   onShowSummaryChange,
   marginTop,
@@ -84,13 +109,56 @@ function VariantBuilder({
 }: VariantBuilderProps): React.JSX.Element {
   const [builderData, setBuilderData] = useState<BuilderData | null>(null)
   const [profileSummary, setProfileSummary] = useState('')
+  const [overrideRows, setOverrideRows] = useState<VariantOverrideRow[]>([])
   const [layoutOpen, setLayoutOpen] = useState(false)
+  // Which row currently shows the autoFocus InlineEdit (e.g. 'bullet:12', 'project:3', 'summary').
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  // Which row is hovered (reveals the pencil/revert affordances).
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null)
 
   useEffect(() => {
     setBuilderData(null)
+    setEditingKey(null)
     window.api.templates.getBuilderData(variantId).then(setBuilderData)
+    window.api.templates.getVariantOverrides(variantId).then(setOverrideRows)
     window.api.profile.get().then((p) => setProfileSummary(p.summary ?? ''))
   }, [variantId])
+
+  type EntityId = { bulletId?: number; projectId?: number }
+
+  // Reword save: write the override, refetch builder effective text + raw rows,
+  // then bump the live preview (no save button — SC#2). Mirrors handleJobToggle.
+  const handleReword = async (
+    entityType: string,
+    field: string,
+    entityId: EntityId,
+    text: string,
+  ): Promise<void> => {
+    await window.api.templates.setVariantOverride(variantId, entityType, field, entityId, text)
+    const [fresh, rows] = await Promise.all([
+      window.api.templates.getBuilderData(variantId),
+      window.api.templates.getVariantOverrides(variantId),
+    ])
+    setBuilderData(fresh)
+    setOverrideRows(rows)
+    onReword?.()
+  }
+
+  // Revert: clear the override, refetch, bump preview — base text restored (D-02/RWD-05).
+  const handleRevert = async (
+    entityType: string,
+    field: string,
+    entityId: EntityId,
+  ): Promise<void> => {
+    await window.api.templates.clearVariantOverride(variantId, entityType, field, entityId)
+    const [fresh, rows] = await Promise.all([
+      window.api.templates.getBuilderData(variantId),
+      window.api.templates.getVariantOverrides(variantId),
+    ])
+    setBuilderData(fresh)
+    setOverrideRows(rows)
+    onReword?.()
+  }
 
   const handleJobToggle = async (jobId: number, currentExcluded: boolean): Promise<void> => {
     const newExcluded = !currentExcluded
@@ -208,6 +276,8 @@ function VariantBuilder({
     )
   }
 
+  const overrideSet = deriveOverrideSet(overrideRows)
+
   const skillGroups = builderData.skills.reduce<Record<string, BuilderSkill[]>>((acc, skill) => {
     const groupKey = skill.categoryName ?? 'Other'
     if (!acc[groupKey]) acc[groupKey] = []
@@ -298,20 +368,77 @@ function VariantBuilder({
                 <span style={toggleHeaderStyle(job.excluded)}>{job.company}</span>
                 <span style={companyStyle}>{job.role}</span>
               </div>
-              {job.bullets.map((bullet) => (
-                <div key={bullet.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', padding: '6px 0' }}>
-                  <input
-                    type="checkbox"
-                    checked={!bullet.excluded}
-                    disabled={job.excluded}
-                    onChange={() => !job.excluded && handleBulletToggle(job.id, bullet.id, bullet.excluded)}
-                    style={{ ...cbSmallStyle, cursor: job.excluded ? 'not-allowed' : 'pointer', opacity: job.excluded ? 0.4 : 1 }}
-                  />
-                  <span style={{ ...toggleTextStyle(job.excluded || bullet.excluded), fontSize: 'var(--font-size-sm)' }}>
-                    {bullet.text}
-                  </span>
-                </div>
-              ))}
+              {job.bullets.map((bullet) => {
+                const rowKey = `bullet:${bullet.id}`
+                const included = !job.excluded && !bullet.excluded
+                const overridden = overrideSet.bullets.has(bullet.id)
+                const isEditing = editingKey === rowKey
+                const isHovered = hoveredKey === rowKey
+                return (
+                  <div
+                    key={bullet.id}
+                    onMouseEnter={() => setHoveredKey(rowKey)}
+                    onMouseLeave={() => setHoveredKey((k) => (k === rowKey ? null : k))}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 'var(--space-3)',
+                      padding: '6px 0',
+                      ...overrideBorderStyle(overridden),
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!bullet.excluded}
+                      disabled={job.excluded}
+                      onChange={() => !job.excluded && handleBulletToggle(job.id, bullet.id, bullet.excluded)}
+                      style={{ ...cbSmallStyle, cursor: job.excluded ? 'not-allowed' : 'pointer', opacity: job.excluded ? 0.4 : 1 }}
+                    />
+                    {isEditing ? (
+                      <div style={{ flex: 1 }}>
+                        <InlineEdit
+                          value={bullet.text}
+                          multiline
+                          autoFocus
+                          onSave={(t) => {
+                            handleReword('job_bullet', 'text', { bulletId: bullet.id }, t)
+                            setEditingKey(null)
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <span style={{ ...toggleTextStyle(job.excluded || bullet.excluded), fontSize: 'var(--font-size-sm)', flex: 1 }}>
+                          {bullet.text}
+                        </span>
+                        {/* Pencil + revert appear on hover for INCLUDED rows only (D-03). */}
+                        {included && isHovered && (
+                          <button
+                            type="button"
+                            title="Reword for this variant"
+                            aria-label="Reword bullet"
+                            onClick={() => setEditingKey(rowKey)}
+                            style={iconButtonStyle}
+                          >
+                            ✎
+                          </button>
+                        )}
+                        {included && overridden && isHovered && (
+                          <button
+                            type="button"
+                            title="Revert to base text"
+                            aria-label="Revert bullet override"
+                            onClick={() => handleRevert('job_bullet', 'text', { bulletId: bullet.id })}
+                            style={iconButtonStyle}
+                          >
+                            ↺
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )
+              })}
               <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', marginTop: 'var(--space-1)' }} />
             </div>
           ))
