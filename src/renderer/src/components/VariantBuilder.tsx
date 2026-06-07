@@ -319,36 +319,87 @@ function VariantBuilder({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
     {/* Scrollable content area */}
     <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-5)' }}>
-      {/* Summary toggle — first in content area */}
-      {profileSummary && (
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={showSummary}
-              onChange={(e) => onShowSummaryChange(e.target.checked)}
-              style={{ ...cbStyle, marginTop: 2 }}
-            />
-            <div>
-              <span style={toggleHeaderStyle(!showSummary)}>Summary</span>
-              <div
-                style={{
-                  ...toggleTextStyle(!showSummary),
-                  fontSize: 'var(--font-size-xs)',
-                  marginTop: 4,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 3,
-                  WebkitBoxOrient: 'vertical' as const,
-                  overflow: 'hidden',
-                }}
-              >
-                {profileSummary}
+      {/* Summary toggle — first in content area.
+          D-04: renders unconditionally so a variant can author a summary from
+          scratch even when the base profile.summary is empty. */}
+      {(() => {
+        const effectiveSummary = builderData.summaryOverride ?? profileSummary
+        const summaryOverridden = overrideSet.hasSummary
+        const isSummaryEditing = editingKey === 'summary'
+        const isSummaryHovered = hoveredKey === 'summary'
+        return (
+          <div
+            style={{ marginBottom: 'var(--space-4)' }}
+            onMouseEnter={() => setHoveredKey('summary')}
+            onMouseLeave={() => setHoveredKey((k) => (k === 'summary' ? null : k))}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, ...overrideBorderStyle(summaryOverridden) }}>
+              <input
+                type="checkbox"
+                checked={showSummary}
+                onChange={(e) => onShowSummaryChange(e.target.checked)}
+                style={{ ...cbStyle, marginTop: 2, cursor: 'pointer' }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <span style={toggleHeaderStyle(!showSummary)}>Summary</span>
+                  {!isSummaryEditing && isSummaryHovered && (
+                    <button
+                      type="button"
+                      title="Reword summary for this variant"
+                      aria-label="Reword summary"
+                      onClick={() => setEditingKey('summary')}
+                      style={iconButtonStyle}
+                    >
+                      ✎
+                    </button>
+                  )}
+                  {!isSummaryEditing && summaryOverridden && isSummaryHovered && (
+                    <button
+                      type="button"
+                      title="Revert to base summary"
+                      aria-label="Revert summary override"
+                      onClick={() => handleRevert('summary', 'text', {})}
+                      style={iconButtonStyle}
+                    >
+                      ↺
+                    </button>
+                  )}
+                </div>
+                {isSummaryEditing ? (
+                  <InlineEdit
+                    value={effectiveSummary}
+                    multiline
+                    autoFocus
+                    placeholder="Add a summary for this variant"
+                    onSave={(t) => {
+                      handleReword('summary', 'text', {}, t)
+                      setEditingKey(null)
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      ...toggleTextStyle(!showSummary),
+                      fontSize: 'var(--font-size-xs)',
+                      marginTop: 4,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical' as const,
+                      overflow: 'hidden',
+                      color: effectiveSummary ? undefined : 'var(--color-text-muted)',
+                      fontStyle: effectiveSummary ? undefined : 'italic',
+                    }}
+                  >
+                    {effectiveSummary || 'Add a summary for this variant'}
+                  </div>
+                )}
               </div>
             </div>
-          </label>
-          <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', marginTop: 'var(--space-4)' }} />
-        </div>
-      )}
+            <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', marginTop: 'var(--space-4)' }} />
+          </div>
+        )
+      })()}
 
       {/* Work History */}
       <div style={{ marginBottom: 'var(--space-6)' }}>
@@ -473,10 +524,64 @@ function VariantBuilder({
       {builderData.projects.length > 0 && (
         <div style={{ marginBottom: 'var(--space-6)' }}>
           <div style={sectionTitleStyle}>Projects</div>
-          {builderData.projects.map((project) => (
+          {builderData.projects.map((project) => {
+            const projectKey = `project:${project.id}`
+            const projectOverridden = overrideSet.projects.has(project.id)
+            const isProjectEditing = editingKey === projectKey
+            const isProjectHovered = hoveredKey === projectKey
+            return (
             <div key={project.id} style={{ marginBottom: 'var(--space-6)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '8px 0', marginBottom: 'var(--space-2)' }}>
-                <span style={toggleHeaderStyle(project.excluded)}>{project.name}</span>
+              <div
+                onMouseEnter={() => setHoveredKey(projectKey)}
+                onMouseLeave={() => setHoveredKey((k) => (k === projectKey ? null : k))}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  padding: '8px 0',
+                  marginBottom: 'var(--space-2)',
+                  ...overrideBorderStyle(projectOverridden),
+                }}
+              >
+                {isProjectEditing ? (
+                  <div style={{ flex: 1 }}>
+                    <InlineEdit
+                      value={project.name}
+                      autoFocus
+                      onSave={(t) => {
+                        handleReword('project_name', 'name', { projectId: project.id }, t)
+                        setEditingKey(null)
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <span style={{ ...toggleHeaderStyle(project.excluded), flex: 1 }}>{project.name}</span>
+                    {/* Project headers have no exclusion checkbox — pencil always available. */}
+                    {isProjectHovered && (
+                      <button
+                        type="button"
+                        title="Reword title for this variant"
+                        aria-label="Reword project title"
+                        onClick={() => setEditingKey(projectKey)}
+                        style={iconButtonStyle}
+                      >
+                        ✎
+                      </button>
+                    )}
+                    {projectOverridden && isProjectHovered && (
+                      <button
+                        type="button"
+                        title="Revert to base title"
+                        aria-label="Revert project title override"
+                        onClick={() => handleRevert('project_name', 'name', { projectId: project.id })}
+                        style={iconButtonStyle}
+                      >
+                        ↺
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
               {project.bullets.map((bullet) => (
                 <div key={bullet.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', padding: '6px 0' }}>
@@ -494,7 +599,8 @@ function VariantBuilder({
               ))}
               <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', marginTop: 'var(--space-1)' }} />
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
