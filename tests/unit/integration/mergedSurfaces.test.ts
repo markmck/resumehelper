@@ -3,10 +3,11 @@ import React from 'react'
 import { describe, test, expect } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import { createTestDb } from '../../helpers/db'
-import { seedVariant, updateProfile } from '../../helpers/factories'
+import { seedVariant, seedProject, updateProfile } from '../../helpers/factories'
 import { unzipDocxXml } from '../../helpers/docx'
 import { templateVariantItems } from '../../../src/main/db/schema'
 import { buildMergedBuilderData } from '../../../src/main/lib/mergeHelper'
+import { setVariantOverride } from '../../../src/main/handlers/templates'
 import { buildResumeDocx } from '../../../src/main/lib/docxBuilder'
 import type { BuilderData } from '../../../src/main/lib/docxBuilder'
 import ClassicTemplate from '@renderer/components/templates/ClassicTemplate'
@@ -177,5 +178,42 @@ describe('mergedSurfaces: buildMergedBuilderData.showSummary derivation', () => 
     }).run()
     const merged = await buildMergedBuilderData(db, variant.id)
     expect(merged.showSummary).toBe(true)
+  })
+})
+
+describe('mergedSurfaces: SC#1 variant-tier effective text flows through getBuilderData', () => {
+  test('summaryOverride reflects a variant-tier summary override (no base summary)', async () => {
+    const db = createTestDb()
+    // D-04: variants may author a summary from scratch even with an empty base.
+    updateProfile(db, {
+      name: 'Jane',
+      email: 'j@x.com',
+      phone: '1',
+      location: 'NY',
+      linkedin: 'jane',
+      summary: '',
+    })
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+
+    // Locked tokens: entityType 'summary', field 'text', no FK ({}).
+    setVariantOverride(db, variant.id, 'summary', 'text', {}, 'Variant summary')
+
+    const merged = await buildMergedBuilderData(db, variant.id)
+    expect(merged.summaryOverride).toBe('Variant summary')
+  })
+
+  test('project effective name reflects a variant-tier project_name override', async () => {
+    const db = createTestDb()
+    updateProfile(db, { name: 'Jane', email: 'j@x.com', phone: '1', location: 'NY', linkedin: 'jane' })
+    const project = seedProject(db, { name: 'Base Project Name' })
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+
+    // Locked tokens: entityType 'project_name', field 'name', FK { projectId }.
+    setVariantOverride(db, variant.id, 'project_name', 'name', { projectId: project.id }, 'Reworded Project')
+
+    const merged = await buildMergedBuilderData(db, variant.id)
+    const mergedProject = merged.projects.find((p) => p.id === project.id)
+    expect(mergedProject).toBeDefined()
+    expect(mergedProject!.name).toBe('Reworded Project')
   })
 })
