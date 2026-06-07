@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Per-Variant Text Overrides
-status: ready_to_plan
-stopped_at: Phase 35 complete (3/3) — ready to discuss Phase 36
-last_updated: 2026-06-05T20:37:00.776Z
-last_activity: 2026-06-05
+status: executing
+stopped_at: Phase 37 Plan 01 complete
+last_updated: "2026-06-07T02:24:00.000Z"
+last_activity: 2026-06-07 -- Phase 37 Plan 01 executed (variant-override preload bridge + duplicate override-copy)
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 25
+  completed_phases: 2
+  total_plans: 10
+  completed_plans: 8
+  percent: 60
 ---
 
 # Project State
@@ -21,24 +21,30 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-05)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 36 — merge precedence + snapshot threading
+**Current focus:** Phase 37 — Variant Reword UI
 
 ## Current Position
 
-Phase: 36
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-06-05
+Phase: 37 (Variant Reword UI) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 37 (Plan 01 complete)
+Last activity: 2026-06-07 -- Phase 37 Plan 01 executed (variant-override preload bridge + duplicate override-copy)
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 - Total phases in milestone: 4 (Phases 35–38)
-- Completed phases: 0
-- Completed plans: 0
-- Completion percent: 0%
+- Completed phases: 2 (35, 36)
+- Completed plans: 8
+- Completion percent: 60%
 - Test suite at milestone start: 247 tests passing
+- Test suite after Phase 36: 281 tests passing
+- Test suite after Phase 37 Plan 01: 284 tests passing
+
+| Phase | Plan | Duration | Tasks | Files |
+| ----- | ---- | -------- | ----- | ----- |
+| 37    | 01   | ~8 min   | 3     | 5     |
 
 ## Accumulated Context
 
@@ -53,6 +59,12 @@ Key decisions scoped for v2.6 (from research):
 - `projects.description` column and project-description reword explicitly deferred (out of scope for v2.6)
 - `createTestDb()` in `tests/helpers/db.ts` must be updated in lockstep with every `ensureSchema()` table addition
 
+Phase 37 decisions (Plan 01):
+
+- Variant-override preload bridge passes NO analysisId (T-37-01) — renderer can only write variant-tier overrides; main handler still hardcodes `analysisId: null`
+- `duplicateVariant` override-copy filters with `isNull(entityOverrides.analysisId)` (never `eq(col, null)`) and copies FK + text/source columns verbatim, omitting DB-generated id/createdAt; function stays synchronous
+- vitest requires `npm rebuild better-sqlite3` (Node ABI 137); dev/start need `electron-rebuild` (Electron ABI 147) — restore the Electron build after running tests
+
 Phase 35 decisions (Plans 01-03):
 
 - Manual delete+insert upsert for `acceptSuggestion` — SQLite partial unique indexes with nullable FK columns do not fire ON CONFLICT when all nullable FK columns are NULL (NULLs are distinct per SQLite UNIQUE semantics); `onConflictDoUpdate` with `targetWhere` generates correct SQL but constraint never trips
@@ -62,7 +74,7 @@ Phase 35 decisions (Plans 01-03):
 ### Pending Todos
 
 - [x] Phase 35: Unified override table + migration — COMPLETE
-- [ ] Phase 36: Merge precedence + snapshot threading
+- [x] Phase 36: Merge precedence + snapshot threading — COMPLETE
 - [ ] Phase 37: Variant reword UI
 - [ ] Phase 38: Excluded-bullet suggestions
 
@@ -73,10 +85,19 @@ Phase 35 decisions (Plans 01-03):
 
 ## Session Continuity
 
-Last session: 2026-06-05T20:26:08.554Z
-Stopped at: Phase 35 context gathered
+Last session: 2026-06-07T02:24:00.000Z
+Stopped at: Completed 37-01-PLAN.md
 Resume file: None
 
 **Completed Milestone:** v2.5 Portability & Debt Cleanup — 5 phases, 19 plans — shipped 2026-06-05
 **Phase 35 complete:** entity_overrides table + migration + acceptSuggestion cutover + mergeHelper Layer 3 redirect + D-01 decision recorded. 264 tests passing.
-**Next:** `/gsd:transition` or `/gsd:plan-phase 36`
+**Phase 36 complete:** two-pass override map (analysis→variant→base precedence), variant-override IPC handlers, summaryOverride threaded into snapshot/scoring/DOCX/resume.json, D-01 inclusion mechanism. Verified + code-reviewed. 281 tests passing. Two integration regressions caught & fixed during post-merge gate (analysis-tier match-by-analysisId; FK-on test posture); resume.json summary gap closed; WR-01 cross-variant guard added.
+**Next:** `/gsd:plan-phase 37` (Variant reword UI) or `/gsd:plan-phase 38` (Excluded-bullet suggestions) — parallelizable now that Phase 36 ships.
+
+### Phase 36 follow-ups (advisory code-review findings, non-blocking)
+
+- WR-02: getVariantOverrides read path returns all entity_types (writes are allowlisted) — minor asymmetry.
+- WR-03: getVariantOverrides uses the (db as any).session raw-prepare shim though it needs no raw SQL.
+- WR-04: ai.ts getOverrides surfaces only analysis-tier rows (unaware of two-tier precedence).
+- WR-05: tests/helpers/db.ts relies on the better-sqlite3 FK-default-ON; consider asserting the pragma at startup so test+prod can't silently lose cascades together.
+- Pre-existing test flake: parallel in-memory SQLite + WAL occasionally reports a transient failure (e.g. acceptSuggestion.test.ts); passes in isolation and on rerun.

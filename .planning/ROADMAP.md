@@ -80,7 +80,7 @@ Phases 30-34 covered: unified `buildMergedBuilderData()` merge path feeding HTML
 **Milestone Goal:** Extend the three-layer data model so users can reword text at the variant tier (not just include/exclude), with a unified `entityOverrides` table replacing the old `analysisBulletOverrides`, correct three-tier merge precedence across all render surfaces, and AI-powered surfacing of excluded bullets that match a job's gaps.
 
 - [x] **Phase 35: Unified Override Table + Migration** - New `entityOverrides` schema, data migration from `analysisBulletOverrides`, `acceptSuggestion` cutover, `createTestDb` sync (completed 2026-06-05)
-- [ ] **Phase 36: Merge Precedence + Snapshot Threading** - Extend `buildMergedBuilderData` with Layer 2.5 variant-tier overrides, `summaryOverride` through snapshots, variant override handlers, inclusion un-exclusion logic
+- [x] **Phase 36: Merge Precedence + Snapshot Threading** - Extend `buildMergedBuilderData` with Layer 2.5 variant-tier overrides, `summaryOverride` through snapshots, variant override handlers, inclusion un-exclusion logic (completed 2026-06-06)
 - [ ] **Phase 37: Variant Reword UI** - Inline reword (InlineEdit) for bullets/summary/project title, override visual indicator, reset-to-base, duplicate copies overrides
 - [ ] **Phase 38: Excluded-Bullet Suggestions** - Scorer prompt extension, new Zod field, `analysisExcludedBulletSuggestions` table, accept/dismiss handlers with bulletId validation, OptimizeVariant panel
 
@@ -126,10 +126,10 @@ Plans:
   4. An excluded bullet accepted at the analysis tier is un-excluded in the merged output for that analysis — it appears in preview for that analysis but not for the base variant view
 
 **Plans**: 4 plans
-- [ ] 36-01-PLAN.md — Wave 0: failing OVR-02/OVR-03 correctness-contract tests (2 new files + 2 extended)
-- [ ] 36-02-PLAN.md — Two-pass override map in buildMergedBuilderData (precedence analysis → variant → base) + inclusion un-exclusion + summaryOverride
-- [ ] 36-03-PLAN.md — Variant-tier override IPC handlers (get/set/clear) in templates.ts
-- [ ] 36-04-PLAN.md — Thread summaryOverride into snapshot freeze (OVR-03), scoring (D-05), and live DOCX export
+- [x] 36-01-PLAN.md — Wave 0: failing OVR-02/OVR-03 correctness-contract tests (2 new files + 2 extended)
+- [x] 36-02-PLAN.md — Two-pass override map in buildMergedBuilderData (precedence analysis → variant → base) + inclusion un-exclusion + summaryOverride
+- [x] 36-03-PLAN.md — Variant-tier override IPC handlers (get/set/clear) in templates.ts
+- [x] 36-04-PLAN.md — Thread summaryOverride into snapshot freeze (OVR-03), scoring (D-05), and live DOCX export
 **UI hint**: yes
 
 ### Phase 37: Variant Reword UI
@@ -145,7 +145,16 @@ Plans:
   4. A "Reset" affordance on each overridden field clears the override and restores the base text in the preview
   5. Duplicating a variant copies all its variant-tier overrides to the new variant — the duplicate starts with the same rewording as the original
 
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1**
+
+- [x] 37-01-PLAN.md — Preload bridge for variant-override handlers + index.d.ts types (VariantOverrideRow, BuilderData.summaryOverride) + duplicateVariant override-copy (RWD-06); Wave 0 backend tests
+- [ ] 37-02-PLAN.md — Pure deriveOverrideSet indicator helper + unit test (RWD-04) + mergedSurfaces summary/project_name effective-text coverage (SC#1)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 37-03-PLAN.md — VariantBuilder reword UI: pencil + InlineEdit + left-border indicator + revert icon for bullets/summary/project title, D-04 author-from-scratch summary, onReword live preview (RWD-01..05)
 **UI hint**: yes
 
 ### Phase 38: Excluded-Bullet Suggestions
@@ -175,8 +184,8 @@ Plans:
 | 25-29 | v2.4 | 12/12 | Complete | 2026-04-21 |
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
 | 35. Unified Override Table + Migration | v2.6 | 3/3 | Complete    | 2026-06-05 |
-| 36. Merge Precedence + Snapshot Threading | v2.6 | 0/? | Not started | - |
-| 37. Variant Reword UI | v2.6 | 0/? | Not started | - |
+| 36. Merge Precedence + Snapshot Threading | v2.6 | 4/4 | Complete   | 2026-06-06 |
+| 37. Variant Reword UI | v2.6 | 1/3 | In progress | - |
 | 38. Excluded-Bullet Suggestions | v2.6 | 0/? | Not started | - |
 
 ## Future (v3.0+)
