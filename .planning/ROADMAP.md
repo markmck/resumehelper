@@ -169,7 +169,19 @@ Plans:
   3. Dismissing a suggestion removes the card from the panel; the bullet remains excluded from the variant
   4. `acceptExcludedBulletSuggestion` validates that the bullet ID exists in `job_bullets` AND is currently excluded from the active variant before writing to `entityOverrides` — a hallucinated or invalid bullet ID is rejected with a logged error, not silently accepted
 
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1**
+
+- [x] 38-01-PLAN.md — analysisExcludedBulletSuggestions table + DDL (schema/ensureSchema/createTestDb lockstep) + Wave 0 failing handler tests
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 38-02-PLAN.md — ResumeScorerSchema + buildScorerPrompt extension, runAnalysis excluded-bullet injection + seeding, four handlers with D-07 validation gate
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 38-03-PLAN.md — preload bridge + OptimizeVariant 'Bullets you excluded that match this job' panel, accept/dismiss/revert, client-side score nudge
 **UI hint**: yes
 
 ## Progress
@@ -185,8 +197,8 @@ Plans:
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
 | 35. Unified Override Table + Migration | v2.6 | 3/3 | Complete    | 2026-06-05 |
 | 36. Merge Precedence + Snapshot Threading | v2.6 | 4/4 | Complete   | 2026-06-06 |
-| 37. Variant Reword UI | v2.6 | 3/3 | Complete   | 2026-06-07 |
-| 38. Excluded-Bullet Suggestions | v2.6 | 0/? | Not started | - |
+| 37. Variant Reword UI | v2.6 | 3/3 | Complete    | 2026-06-08 |
+| 38. Excluded-Bullet Suggestions | v2.6 | 1/3 | In Progress|  |
 
 ## Future (v3.0+)
 

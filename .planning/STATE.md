@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Per-Variant Text Overrides
-status: verifying
-stopped_at: Completed 37-03-PLAN.md (Phase 37 complete)
-last_updated: "2026-06-07T02:41:55.364Z"
-last_activity: 2026-06-07
+status: executing
+stopped_at: Phase 38 context gathered
+last_updated: "2026-06-08T17:02:47.683Z"
+last_activity: 2026-06-08
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 13
+  completed_plans: 11
   percent: 75
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-05)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 37 — Variant Reword UI
+**Current focus:** Phase 38 — excluded-bullet-suggestions
 
 ## Current Position
 
-Phase: 37 (Variant Reword UI) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-06-07
+Phase: 38 (excluded-bullet-suggestions) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-06-08
 
-Progress: [██████████] 100%
+Progress: [█████████░] 85%
 
 ## Performance Metrics
 
@@ -90,8 +90,8 @@ Phase 35 decisions (Plans 01-03):
 
 ## Session Continuity
 
-Last session: 2026-06-07T02:41:47.725Z
-Stopped at: Completed 37-01-PLAN.md
+Last session: 2026-06-08T17:02:47.679Z
+Stopped at: Phase 38 context gathered
 Resume file: None
 
 **Completed Milestone:** v2.5 Portability & Debt Cleanup — 5 phases, 19 plans — shipped 2026-06-05
