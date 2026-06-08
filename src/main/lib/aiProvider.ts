@@ -42,6 +42,13 @@ export const ResumeScorerSchema = z.object({
       target_keywords: z.array(z.string()),
     })
   ),
+  excluded_bullet_suggestions: z.array(
+    z.object({
+      bulletId: z.number().int().positive(),
+      reason: z.string(),
+      matched_keywords: z.array(z.string()),
+    })
+  ).default([]),
 })
 
 export const ResumeJsonSchema = z.object({
@@ -170,8 +177,9 @@ export async function callResumeScorer(
   resumeText: string,
   parsedJob: ParsedJob,
   model: LanguageModel,
+  excludedBulletsText?: string,
 ): Promise<ResumeScore> {
-  const { system, prompt } = buildScorerPrompt(resumeText, parsedJob)
+  const { system, prompt } = buildScorerPrompt(resumeText, parsedJob, excludedBulletsText)
   const result = await generateObject({
     model: model as Parameters<typeof generateObject>[0]['model'],
     schema: ResumeScorerSchema,

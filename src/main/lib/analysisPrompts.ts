@@ -24,7 +24,8 @@ Return only the structured data, no commentary.`
 
 export function buildScorerPrompt(
   resumeText: string,
-  parsedJob: ParsedJob
+  parsedJob: ParsedJob,
+  excludedBulletsText?: string,
 ): { system: string; prompt: string } {
   const system = `You are an expert resume analyst and ATS (Applicant Tracking System) specialist. Your task is to score a resume against a parsed job description.
 
@@ -45,6 +46,16 @@ Rewrite suggestion guidelines (CRITICAL):
 - Each suggestion must reference an existing bullet (using the [B{id}] marker) and only rephrase it to highlight the most relevant keywords
 - Keep rewrites truthful and professional — no exaggeration
 
+Excluded-bullet suggestion guidelines:
+- You will receive a list of base-experience bullets the candidate excluded from their active resume variant (tagged [B{id}] for reference).
+- Review this list against the job's required and preferred skills, key responsibilities, and missing keywords.
+- Suggest at most 3 excluded bullets that are GENUINELY relevant to this specific job's gaps — not just generally strong bullets.
+- Rank suggestions by relevance: the most gap-closing bullet first.
+- For each suggestion, provide: the bulletId (integer, from the [B{id}] tag), a brief reason (1 sentence why this bullet helps), and the matched_keywords (JD keywords this bullet addresses, subset of the job's keywords list).
+- DO NOT suggest bullets that are already covered by the included resume text or are not relevant to the job gaps.
+- DO NOT suggest a bullet if you cannot reliably read its [B{id}] integer — leave excluded_bullet_suggestions empty rather than guess an ID.
+- If no excluded bullets are relevant, return an empty excluded_bullet_suggestions array.
+
 Return only the structured scoring data, no commentary.`
 
   const prompt = `## Parsed Job Data
@@ -52,6 +63,7 @@ ${JSON.stringify(parsedJob, null, 2)}
 
 ## Resume Text
 ${resumeText}
+${excludedBulletsText ? `\n## Excluded Bullets (base experience not on your variant)\n${excludedBulletsText}` : ''}
 
 Score this resume against the job data above. Be rigorous and accurate.`
 

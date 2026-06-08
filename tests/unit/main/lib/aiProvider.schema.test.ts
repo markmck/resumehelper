@@ -5,6 +5,7 @@ import {
   ResumeJsonSchema,
   JobUrlExtractionSchema,
 } from '../../../../src/main/lib/aiProvider'
+import { buildScorerPrompt } from '../../../../src/main/lib/analysisPrompts'
 
 describe('JobParserSchema', () => {
   const validJob = {
@@ -113,6 +114,69 @@ describe('ResumeScorerSchema', () => {
       rewrite_suggestions: [],
     }
     expect(() => ResumeScorerSchema.parse(minimal)).not.toThrow()
+  })
+
+  it('excluded_bullet_suggestions defaults to [] when field is absent (MockLanguageModelV3 fixture compat)', () => {
+    // cannedScore-style fixtures omit excluded_bullet_suggestions — must parse successfully
+    const result = ResumeScorerSchema.parse(validScore)
+    expect(result.excluded_bullet_suggestions).toEqual([])
+  })
+
+  it('excluded_bullet_suggestions round-trips when present with valid data', () => {
+    const withSuggestions = {
+      ...validScore,
+      excluded_bullet_suggestions: [{ bulletId: 42, reason: 'x', matched_keywords: ['k'] }],
+    }
+    const result = ResumeScorerSchema.parse(withSuggestions)
+    expect(result.excluded_bullet_suggestions).toHaveLength(1)
+    expect(result.excluded_bullet_suggestions[0].bulletId).toBe(42)
+    expect(result.excluded_bullet_suggestions[0].reason).toBe('x')
+    expect(result.excluded_bullet_suggestions[0].matched_keywords).toEqual(['k'])
+  })
+
+  it('excluded_bullet_suggestions rejects bulletId of 0 (must be positive integer)', () => {
+    const withZeroId = {
+      ...validScore,
+      excluded_bullet_suggestions: [{ bulletId: 0, reason: 'x', matched_keywords: [] }],
+    }
+    expect(() => ResumeScorerSchema.parse(withZeroId)).toThrow()
+  })
+
+  it('excluded_bullet_suggestions rejects negative bulletId', () => {
+    const withNegativeId = {
+      ...validScore,
+      excluded_bullet_suggestions: [{ bulletId: -1, reason: 'x', matched_keywords: [] }],
+    }
+    expect(() => ResumeScorerSchema.parse(withNegativeId)).toThrow()
+  })
+})
+
+describe('buildScorerPrompt excluded bullets section', () => {
+  const minimalJob = {
+    title: 'Engineer',
+    company: 'ACME',
+    required_skills: [],
+    preferred_skills: [],
+    experience_years: null,
+    education_requirement: null,
+    key_responsibilities: [],
+    keywords: [],
+  }
+
+  it('produces no "## Excluded Bullets" section when third arg is omitted', () => {
+    const { prompt } = buildScorerPrompt('resume text', minimalJob)
+    expect(prompt).not.toContain('## Excluded Bullets')
+  })
+
+  it('produces no "## Excluded Bullets" section when third arg is empty string', () => {
+    const { prompt } = buildScorerPrompt('resume text', minimalJob, '')
+    expect(prompt).not.toContain('## Excluded Bullets')
+  })
+
+  it('appends "## Excluded Bullets" section when third arg is non-empty', () => {
+    const { prompt } = buildScorerPrompt('resume text', minimalJob, '[B42] foo bullet')
+    expect(prompt).toContain('## Excluded Bullets (base experience not on your variant)')
+    expect(prompt).toContain('[B42] foo bullet')
   })
 })
 
