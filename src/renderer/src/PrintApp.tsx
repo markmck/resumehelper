@@ -155,7 +155,9 @@ function PrintApp(): React.JSX.Element {
         window.api.templates.getOptions(variantId),
       ]).then(([profileData, builderData, opts]) => {
         setData({
-          profile: profileData,
+          // Apply the variant's per-variant summary override so PDF export renders the
+          // variant summary, not the base profile.summary (mirrors VariantBuilder).
+          profile: { ...profileData, summary: builderData.summaryOverride ?? profileData.summary },
           jobs: builderData.jobs,
           skills: builderData.skills,
           projects: builderData.projects,

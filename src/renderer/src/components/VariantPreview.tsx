@@ -64,6 +64,14 @@ function VariantPreview({
     const iframe = iframeRef.current
     if (!iframe?.contentWindow || !builderData || !profileData) return
 
+    // Apply the variant's per-variant summary override onto the base profile so the
+    // template renders the variant summary, not the base profile.summary. Mirrors
+    // VariantBuilder's effectiveSummary (`summaryOverride ?? profile.summary`).
+    const effectiveProfile = {
+      ...profileData,
+      summary: builderData.summaryOverride ?? profileData.summary,
+    }
+
     iframe.contentWindow.postMessage({
       type: 'print-data',
       template: layoutTemplate ?? 'classic',
@@ -74,7 +82,7 @@ function VariantPreview({
       marginBottom,
       marginSides,
       payload: {
-        profile: profileData,
+        profile: effectiveProfile,
         jobs: builderData.jobs,
         skills: builderData.skills,
         projects: builderData.projects,
