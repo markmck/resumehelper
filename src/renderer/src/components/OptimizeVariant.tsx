@@ -60,6 +60,16 @@ interface StagedSkill {
   state: StagedSkillState
 }
 
+type StagedExcludedBulletStatus = 'pending' | 'accepted' | 'dismissed'
+
+interface StagedExcludedBullet {
+  bulletId: number
+  bulletText: string
+  reason: string
+  matchedKeywords: string[]
+  status: StagedExcludedBulletStatus
+}
+
 interface BuilderBullet {
   id: number
   text: string
@@ -112,6 +122,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   // ── Suggestion state machine
   const [suggStates, setSuggStates] = useState<SuggestionEdit[]>([])
   const [stagedSkills, setStagedSkills] = useState<StagedSkill[]>([])
+  const [stagedBullets, setStagedBullets] = useState<StagedExcludedBullet[]>([])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
   // ── Threshold state
@@ -258,6 +269,24 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
     )
   }, [analysis?.id])
 
+  // ── Load excluded-bullet suggestions on mount
+  useEffect(() => {
+    if (!analysis?.id) return
+    const loadExcludedBullets = async (): Promise<void> => {
+      const results = await window.api.ai.getExcludedBulletSuggestions(analysis.id)
+      setStagedBullets(
+        results.map((r) => ({
+          bulletId: r.bulletId,
+          bulletText: r.bulletText,
+          reason: r.reason,
+          matchedKeywords: r.matchedKeywords,
+          status: r.status as StagedExcludedBulletStatus,
+        }))
+      )
+    }
+    loadExcludedBullets()
+  }, [analysis?.id])
+
   // ── Local score computation
   const computedScore = useMemo(() => {
     if (!analysis || !analysis.scoreBreakdown) return analysis?.matchScore ?? 0
@@ -278,6 +307,17 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
         }
       }
     }
+    // Resolved keywords from accepted excluded-bullet re-inclusions (D-06)
+    for (const sb of stagedBullets) {
+      if (sb.status === 'accepted') {
+        for (const kw of sb.matchedKeywords) {
+          if (missingKeywords.some((mk) => mk.toLowerCase() === kw.toLowerCase())) {
+            resolvedCount++
+          }
+        }
+      }
+    }
+
     const totalKeywords = keywordHits.length + semanticMatches.length + missingKeywords.length
     const newExact = keywordHits.length + resolvedCount
     const kwScore =
@@ -295,7 +335,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
       experience_score: analysis.scoreBreakdown.experience_score,
       ats_score: analysis.scoreBreakdown.ats_score,
     })
-  }, [analysis, suggStates, stagedSkills])
+  }, [analysis, suggStates, stagedSkills, stagedBullets])
 
   // ── Derived display values
   const originalScore = analysis?.matchScore ?? 0
@@ -421,6 +461,35 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
       prev.map((s) => (s.name === skillName ? { ...s, state: 'skipped' } : s))
     )
     showToast('Skill dismissed')
+  }
+
+  const acceptBullet = async (bulletId: number): Promise<void> => {
+    if (!analysis) return
+    const result = await window.api.ai.acceptExcludedBulletSuggestion(analysis.id, bulletId)
+    if ('error' in result) return
+    setStagedBullets((prev) =>
+      prev.map((b) => (b.bulletId === bulletId ? { ...b, status: 'accepted' } : b))
+    )
+    setPreviewRefreshKey((k) => k + 1)
+  }
+
+  const dismissBullet = async (bulletId: number): Promise<void> => {
+    if (!analysis) return
+    const result = await window.api.ai.dismissExcludedBulletSuggestion(analysis.id, bulletId)
+    if ('error' in result) return
+    setStagedBullets((prev) =>
+      prev.map((b) => (b.bulletId === bulletId ? { ...b, status: 'dismissed' } : b))
+    )
+  }
+
+  const revertBullet = async (bulletId: number): Promise<void> => {
+    if (!analysis) return
+    const result = await window.api.ai.dismissExcludedBulletSuggestion(analysis.id, bulletId)
+    if ('error' in result) return
+    setStagedBullets((prev) =>
+      prev.map((b) => (b.bulletId === bulletId ? { ...b, status: 'pending' } : b))
+    )
+    setPreviewRefreshKey((k) => k + 1)
   }
 
   // ── Loading / Error states
@@ -981,6 +1050,223 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
             </div>
           )}
 
+          {/* Excluded-Bullet Suggestions panel (D-03: below Bullet Rewrites, above Missing Skills) */}
+          {stagedBullets.filter((b) => b.status !== 'dismissed').length > 0 && (
+            <div style={{ marginTop: 'var(--space-8)' }}>
+              {/* Heading row */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-3)',
+                  marginBottom: 'var(--space-4)',
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: 'var(--font-size-base)',
+                    fontWeight: 700,
+                    color: 'var(--color-text-primary)',
+                    margin: 0,
+                  }}
+                >
+                  Bullets you excluded that match this job
+                </h2>
+                {stagedBullets.filter((b) => b.status === 'pending').length > 0 && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '1px 8px',
+                      backgroundColor: 'rgba(139,92,246,0.12)',
+                      color: 'var(--color-accent)',
+                      borderRadius: '999px',
+                      fontSize: 'var(--font-size-xs)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {stagedBullets.filter((b) => b.status === 'pending').length} pending
+                  </span>
+                )}
+              </div>
+
+              {/* Card list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                {stagedBullets
+                  .filter((b) => b.status !== 'dismissed')
+                  .map((b) => {
+                    const isAccepted = b.status === 'accepted'
+                    return (
+                      <div
+                        key={b.bulletId}
+                        style={{
+                          backgroundColor: isAccepted
+                            ? 'rgba(34,197,94,0.04)'
+                            : 'var(--color-bg-surface)',
+                          border: isAccepted
+                            ? '1px solid rgba(34,197,94,0.25)'
+                            : '1px solid var(--color-border-subtle)',
+                          borderRadius: 'var(--radius-lg)',
+                          padding: 'var(--space-3) var(--space-4)',
+                          opacity: 1,
+                          transition: 'opacity 0.2s',
+                        }}
+                      >
+                        {/* Card header row */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 'var(--space-2)',
+                            marginBottom: 'var(--space-3)',
+                          }}
+                        >
+                          {isAccepted && (
+                            <span
+                              style={{
+                                marginLeft: 'auto',
+                                padding: '1px 8px',
+                                backgroundColor: 'rgba(34,197,94,0.12)',
+                                color: 'var(--color-success)',
+                                borderRadius: 'var(--radius-sm)',
+                                fontSize: 'var(--font-size-xs)',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Re-included
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Bullet text block (left-border accent) */}
+                        <div
+                          style={{
+                            borderLeft: '2px solid var(--color-accent)',
+                            paddingLeft: 'var(--space-2)',
+                            marginBottom: 'var(--space-2)',
+                            ...(isAccepted
+                              ? {
+                                  backgroundColor: 'rgba(34,197,94,0.08)',
+                                  borderRadius: `0 var(--radius-sm) var(--radius-sm) 0`,
+                                }
+                              : {}),
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 'var(--font-size-sm)',
+                              color: 'var(--color-text-primary)',
+                              margin: 0,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {b.bulletText}
+                          </p>
+                        </div>
+
+                        {/* AI reason line (omit if empty) */}
+                        {b.reason && (
+                          <p
+                            style={{
+                              fontSize: 'var(--font-size-xs)',
+                              color: 'var(--color-text-secondary)',
+                              margin: '0 0 var(--space-2) 0',
+                            }}
+                          >
+                            {b.reason}
+                          </p>
+                        )}
+
+                        {/* Matched keyword chips */}
+                        {b.matchedKeywords.length > 0 && (
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: 'var(--space-1)',
+                              marginBottom: 'var(--space-3)',
+                            }}
+                          >
+                            {b.matchedKeywords.map((kw, ki) => (
+                              <span
+                                key={ki}
+                                style={{
+                                  padding: '1px 6px',
+                                  backgroundColor: 'rgba(139,92,246,0.12)',
+                                  color: 'var(--color-accent-light)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  fontSize: 'var(--font-size-xs)',
+                                }}
+                              >
+                                {kw}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                          {isAccepted ? (
+                            <button
+                              onClick={() => revertBullet(b.bulletId)}
+                              style={{
+                                padding: '4px 12px',
+                                backgroundColor: 'transparent',
+                                color: 'var(--color-text-secondary)',
+                                border: '1px solid var(--color-border-default)',
+                                borderRadius: 'var(--radius-md)',
+                                fontSize: 'var(--font-size-xs)',
+                                fontWeight: 400,
+                                cursor: 'pointer',
+                                fontFamily: 'var(--font-sans)',
+                              }}
+                            >
+                              Revert
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => acceptBullet(b.bulletId)}
+                                style={{
+                                  padding: '5px 12px',
+                                  backgroundColor: 'rgba(34,197,94,0.12)',
+                                  color: 'var(--color-success)',
+                                  border: '1px solid rgba(34,197,94,0.3)',
+                                  borderRadius: 'var(--radius-md)',
+                                  fontSize: 'var(--font-size-xs)',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  fontFamily: 'var(--font-sans)',
+                                }}
+                              >
+                                Re-include
+                              </button>
+                              <button
+                                onClick={() => dismissBullet(b.bulletId)}
+                                style={{
+                                  padding: '5px 12px',
+                                  backgroundColor: 'transparent',
+                                  color: 'var(--color-text-tertiary)',
+                                  border: 'none',
+                                  borderRadius: 'var(--radius-md)',
+                                  fontSize: 'var(--font-size-xs)',
+                                  cursor: 'pointer',
+                                  fontFamily: 'var(--font-sans)',
+                                }}
+                              >
+                                Dismiss
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
+          )}
+
           {/* Skill Suggestions section */}
           {stagedSkills.length > 0 && (
             <div style={{ marginTop: 'var(--space-8)' }}>
@@ -1310,7 +1596,8 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
               ? analysis.keywordMisses.filter(kw => !resolvedKeywords.has(kw.toLowerCase())).length
               : 0
             const pendingSkills = stagedSkills.filter(s => s.state === 'pending').length
-            const hasItems = pendingRewrites > 0 || remainingKeywords > 0 || pendingSkills > 0
+            const pendingExcludedBulletCount = stagedBullets.filter(b => b.status === 'pending').length
+            const hasItems = pendingRewrites > 0 || remainingKeywords > 0 || pendingSkills > 0 || pendingExcludedBulletCount > 0
             if (!hasItems) return null
             return (
               <div style={{
@@ -1345,6 +1632,9 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                   )}
                   {pendingSkills > 0 && (
                     <li>{pendingSkills} skill suggestion{pendingSkills !== 1 ? 's' : ''}</li>
+                  )}
+                  {pendingExcludedBulletCount > 0 && (
+                    <li>{pendingExcludedBulletCount} excluded bullet suggestion{pendingExcludedBulletCount !== 1 ? 's' : ''}</li>
                   )}
                 </ul>
               </div>
