@@ -601,6 +601,15 @@ export interface Api {
     acceptSkillAddition: (analysisId: number, skillName: string) => Promise<{ success: boolean } | { error: string }>
     dismissSkillAddition: (analysisId: number, skillName: string) => Promise<{ success: boolean } | { error: string }>
     ensureSkillAdditions: (analysisId: number, skills: Array<{ skill: string; severity: string; reason?: string; category?: string }>) => Promise<{ success: boolean } | { error: string }>
+    getExcludedBulletSuggestions: (analysisId: number) => Promise<Array<{
+      bulletId: number
+      bulletText: string
+      reason: string
+      matchedKeywords: string[]
+      status: string
+    }>>
+    acceptExcludedBulletSuggestion: (analysisId: number, bulletId: number) => Promise<{ success: boolean } | { error: string }>
+    dismissExcludedBulletSuggestion: (analysisId: number, bulletId: number) => Promise<{ success: boolean } | { error: string }>
   }
   jobPostings: {
     list: () => Promise<unknown[]>

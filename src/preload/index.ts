@@ -285,6 +285,12 @@ const api = {
       ipcRenderer.invoke('ai:dismissSkillAddition', analysisId, skillName),
     ensureSkillAdditions: (analysisId: number, skills: Array<{ skill: string; severity: string; reason?: string; category?: string }>) =>
       ipcRenderer.invoke('ai:ensureSkillAdditions', analysisId, skills),
+    getExcludedBulletSuggestions: (analysisId: number) =>
+      ipcRenderer.invoke('ai:getExcludedBulletSuggestions', analysisId),
+    acceptExcludedBulletSuggestion: (analysisId: number, bulletId: number) =>
+      ipcRenderer.invoke('ai:acceptExcludedBulletSuggestion', analysisId, bulletId),
+    dismissExcludedBulletSuggestion: (analysisId: number, bulletId: number) =>
+      ipcRenderer.invoke('ai:dismissExcludedBulletSuggestion', analysisId, bulletId),
   },
   jobPostings: {
     list: () => ipcRenderer.invoke('jobPostings:list'),
