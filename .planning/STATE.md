@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Per-Variant Text Overrides
 status: executing
-stopped_at: Phase 38 context gathered
-last_updated: "2026-06-08T17:02:47.683Z"
+stopped_at: Phase 38 Plan 02 complete
+last_updated: "2026-06-08T17:16:09Z"
 last_activity: 2026-06-08
 progress:
   total_phases: 4
@@ -26,18 +26,18 @@ See: .planning/PROJECT.md (updated 2026-06-05)
 ## Current Position
 
 Phase: 38 (excluded-bullet-suggestions) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-06-08
 
-Progress: [█████████░] 85%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
 - Total phases in milestone: 4 (Phases 35–38)
 - Completed phases: 3 (35, 36, 37)
-- Completed plans: 10
-- Completion percent: 75%
+- Completed plans: 12
+- Completion percent: 90%
 - Test suite at milestone start: 247 tests passing
 - Test suite after Phase 36: 281 tests passing
 - Test suite after Phase 37 Plan 01: 284 tests passing
@@ -61,6 +61,8 @@ Key decisions scoped for v2.6 (from research):
 - `summaryOverride` threads through `buildMergedBuilderData` → `buildSnapshotForVariant` — snapshot must freeze override, not base text
 - `projects.description` column and project-description reword explicitly deferred (out of scope for v2.6)
 - `createTestDb()` in `tests/helpers/db.ts` must be updated in lockstep with every `ensureSchema()` table addition
+- `acceptExcludedBulletSuggestion` re-validates bulletId at accept time (not only at seed time) — variant may change between seeding and user action
+- `field='inclusion'` / `source='inclusion'` for re-inclusion entityOverrides row — `field='text'` with empty `overrideText` would blank the bullet text (Pitfall 1)
 
 Phase 37 decisions (Plan 01):
 
@@ -90,8 +92,8 @@ Phase 35 decisions (Plans 01-03):
 
 ## Session Continuity
 
-Last session: 2026-06-08T17:02:47.679Z
-Stopped at: Phase 38 context gathered
+Last session: 2026-06-08T17:16:09Z
+Stopped at: Phase 38 Plan 02 complete — handlers + GREEN tests
 Resume file: None
 
 **Completed Milestone:** v2.5 Portability & Debt Cleanup — 5 phases, 19 plans — shipped 2026-06-05
