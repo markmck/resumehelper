@@ -61,6 +61,7 @@ const validScore = {
   missing_keywords: ['rust'],
   gaps: [{ skill: 'Rust', severity: 'moderate' as const, reason: 'not listed', category: 'language' }],
   rewrite_suggestions: [{ original_text: 'Used TS', suggested_text: 'Shipped TypeScript services', target_keywords: ['typescript'] }],
+  excluded_bullet_suggestions: [],
 }
 
 const validResumeJson = {
