@@ -3,11 +3,12 @@ import React from 'react'
 import { describe, test, expect } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import { createTestDb } from '../../helpers/db'
-import { seedVariant, seedProject, updateProfile } from '../../helpers/factories'
+import { seedVariant, seedProject, updateProfile, seedJob, seedBullet, seedJobPosting, seedAnalysis } from '../../helpers/factories'
 import { unzipDocxXml } from '../../helpers/docx'
 import { templateVariantItems } from '../../../src/main/db/schema'
 import { buildMergedBuilderData } from '../../../src/main/lib/mergeHelper'
 import { setVariantOverride } from '../../../src/main/handlers/templates'
+import { acceptExcludedBulletSuggestion, ensureExcludedBulletSuggestions } from '../../../src/main/handlers/ai'
 import { buildResumeDocx } from '../../../src/main/lib/docxBuilder'
 import type { BuilderData } from '../../../src/main/lib/docxBuilder'
 import ClassicTemplate from '@renderer/components/templates/ClassicTemplate'
@@ -215,5 +216,50 @@ describe('mergedSurfaces: SC#1 variant-tier effective text flows through getBuil
     const mergedProject = merged.projects.find((p) => p.id === project.id)
     expect(mergedProject).toBeDefined()
     expect(mergedProject!.name).toBe('Reworded Project')
+  })
+})
+
+describe('mergedSurfaces: Test 9 — accepted excluded bullet flows through merge (SUG-02)', () => {
+  test('after acceptExcludedBulletSuggestion, buildMergedBuilderData with analysisId yields excluded:false; without analysisId yields excluded:true', async () => {
+    const db = createTestDb()
+    updateProfile(db, { name: 'Jane', email: 'j@x.com', phone: '1', location: 'NY', linkedin: 'jane' })
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+    const job = seedJob(db)
+    const bullet = seedBullet(db, job.id, { text: 'Excluded bullet text', sortOrder: 0 })
+
+    // Mark the bullet as excluded from this variant
+    db.insert(templateVariantItems).values({
+      variantId: variant.id,
+      itemType: 'bullet',
+      bulletId: bullet.id,
+      excluded: true,
+    }).run()
+
+    // Create an analysis tied to this variant
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+
+    // Seed and accept the excluded-bullet suggestion (handlers not yet implemented — Plan 02)
+    ensureExcludedBulletSuggestions(
+      db,
+      analysis.id,
+      [{ bulletId: bullet.id, reason: 'relevant to job', matched_keywords: ['kw'] }],
+      new Set([bullet.id]),
+    )
+    acceptExcludedBulletSuggestion(db, analysis.id, bullet.id)
+
+    // With analysisId: inclusion row is loaded, bullet.excluded should be false
+    const mergedWithAnalysis = await buildMergedBuilderData(db, variant.id, analysis.id)
+    const allBulletsWithAnalysis = mergedWithAnalysis.jobs.flatMap((j) => j.bullets)
+    const bulletWithAnalysis = allBulletsWithAnalysis.find((b) => b.id === bullet.id)
+    expect(bulletWithAnalysis).toBeDefined()
+    expect(bulletWithAnalysis!.excluded).toBe(false)
+
+    // Without analysisId: variant unchanged, bullet should still be excluded
+    const mergedWithoutAnalysis = await buildMergedBuilderData(db, variant.id)
+    const allBulletsWithout = mergedWithoutAnalysis.jobs.flatMap((j) => j.bullets)
+    const bulletWithout = allBulletsWithout.find((b) => b.id === bullet.id)
+    expect(bulletWithout).toBeDefined()
+    expect(bulletWithout!.excluded).toBe(true)
   })
 })
