@@ -9,9 +9,13 @@ import {
   seedProject,
   seedProjectBullet,
   updateProfile,
+  seedJobPosting,
+  seedAnalysis,
 } from '../../../helpers/factories'
-import { buildSnapshotForVariant } from '../../../../src/main/handlers/submissions'
-import { templateVariantItems, education, entityOverrides } from '../../../../src/main/db/schema'
+import { buildSnapshotForVariant, createSubmission } from '../../../../src/main/handlers/submissions'
+import { templateVariantItems, education, entityOverrides, submissions } from '../../../../src/main/db/schema'
+import { setAnalysisMargins, setVariantOptions } from '../../../../src/main/handlers/templates'
+import { eq } from 'drizzle-orm'
 
 describe('buildSnapshotForVariant', () => {
   test('snapshot contains all required shape fields', async () => {
@@ -218,5 +222,123 @@ describe('buildSnapshotForVariant — OVR-03 override freezing', () => {
 
     expect(snapshot.profile).toBeDefined()
     expect(snapshot.profile!.summary).toBe('Base profile summary')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// SC#3 / LAYOUT-04 — effectiveMargins freeze + DB-persisted immutability
+// buildSnapshotForVariant must freeze effectiveMargins.top/bottom/sides into
+// templateOptions.marginTop/Bottom/Sides so snapshots carry the exact margins
+// that were resolved at submission time, immutably.
+// ---------------------------------------------------------------------------
+describe('buildSnapshotForVariant — LAYOUT-04 effectiveMargins freeze', () => {
+  test('FREEZE: buildSnapshotForVariant freezes analysis override triple into templateOptions.margin*', async () => {
+    const db = createTestDb()
+
+    updateProfile(db, {
+      name: 'Jane Doe',
+      email: 'jane@test.com',
+      phone: '555-1234',
+      location: 'NYC',
+      linkedin: 'janedoe',
+    })
+
+    const variant = seedVariant(db, {
+      layoutTemplate: 'classic',
+      templateOptions: JSON.stringify({ marginTop: 0.75, marginBottom: 0.75, marginSides: 0.75 }),
+    })
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+
+    // Set a distinct override triple
+    await setAnalysisMargins(db, analysis.id, { marginTop: 0.5, marginBottom: 0.4, marginSides: 0.6 })
+
+    const snapshot = await buildSnapshotForVariant(db, variant.id, analysis.id)
+
+    // Snapshot must freeze the override triple, not the variant defaults
+    expect(snapshot.templateOptions).toBeDefined()
+    expect(snapshot.templateOptions!.marginTop).toBe(0.5)
+    expect(snapshot.templateOptions!.marginBottom).toBe(0.4)
+    expect(snapshot.templateOptions!.marginSides).toBe(0.6)
+  })
+
+  test('FREEZE (no override): buildSnapshotForVariant freezes variant templateOptions margins when no override exists', async () => {
+    const db = createTestDb()
+
+    updateProfile(db, {
+      name: 'Jane Doe',
+      email: 'jane@test.com',
+      phone: '555-1234',
+      location: 'NYC',
+      linkedin: 'janedoe',
+    })
+
+    const variant = seedVariant(db, {
+      layoutTemplate: 'classic',
+      templateOptions: JSON.stringify({ marginTop: 0.8, marginBottom: 0.9, marginSides: 0.7 }),
+    })
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+    // No setAnalysisMargins call — no override row
+
+    const snapshot = await buildSnapshotForVariant(db, variant.id, analysis.id)
+
+    // Snapshot must freeze the variant's margins (tier 2 fallback)
+    expect(snapshot.templateOptions).toBeDefined()
+    expect(snapshot.templateOptions!.marginTop).toBe(0.8)
+    expect(snapshot.templateOptions!.marginBottom).toBe(0.9)
+    expect(snapshot.templateOptions!.marginSides).toBe(0.7)
+  })
+
+  test('DB-PERSISTED IMMUTABILITY: persisted resumeSnapshot is immutable to later variant margin edits', async () => {
+    const db = createTestDb()
+
+    updateProfile(db, {
+      name: 'Jane Doe',
+      email: 'jane@test.com',
+      phone: '555-1234',
+      location: 'NYC',
+      linkedin: 'janedoe',
+    })
+
+    const job = seedJob(db, { company: 'TestCo', role: 'Dev', startDate: '2024-01' })
+    seedBullet(db, job.id, { text: 'Built something' })
+
+    const variant = seedVariant(db, {
+      layoutTemplate: 'classic',
+      templateOptions: JSON.stringify({ marginTop: 0.75, marginBottom: 0.75, marginSides: 0.75 }),
+    })
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+
+    // Step 1: Set an override triple and create a submission (persists snapshot to DB)
+    await setAnalysisMargins(db, analysis.id, { marginTop: 0.5, marginBottom: 0.4, marginSides: 0.6 })
+    const created = await createSubmission(db, {
+      company: 'ImmutableCo',
+      role: 'Engineer',
+      variantId: variant.id,
+      analysisId: analysis.id,
+    })
+
+    // Step 2: Mutate the variant's margins to clearly different values
+    await setVariantOptions(db, variant.id, { marginTop: 1.5, marginBottom: 1.6, marginSides: 1.7 })
+
+    // Step 3: Re-read the persisted row from the DB and JSON.parse it
+    const [persistedRow] = await db
+      .select({ resumeSnapshot: submissions.resumeSnapshot })
+      .from(submissions)
+      .where(eq(submissions.id, created.id))
+
+    expect(persistedRow).toBeDefined()
+    const parsedSnapshot = JSON.parse(persistedRow.resumeSnapshot)
+
+    // Step 4: Assert frozen margins are STILL the override triple (not the mutated variant values)
+    expect(parsedSnapshot.templateOptions.marginTop).toBe(0.5)
+    expect(parsedSnapshot.templateOptions.marginBottom).toBe(0.4)
+    expect(parsedSnapshot.templateOptions.marginSides).toBe(0.6)
+    // Confirm we're NOT seeing the mutated variant margins
+    expect(parsedSnapshot.templateOptions.marginTop).not.toBe(1.5)
+    expect(parsedSnapshot.templateOptions.marginBottom).not.toBe(1.6)
+    expect(parsedSnapshot.templateOptions.marginSides).not.toBe(1.7)
   })
 })
