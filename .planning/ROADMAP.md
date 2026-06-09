@@ -10,7 +10,8 @@
 - ✅ **v2.3 Job Hunt Accelerator** - Phases 22-24 (shipped 2026-04-03)
 - ✅ **v2.4 Polish & Reliability** - Phases 25-29 (shipped 2026-04-21)
 - ✅ **v2.5 Portability & Debt Cleanup** - Phases 30-34 (shipped 2026-06-05)
-- 🚧 **v2.6 Per-Variant Text Overrides** - Phases 35-38 (in progress)
+- ✅ **v2.6 Per-Variant Text Overrides** - Phases 35-38 (shipped 2026-06-08)
+- 🚧 **v2.7 Optimization Layout Controls** - Phases 39-41 (in progress)
 
 ## Phases
 
@@ -75,7 +76,7 @@ Phases 30-34 covered: unified `buildMergedBuilderData()` merge path feeding HTML
 
 </details>
 
-### 🚧 v2.6 Per-Variant Text Overrides (In Progress)
+### ✅ v2.6 Per-Variant Text Overrides (Phases 35-38) - SHIPPED 2026-06-08
 
 **Milestone Goal:** Extend the three-layer data model so users can reword text at the variant tier (not just include/exclude), with a unified `entityOverrides` table replacing the old `analysisBulletOverrides`, correct three-tier merge precedence across all render surfaces, and AI-powered surfacing of excluded bullets that match a job's gaps.
 
@@ -83,6 +84,16 @@ Phases 30-34 covered: unified `buildMergedBuilderData()` merge path feeding HTML
 - [x] **Phase 36: Merge Precedence + Snapshot Threading** - Extend `buildMergedBuilderData` with Layer 2.5 variant-tier overrides, `summaryOverride` through snapshots, variant override handlers, inclusion un-exclusion logic (completed 2026-06-06)
 - [x] **Phase 37: Variant Reword UI** - Inline reword (InlineEdit) for bullets/summary/project title, override visual indicator, reset-to-base, duplicate copies overrides (completed 2026-06-07)
 - [x] **Phase 38: Excluded-Bullet Suggestions** - Scorer prompt extension, new Zod field, `analysisExcludedBulletSuggestions` table, accept/dismiss handlers with bulletId validation, OptimizeVariant panel (completed 2026-06-09)
+
+Full phase details in `.planning/milestones/v2.6-phases/`.
+
+### 🚧 v2.7 Optimization Layout Controls (In Progress)
+
+**Milestone Goal:** Add a presentation-layer override at the analysis tier so users can re-tune resume margins during job optimization — scoped to that analysis, with a live preview and one-click auto-fit — so re-including bullets and accepting rewrites no longer leaves the resume overflowing.
+
+- [ ] **Phase 39: Analysis Margin Override Data Layer** - Analysis-scoped margin override storage, merge resolution over variant `templateOptions`, snapshot freezing
+- [ ] **Phase 40: Margin Controls + Live Preview in Optimize** - Margin sliders in the Optimize screen, embedded paginated preview pane, revert-to-variant
+- [ ] **Phase 41: Auto-Fit Orphan-Page Removal** - Auto-fit button that tightens margins to drop an orphan trailing page, with a minimum margin floor and unreachable reporting
 
 ## Phase Details
 
@@ -184,6 +195,56 @@ Plans:
 - [x] 38-03-PLAN.md — preload bridge + OptimizeVariant 'Bullets you excluded that match this job' panel, accept/dismiss/revert, client-side score nudge
 **UI hint**: yes
 
+### Phase 39: Analysis Margin Override Data Layer
+
+**Goal**: An analysis-scoped margin override (top/bottom/sides) can be stored and cleared, resolves over the variant's `templateOptions` at merge time so preview/PDF/DOCX all use the effective margins, and is frozen into the submission snapshot — the variant's own margins are never mutated
+**Depends on**: Phase 38 (v2.6 complete)
+**Requirements**: LAYOUT-02, LAYOUT-03, LAYOUT-04
+**Success Criteria** (what must be TRUE):
+
+  1. Setting a margin override for an analysis persists it (scoped to that `analysisId`); re-opening the analysis shows the override, and the variant's saved `templateOptions` margins are unchanged
+  2. `buildMergedBuilderData(db, variantId, analysisId)` returns effective margins resolved as analysis-override → variant `templateOptions` → template default; preview, PDF, and DOCX all render at those effective margins
+  3. Logging a submission from an analysis with a margin override freezes the overridden margins in the snapshot — later edits to the variant's margins do not change the frozen snapshot
+  4. Clearing the override falls back to the variant's margins across all surfaces
+  5. Unit tests cover the merge precedence and snapshot freezing; `createTestDb()` is updated in lockstep with any schema change
+
+**Plans**: 3 plans
+
+Plans:
+- [ ] 39-01-PLAN.md — analysis_layout_overrides table + get/set/clear margin handlers + preload bridge (lockstep test schema)
+- [ ] 39-02-PLAN.md — resolveEffectiveMargins resolver + effectiveMargins on MergedBuilderData (TDD)
+- [ ] 39-03-PLAN.md — route live PDF/DOCX margins through effectiveMargins + freeze into submission snapshot
+
+**UI hint**: no
+
+### Phase 40: Margin Controls + Live Preview in Optimize
+
+**Goal**: The Optimize screen exposes top/bottom/sides margin sliders for the active analysis wired to the Phase 39 override path, with an embedded paginated preview that updates live as the sliders move and reflects the analysis's current merged content, plus a control to revert the analysis margins back to the variant's
+**Depends on**: Phase 39
+**Requirements**: LAYOUT-01, LAYOUT-05, LAYOUT-08
+**Success Criteria** (what must be TRUE):
+
+  1. The Optimize screen shows three margin sliders (top, bottom, sides) seeded with the analysis's effective margins
+  2. Dragging a slider updates an embedded paginated preview in the Optimize screen without navigating away; no separate save button is required (persists per the Phase 39 path)
+  3. The preview reflects the analysis's full merged content — re-included excluded bullets and accepted rewrites are visible — so overflow caused by added content is apparent
+  4. A revert control returns the analysis margins to the variant's margins and the preview/page-count updates accordingly
+
+**UI hint**: yes
+
+### Phase 41: Auto-Fit Orphan-Page Removal
+
+**Goal**: An auto-fit button in the Optimize screen measures the current page count and, when content spills a few lines onto an extra page, tightens the analysis margins just enough to pull that orphan page back — never going below a minimum margin floor, and clearly reporting when the orphan page cannot be removed within the floor
+**Depends on**: Phase 40
+**Requirements**: LAYOUT-06, LAYOUT-07
+**Success Criteria** (what must be TRUE):
+
+  1. With content spilling a few lines onto an extra page, clicking auto-fit tightens margins and the preview drops to one fewer page
+  2. Auto-fit never sets any margin below the minimum floor (~0.4")
+  3. When the orphan page cannot be removed within the floor, auto-fit stops at the floor and shows a clear message rather than silently maxing out or removing content
+  4. The margins auto-fit lands on are persisted as the analysis override via the same Phase 39 path as manual adjustment, and freeze into the snapshot on submit
+
+**UI hint**: yes
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -195,10 +256,10 @@ Plans:
 | 22-24 | v2.3 | 7/7 | Complete | 2026-04-03 |
 | 25-29 | v2.4 | 12/12 | Complete | 2026-04-21 |
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
-| 35. Unified Override Table + Migration | v2.6 | 3/3 | Complete    | 2026-06-05 |
-| 36. Merge Precedence + Snapshot Threading | v2.6 | 4/4 | Complete   | 2026-06-06 |
-| 37. Variant Reword UI | v2.6 | 3/3 | Complete    | 2026-06-08 |
-| 38. Excluded-Bullet Suggestions | v2.6 | 3/3 | Complete    | 2026-06-09 |
+| 35-38 | v2.6 | 13/13 | Complete | 2026-06-08 |
+| 39. Analysis Margin Override Data Layer | v2.7 | 0/? | Pending | - |
+| 40. Margin Controls + Live Preview in Optimize | v2.7 | 0/? | Pending | - |
+| 41. Auto-Fit Orphan-Page Removal | v2.7 | 0/? | Pending | - |
 
 ## Future (v3.0+)
 
