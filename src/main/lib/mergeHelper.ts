@@ -88,6 +88,7 @@ export type MergedBuilderData = {
   references: BuilderReference[]
   showSummary: boolean
   summaryOverride?: string // absent = use profileRow.summary
+  effectiveMargins: EffectiveMargins // always present — resolved at merge time (D-07)
 }
 
 export async function buildMergedBuilderData(
@@ -423,6 +424,56 @@ export async function buildMergedBuilderData(
   const showSummary = summarySentinel ? !summarySentinel.excluded : true
 
   // ----------------------------------------------------------------
+  // effectiveMargins derivation (D-06/D-07) — three-tier precedence
+  // Tier 1: analysis override row (from analysisLayoutOverrides)
+  // Tier 2: variant templateOptions parsed margins
+  // Tier 3: DOCX_MARGIN_DEFAULTS[layoutTemplate] ?? {1.0, 1.0, 1.0}
+  // Mirrors showSummary/summaryOverride resolve-then-return pattern.
+  // ----------------------------------------------------------------
+  // Fetch the variant's layoutTemplate and templateOptions (needed for tiers 2+3)
+  const variantRow = db
+    .select({
+      layoutTemplate: templateVariants.layoutTemplate,
+      templateOptions: templateVariants.templateOptions,
+    })
+    .from(templateVariants)
+    .where(eq(templateVariants.id, variantId))
+    .get()
+
+  const layoutTemplate = variantRow?.layoutTemplate ?? 'traditional'
+
+  let parsedVariantOptions: { marginTop?: number; marginBottom?: number; marginSides?: number } | null = null
+  if (variantRow?.templateOptions) {
+    try {
+      parsedVariantOptions = JSON.parse(variantRow.templateOptions as string) as {
+        marginTop?: number
+        marginBottom?: number
+        marginSides?: number
+      }
+    } catch {
+      // T-39-05: malformed JSON falls back to null → uses template defaults
+      parsedVariantOptions = null
+    }
+  }
+
+  // Fetch override row only when analysisId is provided (T-39-06: bound eq() query)
+  let overrideRow: { marginTop: number; marginBottom: number; marginSides: number } | null = null
+  if (analysisId != null) {
+    const rows = db
+      .select({
+        marginTop: analysisLayoutOverrides.marginTop,
+        marginBottom: analysisLayoutOverrides.marginBottom,
+        marginSides: analysisLayoutOverrides.marginSides,
+      })
+      .from(analysisLayoutOverrides)
+      .where(eq(analysisLayoutOverrides.analysisId, analysisId))
+      .all()
+    overrideRow = rows[0] ?? null
+  }
+
+  const effectiveMargins = resolveEffectiveMargins(layoutTemplate, parsedVariantOptions, overrideRow)
+
+  // ----------------------------------------------------------------
   // Return the merged builder data
   // ----------------------------------------------------------------
   return {
@@ -438,5 +489,6 @@ export async function buildMergedBuilderData(
     references: referencesMapped,
     showSummary,
     summaryOverride,
+    effectiveMargins,
   }
 }
