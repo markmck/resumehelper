@@ -82,7 +82,7 @@ Phases 30-34 covered: unified `buildMergedBuilderData()` merge path feeding HTML
 - [x] **Phase 35: Unified Override Table + Migration** - New `entityOverrides` schema, data migration from `analysisBulletOverrides`, `acceptSuggestion` cutover, `createTestDb` sync (completed 2026-06-05)
 - [x] **Phase 36: Merge Precedence + Snapshot Threading** - Extend `buildMergedBuilderData` with Layer 2.5 variant-tier overrides, `summaryOverride` through snapshots, variant override handlers, inclusion un-exclusion logic (completed 2026-06-06)
 - [x] **Phase 37: Variant Reword UI** - Inline reword (InlineEdit) for bullets/summary/project title, override visual indicator, reset-to-base, duplicate copies overrides (completed 2026-06-07)
-- [ ] **Phase 38: Excluded-Bullet Suggestions** - Scorer prompt extension, new Zod field, `analysisExcludedBulletSuggestions` table, accept/dismiss handlers with bulletId validation, OptimizeVariant panel
+- [x] **Phase 38: Excluded-Bullet Suggestions** - Scorer prompt extension, new Zod field, `analysisExcludedBulletSuggestions` table, accept/dismiss handlers with bulletId validation, OptimizeVariant panel (completed 2026-06-09)
 
 ## Phase Details
 
@@ -177,11 +177,11 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 38-02-PLAN.md — ResumeScorerSchema + buildScorerPrompt extension, runAnalysis excluded-bullet injection + seeding, four handlers with D-07 validation gate
+- [x] 38-02-PLAN.md — ResumeScorerSchema + buildScorerPrompt extension, runAnalysis excluded-bullet injection + seeding, four handlers with D-07 validation gate
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 38-03-PLAN.md — preload bridge + OptimizeVariant 'Bullets you excluded that match this job' panel, accept/dismiss/revert, client-side score nudge
+- [x] 38-03-PLAN.md — preload bridge + OptimizeVariant 'Bullets you excluded that match this job' panel, accept/dismiss/revert, client-side score nudge
 **UI hint**: yes
 
 ## Progress
@@ -198,7 +198,7 @@ Plans:
 | 35. Unified Override Table + Migration | v2.6 | 3/3 | Complete    | 2026-06-05 |
 | 36. Merge Precedence + Snapshot Threading | v2.6 | 4/4 | Complete   | 2026-06-06 |
 | 37. Variant Reword UI | v2.6 | 3/3 | Complete    | 2026-06-08 |
-| 38. Excluded-Bullet Suggestions | v2.6 | 1/3 | In Progress|  |
+| 38. Excluded-Bullet Suggestions | v2.6 | 3/3 | Complete    | 2026-06-09 |
 
 ## Future (v3.0+)
 
