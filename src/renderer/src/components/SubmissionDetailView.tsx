@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Submission, SubmissionEvent, SubmissionSnapshot } from '../../../preload/index.d'
 import SubmissionEventTimeline from './SubmissionEventTimeline'
 import SnapshotViewer from './SnapshotViewer'
+import { sanitizeFilename } from '../../../shared/sanitizeFilename'
 
 interface Props {
   submissionId: number
@@ -204,9 +205,14 @@ function SubmissionDetailView({ submissionId, onBack, onViewAnalysis, onDelete }
     setExportingPdf(true)
     try {
       const parsed = JSON.parse(submission.resumeSnapshot) as SubmissionSnapshot
-      const filename = `${submission.company}_${submission.role}_resume.pdf`
-        .replace(/[^a-zA-Z0-9_\-. ]/g, '_')
-        .replace(/\s+/g, '_')
+      // Sanitize each part with the shared util (drops punctuation like apostrophes
+      // rather than turning "co's" into "co_s"), then drop empties so an absent
+      // company/role doesn't leave doubled underscores. Falls back to "resume.pdf".
+      const base = [submission.company, submission.role]
+        .map((p) => sanitizeFilename(p ?? ''))
+        .filter(Boolean)
+        .join('_')
+      const filename = base ? `${base}_resume.pdf` : 'resume.pdf'
       await window.api.exportFile.snapshotPdf(parsed, filename)
     } catch {
       alert('Could not export PDF.')
