@@ -44,7 +44,14 @@ export const ResumeScorerSchema = z.object({
   ),
   excluded_bullet_suggestions: z.array(
     z.object({
-      bulletId: z.number().int().positive(),
+      // Integer-ness and positivity are enforced via .refine (parse-time only) rather
+      // than .int()/.positive(). Both .int() (minimum/maximum safe-int bounds) and
+      // .positive() (exclusiveMinimum) serialize into the JSON schema, and the Anthropic
+      // structured-output API rejects exclusiveMinimum/maximum on integer types. The
+      // refine keeps the same validation contract while emitting a plain { type: number }.
+      bulletId: z
+        .number()
+        .refine((n) => Number.isInteger(n) && n > 0, { message: 'bulletId must be a positive integer' }),
       reason: z.string(),
       matched_keywords: z.array(z.string()),
     })
