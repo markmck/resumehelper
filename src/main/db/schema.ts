@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 export const jobs = sqliteTable('jobs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -284,4 +284,15 @@ export const entityOverrides = sqliteTable('entity_overrides', {
 export const appSettings = sqliteTable('app_settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
+})
+
+export const analysisLayoutOverrides = sqliteTable('analysis_layout_overrides', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  analysisId: integer('analysis_id')
+    .notNull()
+    .unique()
+    .references(() => analysisResults.id, { onDelete: 'cascade' }),
+  marginTop: real('margin_top').notNull(),
+  marginBottom: real('margin_bottom').notNull(),
+  marginSides: real('margin_sides').notNull(),
 })

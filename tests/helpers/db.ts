@@ -273,6 +273,15 @@ export function createTestDb() {
     CREATE UNIQUE INDEX IF NOT EXISTS \`entity_overrides_analysis_tier_uidx\`
       ON \`entity_overrides\` (\`analysis_id\`, \`entity_type\`, \`bullet_id\`, \`project_id\`, \`job_id\`, \`project_bullet_id\`, \`field\`)
       WHERE \`analysis_id\` IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS \`analysis_layout_overrides\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`analysis_id\` integer NOT NULL UNIQUE,
+      \`margin_top\` real NOT NULL,
+      \`margin_bottom\` real NOT NULL,
+      \`margin_sides\` real NOT NULL,
+      FOREIGN KEY (\`analysis_id\`) REFERENCES \`analysis_results\`(\`id\`) ON DELETE cascade
+    );
   `)
 
   // Add columns that may be missing (matches production ALTER TABLE statements)
