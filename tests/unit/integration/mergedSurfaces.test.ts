@@ -1,6 +1,19 @@
 /** @vitest-environment jsdom */
 import React from 'react'
 import { describe, test, expect, vi, beforeEach } from 'vitest'
+
+// Top-level vi.mock for fs — hoisted by vitest to run before any test; placed here to satisfy
+// the hoisting requirement and avoid the "not at top level" warning.
+vi.mock('fs', async () => {
+  const actual = await vi.importActual<typeof import('fs')>('fs')
+  return {
+    ...actual,
+    promises: {
+      ...(actual.promises as object),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+    },
+  }
+})
 import { renderToString } from 'react-dom/server'
 import { createTestDb } from '../../helpers/db'
 import { seedVariant, seedProject, updateProfile, seedJob, seedBullet, seedJobPosting, seedAnalysis } from '../../helpers/factories'
@@ -355,18 +368,6 @@ describe('mergedSurfaces: LAYOUT-04 — snapshot-replay PDF renders frozen margi
 
     // dialog.showSaveDialog returns a filePath
     ;(dialog as any).showSaveDialog = vi.fn().mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-
-    // Mock fs.writeFile to avoid writing to disk
-    vi.mock('fs', async () => {
-      const actual = await vi.importActual<typeof import('fs')>('fs')
-      return {
-        ...actual,
-        promises: {
-          ...actual.promises,
-          writeFile: vi.fn().mockResolvedValue(undefined),
-        },
-      }
-    })
 
     // Capture the registered handler
     const capturedHandlers: Record<string, Function> = {}
