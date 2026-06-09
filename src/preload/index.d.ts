@@ -645,6 +645,11 @@ export interface Api {
     deleteOldestBackup: () => Promise<{ deleted: string } | { deleted: null }>
     restart: () => Promise<void>
   }
+  analysisLayout: {
+    getMargins: (analysisId: number) => Promise<{ id: number; analysisId: number; marginTop: number; marginBottom: number; marginSides: number } | null>
+    setMargins: (analysisId: number, margins: { marginTop: number; marginBottom: number; marginSides: number }) => Promise<void>
+    clearMargins: (analysisId: number) => Promise<void>
+  }
 }
 
 declare global {

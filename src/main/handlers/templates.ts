@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { db, sqlite } from '../db'
-import { templateVariants, templateVariantItems, jobBullets, projectBullets, entityOverrides } from '../db/schema'
+import { templateVariants, templateVariantItems, jobBullets, projectBullets, entityOverrides, analysisLayoutOverrides } from '../db/schema'
 import { eq, and, desc, inArray, isNull } from 'drizzle-orm'
 import { buildMergedBuilderData } from '../lib/mergeHelper'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
@@ -55,6 +55,41 @@ export async function setVariantOptions(db: Db, variantId: number, options: obje
     .update(templateVariants)
     .set({ templateOptions: JSON.stringify(options) })
     .where(eq(templateVariants.id, variantId))
+}
+
+export async function getAnalysisMargins(db: Db, analysisId: number) {
+  const row = await db
+    .select()
+    .from(analysisLayoutOverrides)
+    .where(eq(analysisLayoutOverrides.analysisId, analysisId))
+  return row[0] ?? null
+}
+
+export async function setAnalysisMargins(
+  db: Db,
+  analysisId: number,
+  margins: { marginTop: number; marginBottom: number; marginSides: number },
+) {
+  if (
+    !Number.isFinite(margins.marginTop) ||
+    !Number.isFinite(margins.marginBottom) ||
+    !Number.isFinite(margins.marginSides)
+  ) {
+    throw new Error('setAnalysisMargins: margin values must be finite numbers')
+  }
+  await db
+    .insert(analysisLayoutOverrides)
+    .values({ analysisId, ...margins })
+    .onConflictDoUpdate({
+      target: analysisLayoutOverrides.analysisId,
+      set: margins,
+    })
+}
+
+export async function clearAnalysisMargins(db: Db, analysisId: number) {
+  await db
+    .delete(analysisLayoutOverrides)
+    .where(eq(analysisLayoutOverrides.analysisId, analysisId))
 }
 
 export async function renameVariant(db: Db, id: number, name: string) {
@@ -622,4 +657,7 @@ export function registerTemplateHandlers(): void {
   ipcMain.handle('templates:clearVariantOverride', (_, variantId, entityType, field, entityId) =>
     clearVariantOverride(db, variantId, entityType, field, entityId),
   )
+  ipcMain.handle('analysisLayout:getMargins', (_, analysisId) => getAnalysisMargins(db, analysisId))
+  ipcMain.handle('analysisLayout:setMargins', (_, analysisId, margins) => setAnalysisMargins(db, analysisId, margins))
+  ipcMain.handle('analysisLayout:clearMargins', (_, analysisId) => clearAnalysisMargins(db, analysisId))
 }

@@ -313,6 +313,14 @@ const api = {
     deleteOldestBackup: () => ipcRenderer.invoke('db:deleteOldestBackup'),
     restart: () => ipcRenderer.invoke('db:restart'),
   },
+  analysisLayout: {
+    getMargins: (analysisId: number) =>
+      ipcRenderer.invoke('analysisLayout:getMargins', analysisId),
+    setMargins: (analysisId: number, margins: { marginTop: number; marginBottom: number; marginSides: number }) =>
+      ipcRenderer.invoke('analysisLayout:setMargins', analysisId, margins),
+    clearMargins: (analysisId: number) =>
+      ipcRenderer.invoke('analysisLayout:clearMargins', analysisId),
+  },
 }
 
 // Print URL base for iframe src in both dev and prod.
