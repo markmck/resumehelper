@@ -40,13 +40,21 @@ export async function buildSnapshotForVariant(db: Db, variantId: number, analysi
   } catch { /* keep undefined */ }
 
   const merged = await buildMergedBuilderData(db, variantId, analysisId)
-  const { showSummary, summaryOverride, ...builderArrays } = merged
+  const { showSummary, summaryOverride, effectiveMargins, ...builderArrays } = merged
 
-  // Freeze showSummary into snapshot's templateOptions for immutability (D-06, D-07).
+  // Freeze showSummary and effectiveMargins into snapshot's templateOptions for immutability (D-06, D-07, D-08).
   if (templateOptions) {
     templateOptions.showSummary = showSummary
+    templateOptions.marginTop = effectiveMargins.top
+    templateOptions.marginBottom = effectiveMargins.bottom
+    templateOptions.marginSides = effectiveMargins.sides
   } else {
-    templateOptions = { showSummary }
+    templateOptions = {
+      showSummary,
+      marginTop: effectiveMargins.top,
+      marginBottom: effectiveMargins.bottom,
+      marginSides: effectiveMargins.sides,
+    }
   }
 
   // Freeze profile at submission time
