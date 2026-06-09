@@ -1,13 +1,13 @@
 /** @vitest-environment jsdom */
 import React from 'react'
-import { describe, test, expect } from 'vitest'
+import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import { createTestDb } from '../../helpers/db'
 import { seedVariant, seedProject, updateProfile, seedJob, seedBullet, seedJobPosting, seedAnalysis } from '../../helpers/factories'
 import { unzipDocxXml } from '../../helpers/docx'
 import { templateVariantItems } from '../../../src/main/db/schema'
 import { buildMergedBuilderData } from '../../../src/main/lib/mergeHelper'
-import { setVariantOverride } from '../../../src/main/handlers/templates'
+import { setVariantOverride, setAnalysisMargins, clearAnalysisMargins } from '../../../src/main/handlers/templates'
 import { acceptExcludedBulletSuggestion, ensureExcludedBulletSuggestions } from '../../../src/main/handlers/ai'
 import { buildResumeDocx } from '../../../src/main/lib/docxBuilder'
 import type { BuilderData } from '../../../src/main/lib/docxBuilder'
@@ -261,5 +261,162 @@ describe('mergedSurfaces: Test 9 — accepted excluded bullet flows through merg
     const bulletWithout = allBulletsWithout.find((b) => b.id === bullet.id)
     expect(bulletWithout).toBeDefined()
     expect(bulletWithout!.excluded).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// SC#2 / SC#4 — Live-surface override/fallback via effectiveMargins
+// Both live-PDF and live-DOCX surfaces now read from MergedBuilderData.effectiveMargins.
+// These tests assert the merge path gives override values when set, and falls back to
+// variant margins when the override is cleared — proving SC#2 and SC#4.
+// ---------------------------------------------------------------------------
+describe('mergedSurfaces: SC#2/SC#4 — effectiveMargins override/fallback on the live-surface merge path', () => {
+  test('SC#2: with an analysis margin override set, effectiveMargins equals the override triple', async () => {
+    const db = createTestDb()
+    updateProfile(db, { name: 'Jane', email: 'j@x.com', phone: '1', location: 'NY', linkedin: 'jane' })
+    const variant = seedVariant(db, {
+      layoutTemplate: 'classic',
+      templateOptions: JSON.stringify({ marginTop: 0.75, marginBottom: 0.75, marginSides: 0.75 }),
+    })
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+
+    // Set a distinct override triple
+    await setAnalysisMargins(db, analysis.id, { marginTop: 0.5, marginBottom: 0.4, marginSides: 0.6 })
+
+    const merged = await buildMergedBuilderData(db, variant.id, analysis.id)
+    expect(merged.effectiveMargins.top).toBe(0.5)
+    expect(merged.effectiveMargins.bottom).toBe(0.4)
+    expect(merged.effectiveMargins.sides).toBe(0.6)
+  })
+
+  test('SC#4: after clearing the override, effectiveMargins falls back to variant templateOptions margins', async () => {
+    const db = createTestDb()
+    updateProfile(db, { name: 'Jane', email: 'j@x.com', phone: '1', location: 'NY', linkedin: 'jane' })
+    const variant = seedVariant(db, {
+      layoutTemplate: 'classic',
+      templateOptions: JSON.stringify({ marginTop: 0.75, marginBottom: 0.8, marginSides: 0.9 }),
+    })
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+
+    // Set then clear the override
+    await setAnalysisMargins(db, analysis.id, { marginTop: 0.5, marginBottom: 0.4, marginSides: 0.6 })
+    await clearAnalysisMargins(db, analysis.id)
+
+    const merged = await buildMergedBuilderData(db, variant.id, analysis.id)
+    // Should now reflect variant margins (not the cleared override)
+    expect(merged.effectiveMargins.top).toBe(0.75)
+    expect(merged.effectiveMargins.bottom).toBe(0.8)
+    expect(merged.effectiveMargins.sides).toBe(0.9)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// LAYOUT-04 replay guarantee — snapshot-replay PDF margin regression
+// export:snapshotPdf reads snapOpts.marginTop/Bottom from a frozen snapshot.
+// After this phase, buildSnapshotForVariant freezes effectiveMargins into those fields.
+// This test locks the replay path: frozen templateOptions.margin* → printToPDF args.
+// ---------------------------------------------------------------------------
+describe('mergedSurfaces: LAYOUT-04 — snapshot-replay PDF renders frozen margins', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  test('export:snapshotPdf passes frozen marginTop/marginBottom to printToPDF and frozen marginSides to postMessage', async () => {
+    // Import mocked electron module (global mock from tests/__mocks__/electron.ts)
+    const electron = await import('electron')
+    const { ipcMain, BrowserWindow: MockBrowserWindow, dialog } = electron as any
+
+    // Spy on printToPDF — returns a Buffer
+    const printToPDFSpy = vi.fn().mockResolvedValue(Buffer.from('pdf'))
+    const executeJSSpy = vi.fn().mockResolvedValue(undefined)
+
+    // Configure BrowserWindow mock for this test — must use function (not arrow) for constructor
+    ;(MockBrowserWindow as any).mockImplementation(function () {
+      return {
+        show: false,
+        loadURL: vi.fn().mockResolvedValue(undefined),
+        loadFile: vi.fn().mockResolvedValue(undefined),
+        destroy: vi.fn(),
+        webContents: {
+          printToPDF: printToPDFSpy,
+          executeJavaScript: executeJSSpy,
+          openDevTools: vi.fn(),
+          send: vi.fn(),
+        },
+      }
+    })
+
+    // ipcMain.once needs to invoke cb immediately so handler doesn't hang on 3s timeout
+    ;(ipcMain as any).once = vi.fn().mockImplementation((_channel: string, cb: () => void) => {
+      cb()
+    })
+
+    // dialog.showSaveDialog returns a filePath
+    ;(dialog as any).showSaveDialog = vi.fn().mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
+
+    // Mock fs.writeFile to avoid writing to disk
+    vi.mock('fs', async () => {
+      const actual = await vi.importActual<typeof import('fs')>('fs')
+      return {
+        ...actual,
+        promises: {
+          ...actual.promises,
+          writeFile: vi.fn().mockResolvedValue(undefined),
+        },
+      }
+    })
+
+    // Capture the registered handler
+    const capturedHandlers: Record<string, Function> = {}
+    ;(ipcMain as any).handle = vi.fn().mockImplementation((channel: string, handler: Function) => {
+      capturedHandlers[channel] = handler
+    })
+
+    // Register handlers — this populates capturedHandlers
+    const { registerExportHandlers } = await import('../../../src/main/handlers/export')
+    registerExportHandlers()
+
+    const snapshotPdfHandler = capturedHandlers['export:snapshotPdf']
+    expect(snapshotPdfHandler).toBeDefined()
+
+    // Crafted snapshotData with pre-frozen effective margins
+    const frozenMarginTop = 0.55
+    const frozenMarginBottom = 0.45
+    const frozenMarginSides = 0.65
+    const snapshotData = {
+      layoutTemplate: 'classic',
+      templateOptions: {
+        marginTop: frozenMarginTop,
+        marginBottom: frozenMarginBottom,
+        marginSides: frozenMarginSides,
+        showSummary: true,
+      },
+      jobs: [],
+      skills: [],
+      projects: [],
+      education: [],
+      volunteer: [],
+      awards: [],
+      publications: [],
+      languages: [],
+      interests: [],
+      references: [],
+    }
+
+    const fakeEvent = {} as Electron.IpcMainInvokeEvent
+    await snapshotPdfHandler(fakeEvent, snapshotData, 'test.pdf')
+
+    // Assert printToPDF received the frozen margin values
+    expect(printToPDFSpy).toHaveBeenCalledOnce()
+    const printArgs = printToPDFSpy.mock.calls[0][0]
+    expect(printArgs.margins.top).toBe(frozenMarginTop)
+    expect(printArgs.margins.bottom).toBe(frozenMarginBottom)
+
+    // Assert executeJavaScript postMessage string contains frozen marginSides
+    expect(executeJSSpy).toHaveBeenCalledOnce()
+    const jsStr = executeJSSpy.mock.calls[0][0] as string
+    expect(jsStr).toContain(String(frozenMarginSides))
   })
 })
