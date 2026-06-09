@@ -24,6 +24,7 @@ import {
   skillCategories,
   projects,
   projectBullets,
+  templateVariants,
   templateVariantItems,
   education,
   volunteer,
@@ -35,7 +36,9 @@ import {
   analysisSkillAdditions,
   analysisResults,
   entityOverrides,
+  analysisLayoutOverrides,
 } from '../db/schema'
+import { DOCX_MARGIN_DEFAULTS } from './docxBuilder'
 import type {
   BuilderJob,
   BuilderSkill,
@@ -50,6 +53,27 @@ import type {
 } from '../../preload/index.d'
 
 type Db = BetterSQLite3Database<typeof schema>
+
+// ---------------------------------------------------------------------------
+// resolveEffectiveMargins — pure three-tier precedence resolver (D-06 / SC#5)
+// Tier 1: analysis override row (from analysisLayoutOverrides)
+// Tier 2: variant templateOptions parsed margins
+// Tier 3: DOCX_MARGIN_DEFAULTS[layoutTemplate] ?? {1.0, 1.0, 1.0}
+// ---------------------------------------------------------------------------
+export type EffectiveMargins = { top: number; bottom: number; sides: number }
+
+export function resolveEffectiveMargins(
+  layoutTemplate: string,
+  variantOptions: { marginTop?: number; marginBottom?: number; marginSides?: number } | null | undefined,
+  override: { marginTop: number; marginBottom: number; marginSides: number } | null | undefined,
+): EffectiveMargins {
+  const defaults = DOCX_MARGIN_DEFAULTS[layoutTemplate] ?? { top: 1.0, bottom: 1.0, sides: 1.0 }
+  return {
+    top:    override?.marginTop    ?? variantOptions?.marginTop    ?? defaults.top,
+    bottom: override?.marginBottom ?? variantOptions?.marginBottom ?? defaults.bottom,
+    sides:  override?.marginSides  ?? variantOptions?.marginSides  ?? defaults.sides,
+  }
+}
 
 export type MergedBuilderData = {
   jobs: BuilderJob[]
