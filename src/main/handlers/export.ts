@@ -27,17 +27,12 @@ export function registerExportHandlers(): void {
     const variant = db.select().from(templateVariants).where(eq(templateVariants.id, variantId)).get()
     const layoutTemplate = variant?.layoutTemplate ?? 'classic'
 
-    // Parse templateOptions for margin values
-    const marginDefaults = DOCX_MARGIN_DEFAULTS[layoutTemplate] ?? { top: 1.0, bottom: 1.0, sides: 1.0 }
-    let pdfMarginTop = marginDefaults.top
-    let pdfMarginBottom = marginDefaults.bottom
-    try {
-      const opts = variant?.templateOptions ? JSON.parse(variant.templateOptions as string) : {}
-      pdfMarginTop = opts.marginTop ?? marginDefaults.top
-      pdfMarginBottom = opts.marginBottom ?? marginDefaults.bottom
-    } catch {
-      // keep defaults
-    }
+    // Live PDF — margins come from the single merge path (D-07)
+    const mergedPdf = await buildMergedBuilderData(db, variantId, analysisId)
+    const { effectiveMargins: pdfEffectiveMargins } = mergedPdf
+    const pdfMarginTop = pdfEffectiveMargins.top
+    const pdfMarginBottom = pdfEffectiveMargins.bottom
+    // marginSides reaches template CSS via the existing postMessage payload (unchanged)
 
     // Load print.html + wait for print:ready signal
     const win = new BrowserWindow({
@@ -92,20 +87,20 @@ export function registerExportHandlers(): void {
 
     const variant = db.select().from(templateVariants).where(eq(templateVariants.id, variantId)).get()
     const layoutTemplate = variant?.layoutTemplate ?? 'classic'
-    let templateOptions: { marginTop?: number; marginBottom?: number; marginSides?: number; skillsDisplay?: string; accentColor?: string } = {}
-    if (variant?.templateOptions) {
-      try {
-        templateOptions = typeof variant.templateOptions === 'string'
-          ? JSON.parse(variant.templateOptions)
-          : (variant.templateOptions as typeof templateOptions)
-      } catch {
-        templateOptions = {}
-      }
-    }
     const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
     const merged = await buildMergedBuilderData(db, variantId, analysisId)
-    const { showSummary, summaryOverride, ...builderData } = merged
+    const { showSummary, summaryOverride, effectiveMargins, ...builderData } = merged
     const effectiveProfile = profileRow && summaryOverride ? { ...profileRow, summary: summaryOverride } : profileRow
+
+    // Live DOCX — overlay resolved effectiveMargins onto templateOptions (D-07)
+    const templateOptions: { marginTop?: number; marginBottom?: number; marginSides?: number; skillsDisplay?: string; accentColor?: string } = {
+      ...(variant?.templateOptions
+        ? (() => { try { return JSON.parse(variant.templateOptions as string) } catch { return {} } })()
+        : {}),
+      marginTop: effectiveMargins.top,
+      marginBottom: effectiveMargins.bottom,
+      marginSides: effectiveMargins.sides,
+    }
 
     const doc = buildResumeDocx(builderData, effectiveProfile, layoutTemplate, templateOptions, showSummary)
     const buffer = await Packer.toBuffer(doc)
