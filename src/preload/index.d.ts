@@ -165,6 +165,7 @@ export interface BuilderData {
   references?: BuilderReference[]
   showSummary?: boolean
   summaryOverride?: string
+  effectiveMargins?: { top: number; bottom: number; sides: number }
 }
 
 export interface VariantOverrideRow {
