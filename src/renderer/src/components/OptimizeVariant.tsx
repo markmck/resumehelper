@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from './Toast'
 import VariantPreview from './VariantPreview'
 import { getScoreColor } from '../lib/scoreColor'
+import { MARGIN_FLOOR } from '../lib/marginConstants'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -134,6 +135,13 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   // ── Preview refresh key (passed to VariantPreview when rendered in this component)
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0)
 
+  // ── Margin state (analysis-scoped overrides)
+  const [marginTop, setMarginTop] = useState(MARGIN_FLOOR)
+  const [marginBottom, setMarginBottom] = useState(MARGIN_FLOOR)
+  const [marginSides, setMarginSides] = useState(MARGIN_FLOOR)
+  const [hasOverride, setHasOverride] = useState(false)
+  const [marginsOpen, setMarginsOpen] = useState(true)
+
   const { showToast } = useToast()
 
   // ── Threshold debounced save
@@ -155,6 +163,54 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
       if (saveThresholdRef.current) clearTimeout(saveThresholdRef.current)
     }
   }, [])
+
+  // ── Margin debounced save
+  const saveMarginsRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Refs to track the latest margin values for the debounced write (avoids stale closure)
+  const latestMarginTop = useRef(MARGIN_FLOOR)
+  const latestMarginBottom = useRef(MARGIN_FLOOR)
+  const latestMarginSides = useRef(MARGIN_FLOOR)
+
+  const handleMarginChange = useCallback((field: 'top' | 'bottom' | 'sides', value: number) => {
+    if (field === 'top') { setMarginTop(value); latestMarginTop.current = value }
+    else if (field === 'bottom') { setMarginBottom(value); latestMarginBottom.current = value }
+    else { setMarginSides(value); latestMarginSides.current = value }
+    setHasOverride(true)
+    if (saveMarginsRef.current) clearTimeout(saveMarginsRef.current)
+    saveMarginsRef.current = setTimeout(() => {
+      if (analysis?.id != null) {
+        window.api.analysisLayout.setMargins(analysis.id, {
+          marginTop: latestMarginTop.current,
+          marginBottom: latestMarginBottom.current,
+          marginSides: latestMarginSides.current,
+        })
+      }
+    }, 300)
+  }, [analysis?.id])
+
+  // ── Cleanup margin debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveMarginsRef.current) clearTimeout(saveMarginsRef.current)
+    }
+  }, [])
+
+  // ── Revert margins to variant defaults
+  const handleRevert = useCallback(async (): Promise<void> => {
+    if (!analysis?.id || !analysis?.variantId) return
+    await window.api.analysisLayout.clearMargins(analysis.id)
+    const builderData = await window.api.templates.getBuilderData(analysis.variantId, analysis.id)
+    if (builderData && !('error' in builderData)) {
+      const em = (builderData as { effectiveMargins?: { top: number; bottom: number; sides: number } }).effectiveMargins
+      if (em) {
+        setMarginTop(em.top)
+        setMarginBottom(em.bottom)
+        setMarginSides(em.sides)
+      }
+    }
+    setHasOverride(false)
+    setPreviewRefreshKey((k) => k + 1)
+  }, [analysis?.id, analysis?.variantId])
 
   // ── Load on mount
   useEffect(() => {
@@ -286,6 +342,43 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
     }
     loadExcludedBullets()
   }, [analysis?.id])
+
+  // ── Seed margin sliders on mount (or when analysis.id changes)
+  useEffect(() => {
+    if (!analysis?.id || !analysis?.variantId) return
+    const seedMargins = async (): Promise<void> => {
+      try {
+        const override = await window.api.analysisLayout.getMargins(analysis.id)
+        if (override !== null) {
+          setMarginTop(override.marginTop)
+          setMarginBottom(override.marginBottom)
+          setMarginSides(override.marginSides)
+          latestMarginTop.current = override.marginTop
+          latestMarginBottom.current = override.marginBottom
+          latestMarginSides.current = override.marginSides
+          setHasOverride(true)
+        } else {
+          // Seed from pre-resolved effectiveMargins in BuilderData (D-07)
+          const builderData = await window.api.templates.getBuilderData(analysis.variantId, analysis.id)
+          if (builderData && !('error' in builderData)) {
+            const em = (builderData as { effectiveMargins?: { top: number; bottom: number; sides: number } }).effectiveMargins
+            if (em) {
+              setMarginTop(em.top)
+              setMarginBottom(em.bottom)
+              setMarginSides(em.sides)
+              latestMarginTop.current = em.top
+              latestMarginBottom.current = em.bottom
+              latestMarginSides.current = em.sides
+            }
+          }
+          setHasOverride(false)
+        }
+      } catch {
+        // Silent fallback per UI-SPEC error-state — sliders keep their MARGIN_FLOOR defaults
+      }
+    }
+    seedMargins()
+  }, [analysis?.id, analysis?.variantId])
 
   // ── Local score computation
   const computedScore = useMemo(() => {
@@ -1815,6 +1908,144 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
             </div>
           )}
 
+          {/* ── MARGINS collapsible section */}
+          <div
+            style={{
+              borderTop: '1px solid var(--color-border-subtle)',
+              marginTop: 'var(--space-5)',
+              paddingTop: 'var(--space-4)',
+            }}
+          >
+            {/* Section header */}
+            <div
+              onClick={() => setMarginsOpen((o) => !o)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}
+            >
+              <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>
+                {marginsOpen ? '▼' : '▶'}
+              </span>
+              <span
+                style={{
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: 'var(--color-text-tertiary)',
+                }}
+              >
+                MARGINS
+              </span>
+              {!marginsOpen && (
+                <span
+                  style={{
+                    fontSize: 'var(--font-size-xs)',
+                    color: 'var(--color-text-muted)',
+                    fontFamily: 'var(--font-mono)',
+                    marginLeft: 4,
+                  }}
+                >
+                  {marginTop.toFixed(2)}{'"'} / {marginBottom.toFixed(2)}{'"'} / {marginSides.toFixed(2)}{'"'}
+                </span>
+              )}
+            </div>
+
+            {/* Expanded slider area */}
+            {marginsOpen && (
+              <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Top slider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28 }}>
+                  <span style={{ fontSize: 'var(--font-size-xs)', minWidth: 48, color: 'var(--color-text-secondary)' }}>Top</span>
+                  <input
+                    type="range"
+                    min={MARGIN_FLOOR}
+                    max={1.2}
+                    step={0.05}
+                    value={marginTop}
+                    onInput={(e) => handleMarginChange('top', parseFloat((e.target as HTMLInputElement).value))}
+                    style={{ flex: 1, accentColor: '#8b5cf6', cursor: 'pointer' }}
+                  />
+                  <span
+                    style={{
+                      fontSize: 'var(--font-size-xs)',
+                      minWidth: 40,
+                      textAlign: 'right',
+                      fontFamily: 'var(--font-mono)',
+                      color: marginTop < 0.5 ? '#f59e0b' : 'var(--color-text-secondary)',
+                    }}
+                  >
+                    {marginTop.toFixed(2)}{'"'}
+                  </span>
+                </div>
+
+                {/* Bottom slider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28 }}>
+                  <span style={{ fontSize: 'var(--font-size-xs)', minWidth: 48, color: 'var(--color-text-secondary)' }}>Bottom</span>
+                  <input
+                    type="range"
+                    min={MARGIN_FLOOR}
+                    max={1.2}
+                    step={0.05}
+                    value={marginBottom}
+                    onInput={(e) => handleMarginChange('bottom', parseFloat((e.target as HTMLInputElement).value))}
+                    style={{ flex: 1, accentColor: '#8b5cf6', cursor: 'pointer' }}
+                  />
+                  <span
+                    style={{
+                      fontSize: 'var(--font-size-xs)',
+                      minWidth: 40,
+                      textAlign: 'right',
+                      fontFamily: 'var(--font-mono)',
+                      color: marginBottom < 0.5 ? '#f59e0b' : 'var(--color-text-secondary)',
+                    }}
+                  >
+                    {marginBottom.toFixed(2)}{'"'}
+                  </span>
+                </div>
+
+                {/* Sides slider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28 }}>
+                  <span style={{ fontSize: 'var(--font-size-xs)', minWidth: 48, color: 'var(--color-text-secondary)' }}>Sides</span>
+                  <input
+                    type="range"
+                    min={MARGIN_FLOOR}
+                    max={1.2}
+                    step={0.05}
+                    value={marginSides}
+                    onInput={(e) => handleMarginChange('sides', parseFloat((e.target as HTMLInputElement).value))}
+                    style={{ flex: 1, accentColor: '#8b5cf6', cursor: 'pointer' }}
+                  />
+                  <span
+                    style={{
+                      fontSize: 'var(--font-size-xs)',
+                      minWidth: 40,
+                      textAlign: 'right',
+                      fontFamily: 'var(--font-mono)',
+                      color: marginSides < 0.5 ? '#f59e0b' : 'var(--color-text-secondary)',
+                    }}
+                  >
+                    {marginSides.toFixed(2)}{'"'}
+                  </span>
+                </div>
+
+                {/* Revert control — always rendered */}
+                <span
+                  onClick={hasOverride ? handleRevert : undefined}
+                  style={{
+                    fontSize: 'var(--font-size-xs)',
+                    color: 'var(--color-text-muted)',
+                    cursor: hasOverride ? 'pointer' : 'default',
+                    textDecoration: hasOverride ? 'underline' : 'none',
+                    opacity: hasOverride ? 1 : 0.4,
+                    marginTop: 4,
+                    display: 'inline-block',
+                  }}
+                >
+                  Revert to variant margins
+                </span>
+              </div>
+            )}
+          </div>
+
           {/* ── Live Preview */}
           <div
             style={{
@@ -1840,6 +2071,9 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                 variantId={analysis.variantId}
                 analysisId={analysis.id}
                 refreshKey={previewRefreshKey}
+                marginTop={marginTop}
+                marginBottom={marginBottom}
+                marginSides={marginSides}
               />
             </div>
           </div>
