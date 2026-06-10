@@ -1,53 +1,42 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.6
-milestone_name: Per-Variant Text Overrides
-status: milestone_complete
-stopped_at: Milestone complete (Phase 38 was final phase)
-last_updated: 2026-06-09T02:33:31.771Z
-last_activity: 2026-06-08
+milestone: v2.7
+milestone_name: Optimization Layout Controls
+status: executing
+stopped_at: Phase 40 UI-SPEC approved
+last_updated: "2026-06-10T17:36:17.685Z"
+last_activity: 2026-06-10
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 13
-  completed_plans: 13
-  percent: 100
+  total_phases: 7
+  completed_phases: 1
+  total_plans: 6
+  completed_plans: 4
+  percent: 14
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-05)
+See: .planning/PROJECT.md (updated 2026-06-09)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Milestone complete
+**Current focus:** Phase 40 — Margin Controls + Live Preview in Optimize
 
 ## Current Position
 
-Phase: 38
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-06-09
-
-Progress: [█████████░] 90%
+Phase: 40 (Margin Controls + Live Preview in Optimize) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-06-10
 
 ## Performance Metrics
 
-- Total phases in milestone: 4 (Phases 35–38)
-- Completed phases: 3 (35, 36, 37)
-- Completed plans: 12
-- Completion percent: 90%
-- Test suite at milestone start: 247 tests passing
-- Test suite after Phase 36: 281 tests passing
-- Test suite after Phase 37 Plan 01: 284 tests passing
-- Test suite after Phase 37 Plan 03: 292 tests passing
-
-| Phase | Plan | Duration | Tasks | Files |
-| ----- | ---- | -------- | ----- | ----- |
-| 37    | 01   | ~8 min   | 3     | 5     |
-| Phase 37 P02 | 6min | 2 tasks | 3 files |
-| Phase 37 P03 | 7min | 3 tasks | 2 files |
+- Total phases in milestone: 3 (Phases 39–41)
+- Completed phases: 0
+- Completed plans: 0
+- Completion percent: 0%
+- Test suite at milestone start: 292 tests passing (carried from v2.6)
 
 ## Accumulated Context
 
@@ -80,26 +69,26 @@ Phase 35 decisions (Plans 01-03):
 
 ### Pending Todos
 
-- [x] Phase 35: Unified override table + migration — COMPLETE
-- [x] Phase 36: Merge precedence + snapshot threading — COMPLETE
-- [ ] Phase 37: Variant reword UI
-- [ ] Phase 38: Excluded-bullet suggestions
+- [ ] Phase 39: Analysis margin override data layer (storage + merge + snapshot freeze)
+- [ ] Phase 40: Margin controls + live preview in Optimize
+- [ ] Phase 41: Auto-fit orphan-page removal
 
 ### Blockers/Concerns
 
-- Phases 37 and 38 are parallelizable once Phase 36 ships — plan-phase should note this
-- Phase 35 blocker (D-01 not recorded) is now RESOLVED — D-01 committed in PROJECT.md Key Decisions
+- Phase 39 storage decision is open: extend the polymorphic `entityOverrides` table with a `templateOptions` entity type vs. a dedicated analysis-layout store — resolve during plan-phase 39
+- Margins are presentation, not content — the first non-content override at the analysis tier; confirm `buildMergedBuilderData` resolves an effective-margins object distinct from text/inclusion overrides
+- Auto-fit (Phase 41) depends on the page-count measurement that drives the existing page-break visualization — reuse it, do not reinvent pagination
+- `createTestDb()` must be updated in lockstep if Phase 39 adds/changes a table
 
 ## Session Continuity
 
-Last session: 2026-06-08T17:33:02.904Z
-Stopped at: Phase 38 Plan 02 complete — handlers + GREEN tests
+Last session: 2026-06-10T17:36:17.681Z
+Stopped at: Phase 40 UI-SPEC approved
 Resume file: None
 
-**Completed Milestone:** v2.5 Portability & Debt Cleanup — 5 phases, 19 plans — shipped 2026-06-05
-**Phase 35 complete:** entity_overrides table + migration + acceptSuggestion cutover + mergeHelper Layer 3 redirect + D-01 decision recorded. 264 tests passing.
-**Phase 36 complete:** two-pass override map (analysis→variant→base precedence), variant-override IPC handlers, summaryOverride threaded into snapshot/scoring/DOCX/resume.json, D-01 inclusion mechanism. Verified + code-reviewed. 281 tests passing. Two integration regressions caught & fixed during post-merge gate (analysis-tier match-by-analysisId; FK-on test posture); resume.json summary gap closed; WR-01 cross-variant guard added.
-**Next:** `/gsd:plan-phase 37` (Variant reword UI) or `/gsd:plan-phase 38` (Excluded-bullet suggestions) — parallelizable now that Phase 36 ships.
+**Completed Milestone:** v2.6 Per-Variant Text Overrides — 4 phases (35–38), 13 plans — shipped 2026-06-08, 292 tests passing.
+**New Milestone:** v2.7 Optimization Layout Controls — analysis-tier margin overrides + live preview in Optimize + auto-fit orphan-page removal.
+**Next:** `/gsd:discuss-phase 39` (gather context) or `/gsd:plan-phase 39` (plan directly) — Analysis Margin Override Data Layer.
 
 ### Phase 36 follow-ups (advisory code-review findings, non-blocking)
 

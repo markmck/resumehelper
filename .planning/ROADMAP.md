@@ -245,7 +245,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 40-01-PLAN.md — Shared MARGIN_FLOOR constant + effectiveMargins on renderer BuilderData type (single-source seed seam)
+- [x] 40-01-PLAN.md — Shared MARGIN_FLOOR constant + effectiveMargins on renderer BuilderData type (single-source seed seam)
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -284,7 +284,7 @@ Plans:
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
 | 35-38 | v2.6 | 13/13 | Complete | 2026-06-08 |
 | 39. Analysis Margin Override Data Layer | v2.7 | 3/3 | Complete    | 2026-06-09 |
-| 40. Margin Controls + Live Preview in Optimize | v2.7 | 0/3 | Planned | - |
+| 40. Margin Controls + Live Preview in Optimize | v2.7 | 1/3 | In Progress|  |
 | 41. Auto-Fit Orphan-Page Removal | v2.7 | 0/? | Pending | - |
 
 ## Future (v3.0+)
