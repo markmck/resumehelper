@@ -91,7 +91,7 @@ Full phase details in `.planning/milestones/v2.6-phases/`.
 
 **Milestone Goal:** Add a presentation-layer override at the analysis tier so users can re-tune resume margins during job optimization — scoped to that analysis, with a live preview and one-click auto-fit — so re-including bullets and accepting rewrites no longer leaves the resume overflowing.
 
-- [ ] **Phase 39: Analysis Margin Override Data Layer** - Analysis-scoped margin override storage, merge resolution over variant `templateOptions`, snapshot freezing
+- [x] **Phase 39: Analysis Margin Override Data Layer** - Analysis-scoped margin override storage, merge resolution over variant `templateOptions`, snapshot freezing (completed 2026-06-09)
 - [ ] **Phase 40: Margin Controls + Live Preview in Optimize** - Margin sliders in the Optimize screen, embedded paginated preview pane, revert-to-variant
 - [ ] **Phase 41: Auto-Fit Orphan-Page Removal** - Auto-fit button that tightens margins to drop an orphan trailing page, with a minimum margin floor and unreachable reporting
 
@@ -137,10 +137,12 @@ Plans:
   4. An excluded bullet accepted at the analysis tier is un-excluded in the merged output for that analysis — it appears in preview for that analysis but not for the base variant view
 
 **Plans**: 4 plans
+
 - [x] 36-01-PLAN.md — Wave 0: failing OVR-02/OVR-03 correctness-contract tests (2 new files + 2 extended)
 - [x] 36-02-PLAN.md — Two-pass override map in buildMergedBuilderData (precedence analysis → variant → base) + inclusion un-exclusion + summaryOverride
 - [x] 36-03-PLAN.md — Variant-tier override IPC handlers (get/set/clear) in templates.ts
 - [x] 36-04-PLAN.md — Thread summaryOverride into snapshot freeze (OVR-03), scoring (D-05), and live DOCX export
+
 **UI hint**: yes
 
 ### Phase 37: Variant Reword UI
@@ -166,6 +168,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1)*
 
 - [x] 37-03-PLAN.md — VariantBuilder reword UI: pencil + InlineEdit + left-border indicator + revert icon for bullets/summary/project title, D-04 author-from-scratch summary, onReword live preview (RWD-01..05)
+
 **UI hint**: yes
 
 ### Phase 38: Excluded-Bullet Suggestions
@@ -193,6 +196,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2)*
 
 - [x] 38-03-PLAN.md — preload bridge + OptimizeVariant 'Bullets you excluded that match this job' panel, accept/dismiss/revert, client-side score nudge
+
 **UI hint**: yes
 
 ### Phase 39: Analysis Margin Override Data Layer
@@ -211,9 +215,17 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 39-01-PLAN.md — analysis_layout_overrides table + get/set/clear margin handlers + preload bridge (lockstep test schema)
-- [ ] 39-02-PLAN.md — resolveEffectiveMargins resolver + effectiveMargins on MergedBuilderData (TDD)
-- [ ] 39-03-PLAN.md — route live PDF/DOCX margins through effectiveMargins + freeze into submission snapshot
+**Wave 1**
+
+- [x] 39-01-PLAN.md — analysis_layout_overrides table + get/set/clear margin handlers + preload bridge (lockstep test schema)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 39-02-PLAN.md — resolveEffectiveMargins resolver + effectiveMargins on MergedBuilderData (TDD)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 39-03-PLAN.md — route live PDF/DOCX margins through effectiveMargins + freeze into submission snapshot
 
 **UI hint**: no
 
@@ -228,6 +240,20 @@ Plans:
   2. Dragging a slider updates an embedded paginated preview in the Optimize screen without navigating away; no separate save button is required (persists per the Phase 39 path)
   3. The preview reflects the analysis's full merged content — re-included excluded bullets and accepted rewrites are visible — so overflow caused by added content is apparent
   4. A revert control returns the analysis margins to the variant's margins and the preview/page-count updates accordingly
+
+**Plans**: 3 plans
+Plans:
+**Wave 1**
+
+- [ ] 40-01-PLAN.md — Shared MARGIN_FLOOR constant + effectiveMargins on renderer BuilderData type (single-source seed seam)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 40-02-PLAN.md — OptimizeVariant MARGINS section: 3 sliders + effective-margins seed + ~300ms debounced setMargins + live preview props + always-rendered revert
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 40-03-PLAN.md — Human-verify checkpoint: seed / live preview / persistence / merged content / revert
 
 **UI hint**: yes
 
@@ -257,8 +283,8 @@ Plans:
 | 25-29 | v2.4 | 12/12 | Complete | 2026-04-21 |
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
 | 35-38 | v2.6 | 13/13 | Complete | 2026-06-08 |
-| 39. Analysis Margin Override Data Layer | v2.7 | 0/? | Pending | - |
-| 40. Margin Controls + Live Preview in Optimize | v2.7 | 0/? | Pending | - |
+| 39. Analysis Margin Override Data Layer | v2.7 | 3/3 | Complete    | 2026-06-09 |
+| 40. Margin Controls + Live Preview in Optimize | v2.7 | 0/3 | Planned | - |
 | 41. Auto-Fit Orphan-Page Removal | v2.7 | 0/? | Pending | - |
 
 ## Future (v3.0+)
