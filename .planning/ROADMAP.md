@@ -249,7 +249,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 40-02-PLAN.md — OptimizeVariant MARGINS section: 3 sliders + effective-margins seed + ~300ms debounced setMargins + live preview props + always-rendered revert
+- [x] 40-02-PLAN.md — OptimizeVariant MARGINS section: 3 sliders + effective-margins seed + ~300ms debounced setMargins + live preview props + always-rendered revert
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -284,7 +284,7 @@ Plans:
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
 | 35-38 | v2.6 | 13/13 | Complete | 2026-06-08 |
 | 39. Analysis Margin Override Data Layer | v2.7 | 3/3 | Complete    | 2026-06-09 |
-| 40. Margin Controls + Live Preview in Optimize | v2.7 | 1/3 | In Progress|  |
+| 40. Margin Controls + Live Preview in Optimize | v2.7 | 2/3 | In Progress|  |
 | 41. Auto-Fit Orphan-Page Removal | v2.7 | 0/? | Pending | - |
 
 ## Future (v3.0+)
