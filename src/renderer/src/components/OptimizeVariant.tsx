@@ -141,6 +141,8 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   const [marginSides, setMarginSides] = useState(MARGIN_FLOOR)
   const [hasOverride, setHasOverride] = useState(false)
   const [marginsOpen, setMarginsOpen] = useState(true)
+  // ── Expanded margin-adjustment modal (large, readable preview surface)
+  const [marginsModalOpen, setMarginsModalOpen] = useState(false)
 
   const { showToast } = useToast()
 
@@ -194,6 +196,16 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
       if (saveMarginsRef.current) clearTimeout(saveMarginsRef.current)
     }
   }, [])
+
+  // ── Close the expanded margin modal on Escape
+  useEffect(() => {
+    if (!marginsModalOpen) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setMarginsModalOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [marginsModalOpen])
 
   // ── Revert margins to variant defaults
   const handleRevert = useCallback(async (): Promise<void> => {
@@ -648,6 +660,61 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   const CIRCUMFERENCE = 314 // 2 * pi * 50
   const strokeOffset = CIRCUMFERENCE - (CIRCUMFERENCE * computedScore) / 100
   const ringColor = getScoreColor(computedScore, threshold)
+
+  // Three margin sliders + revert control, shared by the right-rail section and the
+  // expanded modal. Both surfaces drive the same margin state, so edits in either
+  // place update the other and persist via the same debounced override path.
+  const marginSliderConfig: Array<{ label: string; field: 'top' | 'bottom' | 'sides'; value: number }> = [
+    { label: 'Top', field: 'top', value: marginTop },
+    { label: 'Bottom', field: 'bottom', value: marginBottom },
+    { label: 'Sides', field: 'sides', value: marginSides },
+  ]
+
+  const renderMarginSliders = (): React.JSX.Element => (
+    <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {marginSliderConfig.map(({ label, field, value }) => (
+        <div key={field} style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28 }}>
+          <span style={{ fontSize: 'var(--font-size-xs)', minWidth: 48, color: 'var(--color-text-secondary)' }}>{label}</span>
+          <input
+            type="range"
+            min={MARGIN_FLOOR}
+            max={1.2}
+            step={0.05}
+            value={value}
+            onInput={(e) => handleMarginChange(field, parseFloat((e.target as HTMLInputElement).value))}
+            style={{ flex: 1, accentColor: '#8b5cf6', cursor: 'pointer' }}
+          />
+          <span
+            style={{
+              fontSize: 'var(--font-size-xs)',
+              minWidth: 40,
+              textAlign: 'right',
+              fontFamily: 'var(--font-mono)',
+              color: value < 0.5 ? '#f59e0b' : 'var(--color-text-secondary)',
+            }}
+          >
+            {value.toFixed(2)}{'"'}
+          </span>
+        </div>
+      ))}
+
+      {/* Revert control — always rendered */}
+      <span
+        onClick={hasOverride ? handleRevert : undefined}
+        style={{
+          fontSize: 'var(--font-size-xs)',
+          color: 'var(--color-text-muted)',
+          cursor: hasOverride ? 'pointer' : 'default',
+          textDecoration: hasOverride ? 'underline' : 'none',
+          opacity: hasOverride ? 1 : 0.4,
+          marginTop: 4,
+          display: 'inline-block',
+        }}
+      >
+        Revert to variant margins
+      </span>
+    </div>
+  )
 
   return (
     <div
@@ -1950,100 +2017,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
             </div>
 
             {/* Expanded slider area */}
-            {marginsOpen && (
-              <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {/* Top slider */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28 }}>
-                  <span style={{ fontSize: 'var(--font-size-xs)', minWidth: 48, color: 'var(--color-text-secondary)' }}>Top</span>
-                  <input
-                    type="range"
-                    min={MARGIN_FLOOR}
-                    max={1.2}
-                    step={0.05}
-                    value={marginTop}
-                    onInput={(e) => handleMarginChange('top', parseFloat((e.target as HTMLInputElement).value))}
-                    style={{ flex: 1, accentColor: '#8b5cf6', cursor: 'pointer' }}
-                  />
-                  <span
-                    style={{
-                      fontSize: 'var(--font-size-xs)',
-                      minWidth: 40,
-                      textAlign: 'right',
-                      fontFamily: 'var(--font-mono)',
-                      color: marginTop < 0.5 ? '#f59e0b' : 'var(--color-text-secondary)',
-                    }}
-                  >
-                    {marginTop.toFixed(2)}{'"'}
-                  </span>
-                </div>
-
-                {/* Bottom slider */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28 }}>
-                  <span style={{ fontSize: 'var(--font-size-xs)', minWidth: 48, color: 'var(--color-text-secondary)' }}>Bottom</span>
-                  <input
-                    type="range"
-                    min={MARGIN_FLOOR}
-                    max={1.2}
-                    step={0.05}
-                    value={marginBottom}
-                    onInput={(e) => handleMarginChange('bottom', parseFloat((e.target as HTMLInputElement).value))}
-                    style={{ flex: 1, accentColor: '#8b5cf6', cursor: 'pointer' }}
-                  />
-                  <span
-                    style={{
-                      fontSize: 'var(--font-size-xs)',
-                      minWidth: 40,
-                      textAlign: 'right',
-                      fontFamily: 'var(--font-mono)',
-                      color: marginBottom < 0.5 ? '#f59e0b' : 'var(--color-text-secondary)',
-                    }}
-                  >
-                    {marginBottom.toFixed(2)}{'"'}
-                  </span>
-                </div>
-
-                {/* Sides slider */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28 }}>
-                  <span style={{ fontSize: 'var(--font-size-xs)', minWidth: 48, color: 'var(--color-text-secondary)' }}>Sides</span>
-                  <input
-                    type="range"
-                    min={MARGIN_FLOOR}
-                    max={1.2}
-                    step={0.05}
-                    value={marginSides}
-                    onInput={(e) => handleMarginChange('sides', parseFloat((e.target as HTMLInputElement).value))}
-                    style={{ flex: 1, accentColor: '#8b5cf6', cursor: 'pointer' }}
-                  />
-                  <span
-                    style={{
-                      fontSize: 'var(--font-size-xs)',
-                      minWidth: 40,
-                      textAlign: 'right',
-                      fontFamily: 'var(--font-mono)',
-                      color: marginSides < 0.5 ? '#f59e0b' : 'var(--color-text-secondary)',
-                    }}
-                  >
-                    {marginSides.toFixed(2)}{'"'}
-                  </span>
-                </div>
-
-                {/* Revert control — always rendered */}
-                <span
-                  onClick={hasOverride ? handleRevert : undefined}
-                  style={{
-                    fontSize: 'var(--font-size-xs)',
-                    color: 'var(--color-text-muted)',
-                    cursor: hasOverride ? 'pointer' : 'default',
-                    textDecoration: hasOverride ? 'underline' : 'none',
-                    opacity: hasOverride ? 1 : 0.4,
-                    marginTop: 4,
-                    display: 'inline-block',
-                  }}
-                >
-                  Revert to variant margins
-                </span>
-              </div>
-            )}
+            {marginsOpen && renderMarginSliders()}
           </div>
 
           {/* ── Live Preview */}
@@ -2054,18 +2028,46 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
               paddingTop: 'var(--space-4)',
             }}
           >
-            <p
+            <div
               style={{
-                fontSize: 'var(--font-size-xs)',
-                fontWeight: 600,
-                color: 'var(--color-text-tertiary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 margin: '0 0 var(--space-3) 0',
               }}
             >
-              Live Preview
-            </p>
+              <p
+                style={{
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 600,
+                  color: 'var(--color-text-tertiary)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  margin: 0,
+                }}
+              >
+                Live Preview
+              </p>
+              <button
+                onClick={() => setMarginsModalOpen(true)}
+                title="Expand preview to adjust margins"
+                style={{
+                  background: 'none',
+                  border: '1px solid var(--color-border-default)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--color-text-secondary)',
+                  cursor: 'pointer',
+                  fontSize: 'var(--font-size-xs)',
+                  fontFamily: 'var(--font-sans)',
+                  padding: '2px 8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                ⤢ Expand
+              </button>
+            </div>
             <div style={{ height: 400 }}>
               <VariantPreview
                 variantId={analysis.variantId}
@@ -2080,6 +2082,107 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
 
         </div>
       </div>
+
+      {/* ── Expanded margin-adjustment modal */}
+      {marginsModalOpen && (
+        <div
+          onClick={() => setMarginsModalOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--space-6)',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'var(--color-bg-surface)',
+              border: '1px solid var(--color-border-subtle)',
+              borderRadius: 'var(--radius-lg)',
+              width: 'min(1100px, 95vw)',
+              height: 'min(900px, 92vh)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.45)',
+            }}
+          >
+            {/* Modal header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: 'var(--space-4) var(--space-5)',
+                borderBottom: '1px solid var(--color-border-subtle)',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontSize: 'var(--font-size-base)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                Adjust Margins
+              </span>
+              <button
+                onClick={() => setMarginsModalOpen(false)}
+                aria-label="Close"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--color-text-secondary)',
+                  fontSize: 18,
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  padding: 4,
+                  fontFamily: 'var(--font-sans)',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal body: large preview + shared sliders */}
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 300px', overflow: 'hidden' }}>
+              <div
+                style={{
+                  height: '100%',
+                  boxSizing: 'border-box',
+                  padding: 'var(--space-4)',
+                  borderRight: '1px solid var(--color-border-subtle)',
+                  overflow: 'hidden',
+                }}
+              >
+                <VariantPreview
+                  variantId={analysis.variantId}
+                  analysisId={analysis.id}
+                  refreshKey={previewRefreshKey}
+                  marginTop={marginTop}
+                  marginBottom={marginBottom}
+                  marginSides={marginSides}
+                />
+              </div>
+              <div style={{ overflowY: 'auto', padding: 'var(--space-5)' }}>
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-xs)',
+                    fontWeight: 600,
+                    color: 'var(--color-text-tertiary)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    margin: 0,
+                  }}
+                >
+                  MARGINS
+                </p>
+                {renderMarginSliders()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
