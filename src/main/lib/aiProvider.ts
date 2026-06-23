@@ -56,6 +56,10 @@ export const ResumeScorerSchema = z.object({
       matched_keywords: z.array(z.string()),
     })
   ).default([]),
+  // SUM-01: AI-suggested job-tailored summary. Rides the existing scorer call.
+  // .default('') ensures backward compat — all existing MockLanguageModelV3 fixtures
+  // that omit this field continue to parse successfully (same pattern as excluded_bullet_suggestions).
+  suggested_summary: z.string().default(''),
 })
 
 export const ResumeJsonSchema = z.object({

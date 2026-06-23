@@ -56,6 +56,13 @@ Excluded-bullet suggestion guidelines:
 - DO NOT suggest a bullet if you cannot reliably read its [B{id}] integer — leave excluded_bullet_suggestions empty rather than guess an ID.
 - If no excluded bullets are relevant, return an empty excluded_bullet_suggestions array.
 
+Summary suggestion guidelines (suggested_summary field):
+- Write a 2–4 sentence professional summary tailored to THIS specific job posting.
+- The summary should highlight the candidate's most relevant experience and incorporate the job's key keywords naturally.
+- Base the summary ONLY on skills and experience present in the resume — do NOT fabricate experience, titles, or credentials.
+- If the candidate's profile has no summary section, write one from scratch based on their resume facts.
+- Return an empty string if you cannot write a credible job-tailored summary from the resume content.
+
 Return only the structured scoring data, no commentary.`
 
   const prompt = `## Parsed Job Data
