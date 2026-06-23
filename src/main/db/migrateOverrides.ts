@@ -120,9 +120,27 @@ export function assertOverrideRowCounts(sqlite: Database.Database): AssertOverri
     `SELECT COUNT(*) as cnt FROM analysis_bullet_overrides`
   ).get() as { cnt: number }
 
-  const dstRow = sqlite.prepare(
-    `SELECT COUNT(*) as cnt FROM entity_overrides WHERE entity_type = 'job_bullet'`
-  ).get() as { cnt: number }
+  // dstCount counts only MIGRATED source rows that are actually present in
+  // entity_overrides, matched by the migration's idempotency key (analysis_id +
+  // bullet_id). It deliberately does NOT count every entity_overrides job_bullet
+  // row: that table also accumulates variant-tier rewords (analysis_id NULL),
+  // excluded-bullet re-inclusions (field='inclusion'), and post-migration accepted
+  // suggestions (the Phase 35 cutover writes new rewrites here, not to the
+  // read-only source table). A raw COUNT(*) over job_bullet rows produced a false
+  // "data loss" alarm whenever those legitimate writes pushed the destination
+  // count above the frozen source count.
+  const dstRow = sqlite.prepare(`
+    SELECT COUNT(*) as cnt
+    FROM analysis_bullet_overrides abo
+    JOIN analysis_results ar ON ar.id = abo.analysis_id
+    WHERE ar.variant_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM entity_overrides eo
+        WHERE eo.analysis_id = abo.analysis_id
+          AND eo.bullet_id   = abo.bullet_id
+          AND eo.entity_type = 'job_bullet'
+      )
+  `).get() as { cnt: number }
 
   // Count rows skipped because variant_id is NULL (no matching AR or AR.variant_id IS NULL)
   const skippedRow = sqlite.prepare(`
@@ -136,13 +154,18 @@ export function assertOverrideRowCounts(sqlite: Database.Database): AssertOverri
   const dstCount = dstRow.cnt
   const skippedNullVariant = skippedRow.cnt
 
+  // Integrity contract: every source row is either migrated-and-present (dstCount)
+  // or skipped for a NULL variant (skippedNullVariant). The two partition the source
+  // table, so dstCount + skippedNullVariant === srcCount holds iff zero migratable
+  // rows are missing from entity_overrides — a genuine data-loss signal. Extra
+  // (non-migrated) entity_overrides rows can no longer trip it.
   const ok = dstCount + skippedNullVariant === srcCount
 
   if (!ok) {
     console.error(
-      `[migrateOverrides] Row-count assertion FAILED — possible data loss detected. ` +
+      `[migrateOverrides] Row-count assertion FAILED — migrated rows missing from entity_overrides. ` +
       `source (analysis_bullet_overrides): ${srcCount}, ` +
-      `destination (entity_overrides job_bullet): ${dstCount}, ` +
+      `migrated rows present (entity_overrides job_bullet): ${dstCount}, ` +
       `skipped (NULL variant): ${skippedNullVariant}. ` +
       `Expected dstCount + skipped === srcCount (${dstCount} + ${skippedNullVariant} !== ${srcCount}). ` +
       `App launch will continue — investigate migration state.`

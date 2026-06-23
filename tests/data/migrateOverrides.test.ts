@@ -383,6 +383,47 @@ describe('assertOverrideRowCounts', () => {
     expect(result.ok).toBe(true)
   })
 
+  it('Test 7 (regression): extra entity_overrides rows from other write paths do not trip the alarm', () => {
+    // Reproduces the production false positive: entity_overrides accumulates job_bullet
+    // rows from variant-tier rewords (Phase 37), excluded-bullet re-inclusions (Phase 38),
+    // and post-migration accepted suggestions (Phase 35 cutover). A raw COUNT(*) over
+    // job_bullet rows reported dst > src and falsely flagged "data loss". The fixed
+    // assertion counts only migrated rows present, so it stays ok:true.
+    const jobId = seedJob(sqlite)
+    const variantId = seedVariant(sqlite)
+    const jobPostingId = seedJobPosting(sqlite)
+    const analysisId = seedAnalysis(sqlite, jobPostingId, variantId)
+    const bulletId1 = seedBullet(sqlite, jobId)
+    seedOverride(sqlite, analysisId, bulletId1, 'Migrated row')
+
+    migrateBulletOverrides(sqlite)
+
+    // Simulate post-migration writes that ALSO create entity_overrides job_bullet rows
+    // but never existed in analysis_bullet_overrides.
+    const bulletId2 = seedBullet(sqlite, jobId) // variant-tier reword (analysis_id NULL)
+    const bulletId3 = seedBullet(sqlite, jobId) // excluded-bullet re-inclusion
+    sqlite.prepare(
+      `INSERT INTO entity_overrides (variant_id, analysis_id, entity_type, bullet_id, field, override_text, source)
+       VALUES (?, NULL, 'job_bullet', ?, 'text', 'Variant reword', 'user')`
+    ).run(variantId, bulletId2)
+    sqlite.prepare(
+      `INSERT INTO entity_overrides (variant_id, analysis_id, entity_type, bullet_id, field, override_text, source)
+       VALUES (?, ?, 'job_bullet', ?, 'inclusion', '', 'inclusion')`
+    ).run(variantId, analysisId, bulletId3)
+
+    // entity_overrides now holds 3 job_bullet rows but only 1 came from the migration.
+    const { cnt: rawJobBulletRows } = sqlite.prepare(
+      `SELECT COUNT(*) as cnt FROM entity_overrides WHERE entity_type='job_bullet'`
+    ).get() as { cnt: number }
+    expect(rawJobBulletRows).toBe(3)
+
+    const result = assertOverrideRowCounts(sqlite)
+    expect(result.ok).toBe(true)        // old raw-count logic would report false here
+    expect(result.srcCount).toBe(1)
+    expect(result.dstCount).toBe(1)     // only the migrated row is counted, not the 2 extras
+    expect(result.skippedNullVariant).toBe(0)
+  })
+
   it('assertOverrideRowCounts accounts for NULL-variant skipped rows', () => {
     const jobId = seedJob(sqlite)
     const variantId = seedVariant(sqlite)
