@@ -16,9 +16,10 @@ interface PagedContentProps {
   isIframe: boolean
   marginTopIn?: number   // top margin in inches (per page)
   marginBottomIn?: number // bottom margin in inches (per page)
+  onPageCount?: (n: number) => void   // lift computed count to PrintApp
 }
 
-function PagedContent({ children, isIframe, marginTopIn = 1.0, marginBottomIn = 1.0 }: PagedContentProps): React.JSX.Element {
+function PagedContent({ children, isIframe, marginTopIn = 1.0, marginBottomIn = 1.0, onPageCount }: PagedContentProps): React.JSX.Element {
   const measureRef = useRef<HTMLDivElement>(null)
   const [pageCount, setPageCount] = useState(1)
 
@@ -31,7 +32,9 @@ function PagedContent({ children, isIframe, marginTopIn = 1.0, marginBottomIn = 
     const el = measureRef.current
     if (!el) return
     const height = el.scrollHeight
-    setPageCount(Math.max(1, Math.ceil(height / usableHeight)))
+    const n = Math.max(1, Math.ceil(height / usableHeight))
+    setPageCount(n)
+    onPageCount?.(n)
   })
 
   if (!isIframe) {
@@ -133,6 +136,7 @@ function PrintApp(): React.JSX.Element {
   const [marginTop, setMarginTop] = useState<number | undefined>(undefined)
   const [marginBottom, setMarginBottom] = useState<number | undefined>(undefined)
   const [marginSides, setMarginSides] = useState<number | undefined>(undefined)
+  const [printPageCount, setPrintPageCount] = useState(1)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -224,14 +228,14 @@ function PrintApp(): React.JSX.Element {
     const reportHeight = (): void => {
       const el = contentRef.current
       if (!el) return
-      window.parent.postMessage({ type: 'print-height', height: el.scrollHeight }, '*')
+      window.parent.postMessage({ type: 'print-height', height: el.scrollHeight, pageCount: printPageCount }, '*')
     }
 
     // Give React frames to paint + PagedContent to measure, then report
     requestAnimationFrame(() => {
       setTimeout(reportHeight, 100)
     })
-  }, [data])
+  }, [data, printPageCount])
 
   useEffect(() => {
     if (data !== null && typeof window.electron !== 'undefined') {
@@ -275,7 +279,7 @@ function PrintApp(): React.JSX.Element {
           }
         `}</style>
       )}
-      <PagedContent isIframe={isIframe} marginTopIn={marginTop ?? TEMPLATE_DEFAULTS[templateKey]?.top ?? 1.0} marginBottomIn={marginBottom ?? TEMPLATE_DEFAULTS[templateKey]?.bottom ?? 1.0}>
+      <PagedContent isIframe={isIframe} marginTopIn={marginTop ?? TEMPLATE_DEFAULTS[templateKey]?.top ?? 1.0} marginBottomIn={marginBottom ?? TEMPLATE_DEFAULTS[templateKey]?.bottom ?? 1.0} onPageCount={setPrintPageCount}>
         <TemplateComponent
           profile={data.profile}
           jobs={data.jobs}
