@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { db, sqlite } from '../db'
-import { templateVariants, templateVariantItems, jobBullets, projectBullets, entityOverrides, analysisLayoutOverrides } from '../db/schema'
+import { templateVariants, templateVariantItems, jobBullets, projectBullets, entityOverrides, analysisLayoutOverrides, analysisResults, analysisSkillAdditions, skills, skillCategories } from '../db/schema'
 import { eq, and, desc, inArray, isNull } from 'drizzle-orm'
 import { buildMergedBuilderData } from '../lib/mergeHelper'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
@@ -637,6 +637,260 @@ export function setVariantOverride(
   return { success: true }
 }
 
+// ---------------------------------------------------------------------------
+// Phase 41 Plan 05: Analysis-to-variant bake (SAVE-01 / SAVE-02)
+// ---------------------------------------------------------------------------
+
+/**
+ * Pure transform: rebind analysis-tier entity_overrides rows to a new variant.
+ * Each input row is mapped to a variant-tier row (analysisId=null, variantId=newVariantId)
+ * with all other fields preserved verbatim.
+ */
+export function bakeAnalysisOverrideRows(
+  analysisTierRows: Array<{
+    entityType: string
+    field: string
+    bulletId: number | null
+    projectId: number | null
+    jobId: number | null
+    projectBulletId: number | null
+    overrideText: string
+    source: string
+  }>,
+  newVariantId: number,
+): Array<{
+  variantId: number
+  analysisId: null
+  entityType: string
+  field: string
+  bulletId: number | null
+  projectId: number | null
+  jobId: number | null
+  projectBulletId: number | null
+  overrideText: string
+  source: string
+}> {
+  return analysisTierRows.map((row) => ({
+    variantId: newVariantId,
+    analysisId: null,
+    entityType: row.entityType,
+    field: row.field,
+    bulletId: row.bulletId,
+    projectId: row.projectId,
+    jobId: row.jobId,
+    projectBulletId: row.projectBulletId,
+    overrideText: row.overrideText,
+    source: row.source,
+  }))
+}
+
+/**
+ * Pure transform: merge a margin override into a variant's templateOptions JSON.
+ * - null layoutOverride → returns existingOptionsJson unchanged (including null → null).
+ * - Non-null override → deep-merges margin keys into the existing options object
+ *   (existing keys like accentColor/showSummary are preserved).
+ * - Malformed existingOptionsJson → treats as empty object (no throw).
+ */
+export function mergeMarginIntoOptions(
+  existingOptionsJson: string | null,
+  layoutOverride: { marginTop: number; marginBottom: number; marginSides: number } | null,
+): string | null {
+  if (layoutOverride === null) {
+    return existingOptionsJson
+  }
+  let existing: Record<string, unknown> = {}
+  if (existingOptionsJson) {
+    try {
+      existing = JSON.parse(existingOptionsJson) as Record<string, unknown>
+    } catch {
+      existing = {}
+    }
+  }
+  return JSON.stringify({
+    ...existing,
+    marginTop: layoutOverride.marginTop,
+    marginBottom: layoutOverride.marginBottom,
+    marginSides: layoutOverride.marginSides,
+  })
+}
+
+/**
+ * SAVE-01 / SAVE-02: create a new variant that captures the analysis's accepted
+ * rewrites, re-included excluded bullets, added skills, and margin overrides as
+ * variant-tier state. The source variant and the analysis are never mutated.
+ *
+ * Algorithm:
+ *  1. Load analysis → get sourceVariantId (error if missing or null).
+ *  2. duplicateVariant(db, sourceVariantId) → newVariant (copies templateVariantItems + variant-tier overrides).
+ *  3. Single sqlite.transaction bakes:
+ *     a) analysis-tier entity_overrides: collision-safe delete-before-insert for each row.
+ *     b) accepted analysis_skill_additions: find-or-insert global skills row, then
+ *        exclude from every other variant via templateVariantItems (SELECT-first idempotency guard).
+ *     c) analysis_layout_overrides: promote into newVariant.templateOptions via mergeMarginIntoOptions.
+ *  4. On any bake failure: delete newVariant (cascade-removes its rows), return { error }.
+ */
+export function saveAnalysisAsVariant(
+  db: Db,
+  analysisId: number,
+): { newVariantId: number } | { error: string } {
+  // 1. Load analysis row
+  const analysisRow = db
+    .select({ variantId: analysisResults.variantId })
+    .from(analysisResults)
+    .where(eq(analysisResults.id, analysisId))
+    .get()
+  if (!analysisRow) return { error: `Analysis ${analysisId} not found` }
+  const sourceVariantId = analysisRow.variantId
+  if (sourceVariantId == null) return { error: 'Analysis has no associated variant' }
+
+  // 2. Duplicate source variant outside the bake transaction
+  let newVariant: ReturnType<typeof duplicateVariant>
+  try {
+    newVariant = duplicateVariant(db, sourceVariantId)
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+
+  // 3. Bake analysis-tier state onto the new variant — single synchronous transaction
+  try {
+    // Read data needed for the bake (outside the transaction, before it starts)
+    const analysisTierRows = db
+      .select()
+      .from(entityOverrides)
+      .where(eq(entityOverrides.analysisId, analysisId))
+      .all()
+
+    const acceptedSkillRows = db
+      .select()
+      .from(analysisSkillAdditions)
+      .where(
+        and(
+          eq(analysisSkillAdditions.analysisId, analysisId),
+          eq(analysisSkillAdditions.status, 'accepted'),
+        ),
+      )
+      .all()
+
+    const layoutOverride = db
+      .select()
+      .from(analysisLayoutOverrides)
+      .where(eq(analysisLayoutOverrides.analysisId, analysisId))
+      .get()
+
+    // All existing variants (for cross-variant skill exclusion)
+    const allVariants = db
+      .select({ id: templateVariants.id })
+      .from(templateVariants)
+      .all()
+    const otherVariantIds = allVariants.map((v) => v.id).filter((id) => id !== newVariant.id)
+
+    sqlite.transaction(() => {
+      // (a) Bake analysis-tier entity_overrides: collision-safe delete-before-insert
+      const bakedRows = bakeAnalysisOverrideRows(analysisTierRows, newVariant.id)
+      for (const row of bakedRows) {
+        // Delete any colliding variant-tier row on the new variant
+        db.delete(entityOverrides)
+          .where(
+            and(
+              eq(entityOverrides.variantId, newVariant.id),
+              isNull(entityOverrides.analysisId),
+              eq(entityOverrides.entityType, row.entityType),
+              eq(entityOverrides.field, row.field),
+              row.bulletId != null
+                ? eq(entityOverrides.bulletId, row.bulletId)
+                : isNull(entityOverrides.bulletId),
+              row.projectId != null
+                ? eq(entityOverrides.projectId, row.projectId)
+                : isNull(entityOverrides.projectId),
+            ),
+          )
+          .run()
+        // Insert the baked (variant-tier) row
+        db.insert(entityOverrides).values(row).run()
+      }
+
+      // (b) Bake accepted skills: find-or-insert global skills row, then exclude from other variants
+      for (const addition of acceptedSkillRows) {
+        // Find-or-insert the global skills row by name
+        let skillRow = db
+          .select({ id: skills.id })
+          .from(skills)
+          .where(eq(skills.name, addition.skillName))
+          .get()
+
+        if (!skillRow) {
+          // Resolve categoryId from skill_categories if a category name is provided
+          let categoryId: number | null = null
+          if (addition.category) {
+            const catRow = db
+              .select({ id: skillCategories.id })
+              .from(skillCategories)
+              .where(eq(skillCategories.name, addition.category))
+              .get()
+            categoryId = catRow?.id ?? null
+          }
+          const [inserted] = db
+            .insert(skills)
+            .values({ name: addition.skillName, tags: '[]', categoryId })
+            .returning()
+            .all()
+          skillRow = inserted
+        }
+
+        const skillId = skillRow.id
+
+        // Exclude the skill from every pre-existing variant (not the new one)
+        // BLOCKER fix: SELECT-first idempotency guard — no UNIQUE index on (variantId, skillId, itemType)
+        for (const otherVariantId of otherVariantIds) {
+          const existing = db
+            .select({ id: templateVariantItems.id })
+            .from(templateVariantItems)
+            .where(
+              and(
+                eq(templateVariantItems.variantId, otherVariantId),
+                eq(templateVariantItems.skillId, skillId),
+                eq(templateVariantItems.itemType, 'skill'),
+              ),
+            )
+            .get()
+          if (!existing) {
+            db.insert(templateVariantItems)
+              .values({
+                variantId: otherVariantId,
+                itemType: 'skill',
+                skillId,
+                excluded: true,
+              })
+              .run()
+          }
+        }
+      }
+
+      // (c) Promote margin override into new variant's templateOptions
+      const mergedOptions = mergeMarginIntoOptions(
+        newVariant.templateOptions ?? null,
+        layoutOverride ?? null,
+      )
+      if (mergedOptions !== null) {
+        db.update(templateVariants)
+          .set({ templateOptions: mergedOptions })
+          .where(eq(templateVariants.id, newVariant.id))
+          .run()
+      }
+    })()
+
+    return { newVariantId: newVariant.id }
+  } catch (err) {
+    // Orphan prevention: delete the newly-created variant so no ghost variant remains
+    try {
+      db.delete(templateVariants).where(eq(templateVariants.id, newVariant.id)).run()
+    } catch {
+      // Best-effort cleanup; ignore secondary errors
+    }
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export function registerTemplateHandlers(): void {
   ipcMain.handle('templates:list', () => listVariants(db))
   ipcMain.handle('templates:create', (_, data) => createVariant(db, data))
@@ -660,4 +914,5 @@ export function registerTemplateHandlers(): void {
   ipcMain.handle('analysisLayout:getMargins', (_, analysisId) => getAnalysisMargins(db, analysisId))
   ipcMain.handle('analysisLayout:setMargins', (_, analysisId, margins) => setAnalysisMargins(db, analysisId, margins))
   ipcMain.handle('analysisLayout:clearMargins', (_, analysisId) => clearAnalysisMargins(db, analysisId))
+  ipcMain.handle('templates:saveAnalysisAsVariant', (_, analysisId: number) => saveAnalysisAsVariant(db, analysisId))
 }
