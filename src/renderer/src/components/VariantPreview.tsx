@@ -12,6 +12,7 @@ interface VariantPreviewProps {
   marginTop?: number
   marginBottom?: number
   marginSides?: number
+  onContentHeight?: (iframeH: number, pageCount?: number) => void
 }
 
 function VariantPreview({
@@ -25,6 +26,7 @@ function VariantPreview({
   marginTop,
   marginBottom,
   marginSides,
+  onContentHeight,
 }: VariantPreviewProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -104,11 +106,12 @@ function VariantPreview({
         sendDataToIframe()
       } else if (event.data?.type === 'print-height' && typeof event.data.height === 'number') {
         setIframeHeight(event.data.height)
+        onContentHeight?.(event.data.height, event.data.pageCount as number | undefined)
       }
     }
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
-  }, [sendDataToIframe])
+  }, [sendDataToIframe, onContentHeight])
 
   // Also send data when builderData/profileData update (iframe may already be ready)
   useEffect(() => {
