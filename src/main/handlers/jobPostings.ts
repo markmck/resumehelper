@@ -198,11 +198,27 @@ export async function getJobPostingAnalyses(db: Db, analysisId: number) {
         .run()
     }
 
+    // SUM-01: Extract suggested_summary from rawLlmResponse (Option c — keep renderer decoupled
+    // from raw format). Parse once in a try/catch; default to '' on missing/malformed.
+    let suggestedSummary = ''
+    try {
+      const raw = analysis.rawLlmResponse
+      if (raw && raw.length > 0) {
+        const parsed = JSON.parse(raw) as Record<string, unknown>
+        if (typeof parsed['suggested_summary'] === 'string') {
+          suggestedSummary = parsed['suggested_summary']
+        }
+      }
+    } catch {
+      // rawLlmResponse is missing or not valid JSON — leave suggestedSummary as ''
+    }
+
     return {
       id: analysis.id,
       jobPostingId: analysis.jobPostingId,
       variantId: analysis.variantId,
       variantName,
+      suggestedSummary,
       matchScore: analysis.matchScore,
       keywordHits: JSON.parse(analysis.keywordHits) as string[],
       keywordMisses: JSON.parse(analysis.keywordMisses) as string[],

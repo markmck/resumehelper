@@ -208,6 +208,51 @@ export function acceptSuggestion(db: Db, analysisId: number, bulletId: number, t
   }
 }
 
+// SUM-02: Write an analysis-tier entity_overrides summary override.
+// Mirrors acceptSuggestion exactly — delete-then-insert in one sqlite.transaction
+// so there is always exactly one summary row per analysis (upsert guarantee).
+// Does NOT route through setVariantOverride (which hardcodes analysisId:null — research pitfall).
+export function acceptAnalysisSummary(db: Db, analysisId: number, text: string) {
+  try {
+    // Resolve variantId from the analysis row (may be null — matches acceptSuggestion pattern)
+    const analysisRow = db
+      .select({ variantId: analysisResults.variantId })
+      .from(analysisResults)
+      .where(eq(analysisResults.id, analysisId))
+      .get()
+    const variantId = analysisRow?.variantId ?? null
+
+    sqlite.transaction(() => {
+      // Delete any existing analysis-tier summary override for this analysis
+      db.delete(entityOverrides)
+        .where(
+          and(
+            eq(entityOverrides.analysisId, analysisId),
+            eq(entityOverrides.entityType, 'summary'),
+            eq(entityOverrides.field, 'text'),
+          )
+        )
+        .run()
+
+      db.insert(entityOverrides)
+        .values({
+          variantId,
+          analysisId,
+          entityType: 'summary',
+          field: 'text',
+          overrideText: text,
+          source: 'ai_suggestion',
+        })
+        .run()
+    })()
+
+    return { success: true }
+  } catch (err) {
+    console.error('ai:acceptAnalysisSummary error', err)
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export function dismissSuggestion(db: Db, analysisId: number, bulletId: number) {
   try {
     db.delete(entityOverrides)
@@ -548,5 +593,9 @@ export function registerAiHandlers(): void {
 
   ipcMain.handle('ai:dismissExcludedBulletSuggestion', (_event, analysisId: number, bulletId: number) =>
     dismissExcludedBulletSuggestion(db, analysisId, bulletId),
+  )
+
+  ipcMain.handle('ai:acceptAnalysisSummary', (_event, analysisId: number, text: string) =>
+    acceptAnalysisSummary(db, analysisId, text),
   )
 }
