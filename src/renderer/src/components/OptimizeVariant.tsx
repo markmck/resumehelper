@@ -3,6 +3,7 @@ import { useToast } from './Toast'
 import VariantPreview from './VariantPreview'
 import { getScoreColor } from '../lib/scoreColor'
 import { MARGIN_FLOOR } from '../lib/marginConstants'
+import { pageCountFromIframeHeight, canAutoFitSucceed, nextMarginStep, allAtFloor } from '../lib/autoFit'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -110,6 +111,36 @@ function pointImpact(kwCount: number): { label: string; color: string; bg: strin
   return { label: '+2 pts', color: 'var(--color-warning)', bg: 'rgba(245,158,11,0.12)' }
 }
 
+// ─── Auto-fit helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Wait for the iframe to report a new (changed) content height.
+ * Captures `prev` at call time, then polls every 30ms after an initial 150ms
+ * settle delay. Resolves with the new height value, or rejects after `timeoutMs`.
+ */
+function waitForNextHeight(
+  heightRef: React.MutableRefObject<number | null>,
+  timeoutMs = 600
+): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    const prev = heightRef.current
+    const deadline = Date.now() + timeoutMs
+    // Initial settle delay before polling starts
+    setTimeout(() => {
+      const poll = setInterval(() => {
+        const curr = heightRef.current
+        if (curr !== null && curr !== prev) {
+          clearInterval(poll)
+          resolve(curr)
+        } else if (Date.now() >= deadline) {
+          clearInterval(poll)
+          reject(new Error('waitForNextHeight: timed out'))
+        }
+      }, 30)
+    }, 150)
+  })
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVariantProps): React.JSX.Element {
@@ -143,6 +174,12 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   const [marginsOpen, setMarginsOpen] = useState(true)
   // ── Expanded margin-adjustment modal (large, readable preview surface)
   const [marginsModalOpen, setMarginsModalOpen] = useState(false)
+
+  // ── Auto-fit state (Phase 41)
+  const [autoFitStatus, setAutoFitStatus] = useState<'idle' | 'running' | 'success' | 'cannot-fit'>('idle')
+  const [currentPageCount, setCurrentPageCount] = useState(1)
+  const autoFitRunning = useRef(false)
+  const currentContentHeightRef = useRef<number | null>(null)
 
   const { showToast } = useToast()
 
@@ -206,6 +243,122 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [marginsModalOpen])
+
+  // ── Content-height callback (wired to both VariantPreview instances)
+  const handleContentHeight = useCallback((iframeH: number, pageCount?: number): void => {
+    currentContentHeightRef.current = iframeH
+    setCurrentPageCount(pageCount ?? pageCountFromIframeHeight(iframeH))
+  }, [])
+
+  // ── Auto-fit: step-and-remeasure loop
+  const handleAutoFit = useCallback(async (): Promise<void> => {
+    // Guards
+    if (!analysis?.id) return
+    if (autoFitRunning.current) return
+    if (currentPageCount <= 1) return
+
+    // Orphan-page scope only (Pitfall 6): more than 2 pages → cannot collapse to 1
+    if (currentPageCount > 2) {
+      setAutoFitStatus('cannot-fit')
+      return
+    }
+
+    const iframeH = currentContentHeightRef.current
+    if (iframeH === null) return
+
+    // Feasibility pre-check
+    const startTop = latestMarginTop.current
+    const startBottom = latestMarginBottom.current
+    const startSides = latestMarginSides.current
+
+    if (!canAutoFitSucceed(iframeH, startTop, startBottom, MARGIN_FLOOR)) {
+      setAutoFitStatus('cannot-fit')
+      return
+    }
+
+    // Cancel any pending debounced save (Pitfall 4)
+    if (saveMarginsRef.current) clearTimeout(saveMarginsRef.current)
+
+    autoFitRunning.current = true
+    setAutoFitStatus('running')
+
+    let top = startTop
+    let bottom = startBottom
+    let sides = startSides
+    const startPageCount = currentPageCount
+
+    try {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const next = nextMarginStep(top, bottom, sides, MARGIN_FLOOR, 0.05)
+        if (next === null) {
+          // All at floor, still > 1 page
+          window.api.analysisLayout.setMargins(analysis.id, {
+            marginTop: top,
+            marginBottom: bottom,
+            marginSides: sides,
+          })
+          setHasOverride(true)
+          setAutoFitStatus('cannot-fit')
+          break
+        }
+
+        // Write margins directly (mirror handleMarginChange body, but NO debounce)
+        top = next.top
+        bottom = next.bottom
+        sides = next.sides
+        setMarginTop(top)
+        setMarginBottom(bottom)
+        setMarginSides(sides)
+        latestMarginTop.current = top
+        latestMarginBottom.current = bottom
+        latestMarginSides.current = sides
+
+        // Wait for the iframe to report a new height
+        let newH: number
+        try {
+          newH = await waitForNextHeight(currentContentHeightRef)
+        } catch {
+          // Timeout — treat as cannot-fit at current margins
+          window.api.analysisLayout.setMargins(analysis.id, {
+            marginTop: top,
+            marginBottom: bottom,
+            marginSides: sides,
+          })
+          setHasOverride(true)
+          setAutoFitStatus('cannot-fit')
+          break
+        }
+
+        const newPageCount = pageCountFromIframeHeight(newH)
+        if (newPageCount < startPageCount) {
+          // Success — page dropped
+          window.api.analysisLayout.setMargins(analysis.id, {
+            marginTop: top,
+            marginBottom: bottom,
+            marginSides: sides,
+          })
+          setHasOverride(true)
+          setAutoFitStatus('success')
+          break
+        }
+
+        if (allAtFloor(top, bottom, sides, MARGIN_FLOOR)) {
+          // Reached floor, still > 1 page
+          window.api.analysisLayout.setMargins(analysis.id, {
+            marginTop: top,
+            marginBottom: bottom,
+            marginSides: sides,
+          })
+          setHasOverride(true)
+          setAutoFitStatus('cannot-fit')
+          break
+        }
+      }
+    } finally {
+      autoFitRunning.current = false
+    }
+  }, [analysis?.id, currentPageCount])
 
   // ── Revert margins to variant defaults
   const handleRevert = useCallback(async (): Promise<void> => {
@@ -713,6 +866,76 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
       >
         Revert to variant margins
       </span>
+
+      {/* Auto-Fit button */}
+      <button
+        onClick={handleAutoFit}
+        disabled={autoFitStatus === 'running' || currentPageCount <= 1}
+        style={{
+          marginTop: 8,
+          padding: '4px 10px',
+          background: 'none',
+          border: '1px solid var(--color-border-default)',
+          borderRadius: 'var(--radius-sm)',
+          color: (autoFitStatus === 'running' || currentPageCount <= 1)
+            ? 'var(--color-text-muted)'
+            : 'var(--color-text-secondary)',
+          cursor: (autoFitStatus === 'running' || currentPageCount <= 1) ? 'not-allowed' : 'pointer',
+          fontSize: 'var(--font-size-xs)',
+          fontFamily: 'var(--font-sans)',
+          opacity: currentPageCount <= 1 ? 0.4 : 1,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        {autoFitStatus === 'running' && (
+          <span
+            style={{
+              display: 'inline-block',
+              width: 10,
+              height: 10,
+              border: '2px solid var(--color-accent)',
+              borderTopColor: 'transparent',
+              borderRadius: '50%',
+              animation: 'ov-spin 0.8s linear infinite',
+            }}
+          />
+        )}
+        {autoFitStatus === 'running' ? 'Fitting...' : 'Auto-Fit'}
+      </button>
+
+      {/* Success note */}
+      {autoFitStatus === 'success' && (
+        <span
+          style={{
+            fontSize: 'var(--font-size-xs)',
+            color: 'var(--color-success)',
+            marginTop: 4,
+            display: 'block',
+          }}
+        >
+          Margins tightened to fit
+        </span>
+      )}
+
+      {/* Cannot-fit banner */}
+      {autoFitStatus === 'cannot-fit' && (
+        <div
+          style={{
+            background: 'var(--color-bg-raised)',
+            border: '1px solid var(--color-warning-bg)',
+            borderLeft: '2px solid var(--color-warning)',
+            borderRadius: 'var(--radius-md)',
+            padding: '10px 12px',
+            marginTop: 8,
+            fontSize: 'var(--font-size-xs)',
+            color: 'var(--color-text-secondary)',
+          }}
+        >
+          Cannot fit page 2 within the 0.4&quot; minimum margin. Try removing some content.
+        </div>
+      )}
     </div>
   )
 
@@ -2076,6 +2299,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                 marginTop={marginTop}
                 marginBottom={marginBottom}
                 marginSides={marginSides}
+                onContentHeight={handleContentHeight}
               />
             </div>
           </div>
@@ -2162,6 +2386,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                   marginTop={marginTop}
                   marginBottom={marginBottom}
                   marginSides={marginSides}
+                  onContentHeight={handleContentHeight}
                 />
               </div>
               <div style={{ overflowY: 'auto', padding: 'var(--space-5)' }}>
