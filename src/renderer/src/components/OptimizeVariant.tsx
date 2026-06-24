@@ -44,6 +44,7 @@ interface AnalysisData {
   createdAt: Date
   company: string
   role: string
+  suggestedSummary?: string
 }
 
 type SuggestionState = 'pending' | 'accepted' | 'dismissed'
@@ -157,6 +158,10 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   const [stagedBullets, setStagedBullets] = useState<StagedExcludedBullet[]>([])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
+  // ── Summary card state
+  const [summaryCardState, setSummaryCardState] = useState<'pending' | 'editing' | 'accepted' | 'dismissed'>('pending')
+  const [summaryEditText, setSummaryEditText] = useState('')
+
   // ── Threshold state
   const [threshold, setThreshold] = useState(80)
 
@@ -174,6 +179,9 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   const [marginsOpen, setMarginsOpen] = useState(true)
   // ── Expanded margin-adjustment modal (large, readable preview surface)
   const [marginsModalOpen, setMarginsModalOpen] = useState(false)
+
+  // ── Save-as-variant state
+  const [savingVariant, setSavingVariant] = useState(false)
 
   // ── Auto-fit state (Phase 41)
   const [autoFitStatus, setAutoFitStatus] = useState<'idle' | 'running' | 'success' | 'cannot-fit'>('idle')
@@ -508,6 +516,13 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
     loadExcludedBullets()
   }, [analysis?.id])
 
+  // ── Seed summary edit text when analysis loads (session-only; non-empty guard prevents card render)
+  useEffect(() => {
+    if (!analysis?.id) return
+    const text = analysis.suggestedSummary ?? ''
+    if (text) setSummaryEditText(text)
+  }, [analysis?.id])
+
   // ── Seed margin sliders on mount (or when analysis.id changes)
   useEffect(() => {
     if (!analysis?.id || !analysis?.variantId) return
@@ -748,6 +763,39 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
       prev.map((b) => (b.bulletId === bulletId ? { ...b, status: 'pending' } : b))
     )
     setPreviewRefreshKey((k) => k + 1)
+  }
+
+  // ── Summary card handlers (SUM-01 / SUM-02)
+  const acceptSummary = async (): Promise<void> => {
+    if (!analysis) return
+    const result = await window.api.ai.acceptAnalysisSummary(analysis.id, summaryEditText)
+    if ('error' in result) {
+      showToast('Failed to apply summary')
+      return
+    }
+    setSummaryCardState('accepted')
+    setPreviewRefreshKey((k) => k + 1)
+    showToast('Summary applied')
+  }
+
+  const dismissSummary = (): void => {
+    setSummaryCardState('dismissed')
+  }
+
+  // ── Save-as-variant handler (SAVE-01)
+  const handleSaveAsVariant = async (): Promise<void> => {
+    if (!analysis?.id) return
+    setSavingVariant(true)
+    try {
+      const result = await window.api.templates.saveAnalysisAsVariant(analysis.id)
+      if ('error' in result) {
+        showToast(result.error)
+      } else {
+        showToast('Saved as a new variant — rename it in Variant Builder')
+      }
+    } finally {
+      setSavingVariant(false)
+    }
   }
 
   // ── Loading / Error states
@@ -995,6 +1043,23 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
           Optimize Variant
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <button
+            onClick={handleSaveAsVariant}
+            disabled={savingVariant}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: 'var(--color-bg-surface)',
+              color: 'var(--color-accent)',
+              border: '1px solid var(--color-accent)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--font-size-sm)',
+              fontFamily: 'var(--font-sans)',
+              cursor: savingVariant ? 'not-allowed' : 'pointer',
+              opacity: savingVariant ? 0.6 : 1,
+            }}
+          >
+            {savingVariant ? 'Saving...' : 'Save as new variant'}
+          </button>
           {onLogSubmission && (
             <button
               onClick={() => onLogSubmission(analysisId)}
@@ -1430,6 +1495,114 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {/* Suggested-Summary accept/edit/dismiss card (SUM-01) — above excluded-bullet panel */}
+          {analysis.suggestedSummary && summaryCardState !== 'dismissed' && (
+            <div style={{ marginTop: 'var(--space-8)' }}>
+              <div
+                style={{
+                  backgroundColor: summaryCardState === 'accepted' ? 'rgba(34,197,94,0.04)' : 'var(--color-bg-surface)',
+                  border: summaryCardState === 'accepted'
+                    ? '1px solid rgba(34,197,94,0.25)'
+                    : '1px solid var(--color-border-subtle)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: 'var(--space-4)',
+                }}
+              >
+                {/* Card header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+                  <h2
+                    style={{
+                      fontSize: 'var(--font-size-base)',
+                      fontWeight: 700,
+                      color: 'var(--color-text-primary)',
+                      margin: 0,
+                    }}
+                  >
+                    AI-suggested summary
+                  </h2>
+                  {summaryCardState === 'accepted' && (
+                    <span
+                      style={{
+                        marginLeft: 'auto',
+                        padding: '1px 8px',
+                        backgroundColor: 'rgba(34,197,94,0.12)',
+                        color: 'var(--color-success)',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: 'var(--font-size-xs)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Accepted
+                    </span>
+                  )}
+                </div>
+
+                {/* Editable textarea */}
+                <textarea
+                  value={summaryEditText}
+                  onChange={(e) => { setSummaryEditText(e.target.value); setSummaryCardState('editing') }}
+                  onFocus={() => { if (summaryCardState === 'pending') setSummaryCardState('editing') }}
+                  rows={4}
+                  disabled={summaryCardState === 'accepted'}
+                  style={{
+                    width: '100%',
+                    padding: 'var(--space-2) var(--space-3)',
+                    backgroundColor: summaryCardState === 'accepted' ? 'rgba(34,197,94,0.08)' : 'var(--color-bg-input)',
+                    border: summaryCardState === 'accepted'
+                      ? '1px solid rgba(34,197,94,0.25)'
+                      : '1px solid var(--color-border-default)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--color-text-primary)',
+                    fontSize: 'var(--font-size-sm)',
+                    fontFamily: 'var(--font-sans)',
+                    lineHeight: 1.5,
+                    resize: 'vertical',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    marginBottom: 'var(--space-3)',
+                  }}
+                />
+
+                {/* Action buttons */}
+                {summaryCardState !== 'accepted' && (
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={acceptSummary}
+                      style={{
+                        padding: '5px 12px',
+                        backgroundColor: 'rgba(34,197,94,0.12)',
+                        color: 'var(--color-success)',
+                        border: '1px solid rgba(34,197,94,0.3)',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: 'var(--font-size-xs)',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: 'var(--font-sans)',
+                      }}
+                    >
+                      Accept summary
+                    </button>
+                    <button
+                      onClick={dismissSummary}
+                      style={{
+                        padding: '5px 12px',
+                        backgroundColor: 'transparent',
+                        color: 'var(--color-text-tertiary)',
+                        border: 'none',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: 'var(--font-size-xs)',
+                        cursor: 'pointer',
+                        fontFamily: 'var(--font-sans)',
+                      }}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
