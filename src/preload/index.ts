@@ -77,6 +77,8 @@ const api = {
       entityId: { bulletId?: number; projectId?: number },
     ) =>
       ipcRenderer.invoke('templates:clearVariantOverride', variantId, entityType, field, entityId),
+    saveAnalysisAsVariant: (analysisId: number) =>
+      ipcRenderer.invoke('templates:saveAnalysisAsVariant', analysisId),
   },
   submissions: {
     list: () => ipcRenderer.invoke('submissions:list'),
@@ -291,6 +293,8 @@ const api = {
       ipcRenderer.invoke('ai:acceptExcludedBulletSuggestion', analysisId, bulletId),
     dismissExcludedBulletSuggestion: (analysisId: number, bulletId: number) =>
       ipcRenderer.invoke('ai:dismissExcludedBulletSuggestion', analysisId, bulletId),
+    acceptAnalysisSummary: (analysisId: number, text: string) =>
+      ipcRenderer.invoke('ai:acceptAnalysisSummary', analysisId, text),
   },
   jobPostings: {
     list: () => ipcRenderer.invoke('jobPostings:list'),

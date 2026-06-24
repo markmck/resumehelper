@@ -393,6 +393,7 @@ export interface Api {
       field: string,
       entityId: { bulletId?: number; projectId?: number },
     ) => Promise<{ success: boolean }>
+    saveAnalysisAsVariant: (analysisId: number) => Promise<{ newVariantId: number } | { error: string }>
   }
   submissions: {
     list: () => Promise<Submission[]>
@@ -611,6 +612,7 @@ export interface Api {
     }>>
     acceptExcludedBulletSuggestion: (analysisId: number, bulletId: number) => Promise<{ success: boolean } | { error: string }>
     dismissExcludedBulletSuggestion: (analysisId: number, bulletId: number) => Promise<{ success: boolean } | { error: string }>
+    acceptAnalysisSummary: (analysisId: number, text: string) => Promise<{ success: boolean } | { error: string }>
   }
   jobPostings: {
     list: () => Promise<unknown[]>
