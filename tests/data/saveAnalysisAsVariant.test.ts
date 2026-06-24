@@ -184,6 +184,23 @@ describe('saveAnalysisAsVariant', () => {
     expect(projectRow?.overrideText).toBe('Renamed Project')
   })
 
+  it('case 1b: the new variant is named after the job (company – role), not "<source> (Copy)"', () => {
+    const db = createTestDb()
+    const { analysis } = seedPrerequisites(db)
+
+    const result = saveAnalysisAsVariant(db, analysis.id)
+    const { newVariantId } = result as { newVariantId: number }
+
+    const newVariant = db
+      .select({ name: schema.templateVariants.name })
+      .from(schema.templateVariants)
+      .where(eq(schema.templateVariants.id, newVariantId))
+      .get()
+    // seedPrerequisites seeds jobPostings with company 'Acme Corp', role 'Engineer'
+    expect(newVariant?.name).toBe('Acme Corp – Engineer')
+    expect(newVariant?.name).not.toContain('(Copy)')
+  })
+
   it('case 2: collision safety — source variant has a variant-tier override for bullet B AND analysis has an override for the same bullet B; new variant ends with exactly ONE entity_overrides row for that field carrying the analysis text', () => {
     const db = createTestDb()
     const { sourceVariant, analysis, bullet } = seedPrerequisites(db)

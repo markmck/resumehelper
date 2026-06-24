@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { db, sqlite } from '../db'
-import { templateVariants, templateVariantItems, jobBullets, projectBullets, entityOverrides, analysisLayoutOverrides, analysisResults, analysisSkillAdditions, skills, skillCategories } from '../db/schema'
+import { templateVariants, templateVariantItems, jobBullets, projectBullets, entityOverrides, analysisLayoutOverrides, analysisResults, analysisSkillAdditions, skills, skillCategories, jobPostings } from '../db/schema'
 import { eq, and, desc, inArray, isNull } from 'drizzle-orm'
 import { buildMergedBuilderData } from '../lib/mergeHelper'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
@@ -733,10 +733,15 @@ export function saveAnalysisAsVariant(
   db: Db,
   analysisId: number,
 ): { newVariantId: number } | { error: string } {
-  // 1. Load analysis row
+  // 1. Load analysis row joined to its job posting (for the job-named variant)
   const analysisRow = db
-    .select({ variantId: analysisResults.variantId })
+    .select({
+      variantId: analysisResults.variantId,
+      company: jobPostings.company,
+      role: jobPostings.role,
+    })
     .from(analysisResults)
+    .innerJoin(jobPostings, eq(analysisResults.jobPostingId, jobPostings.id))
     .where(eq(analysisResults.id, analysisId))
     .get()
   if (!analysisRow) return { error: `Analysis ${analysisId} not found` }
@@ -749,6 +754,14 @@ export function saveAnalysisAsVariant(
     newVariant = duplicateVariant(db, sourceVariantId)
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) }
+  }
+
+  // 2b. Name the new variant after the job so it's findable among saved variants
+  // (replaces duplicateVariant's "<source> (Copy)" default). Falls back to the
+  // (Copy) name if the posting has no company/role text.
+  const jobName = [analysisRow.company, analysisRow.role].map((s) => s?.trim()).filter(Boolean).join(' – ')
+  if (jobName) {
+    db.update(templateVariants).set({ name: jobName }).where(eq(templateVariants.id, newVariant.id)).run()
   }
 
   // 3. Bake analysis-tier state onto the new variant — single synchronous transaction
