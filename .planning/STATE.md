@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Optimization Layout Controls
-status: executing
+status: Awaiting next milestone
 stopped_at: Phase 40 UI-SPEC approved
-last_updated: "2026-06-10T17:43:30.919Z"
-last_activity: 2026-06-10
+last_updated: "2026-06-24T20:57:50.432Z"
+last_activity: 2026-06-24 — Milestone v2.7 completed and archived
 progress:
   total_phases: 7
-  completed_phases: 1
-  total_plans: 6
-  completed_plans: 5
-  percent: 14
+  completed_phases: 3
+  total_plans: 15
+  completed_plans: 15
+  percent: 43
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-09)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** Phase 40 — Margin Controls + Live Preview in Optimize
+**Current focus:** v2.7 milestone complete — ready to complete/archive milestone
 
 ## Current Position
 
-Phase: 40 (Margin Controls + Live Preview in Optimize) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-06-10
+Phase: Milestone v2.7 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-24 — Milestone v2.7 completed and archived
 
 ## Performance Metrics
 
@@ -69,9 +69,11 @@ Phase 35 decisions (Plans 01-03):
 
 ### Pending Todos
 
-- [ ] Phase 39: Analysis margin override data layer (storage + merge + snapshot freeze)
-- [ ] Phase 40: Margin controls + live preview in Optimize
+- [x] Phase 39: Analysis margin override data layer (storage + merge + snapshot freeze)
+- [x] Phase 40: Margin controls + live preview in Optimize (+ expand-to-modal preview)
 - [ ] Phase 41: Auto-fit orphan-page removal
+- [ ] Backlog: Save optimized variant as a new variant (promote analysis-tier optimizations into a standalone variant)
+- [ ] Backlog: Suggest summary for job in optimization (AI-proposed tailored summary via summaryOverride, accept/edit/dismiss)
 
 ### Blockers/Concerns
 
@@ -97,3 +99,7 @@ Resume file: None
 - WR-04: ai.ts getOverrides surfaces only analysis-tier rows (unaware of two-tier precedence).
 - WR-05: tests/helpers/db.ts relies on the better-sqlite3 FK-default-ON; consider asserting the pragma at startup so test+prod can't silently lose cascades together.
 - Pre-existing test flake: parallel in-memory SQLite + WAL occasionally reports a transient failure (e.g. acceptSuggestion.test.ts); passes in isolation and on rerun.
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

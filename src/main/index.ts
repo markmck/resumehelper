@@ -3,10 +3,13 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerAllHandlers } from './handlers'
+import { initAutoUpdater } from './updater'
+
+let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1100,
     height: 750,
     show: false,
@@ -20,7 +23,11 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    mainWindow?.show()
+  })
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -54,6 +61,8 @@ app.whenReady().then(() => {
   registerAllHandlers()
 
   createWindow()
+
+  initAutoUpdater(() => mainWindow)
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

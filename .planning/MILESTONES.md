@@ -1,5 +1,27 @@
 # Milestones
 
+## v2.7 Optimization Layout Controls (Shipped: 2026-06-24)
+
+**Phases completed:** 3 phases, 15 plans, 16 tasks
+
+**Key accomplishments:**
+
+- Dedicated `analysis_layout_overrides` SQLite table (UNIQUE analysisId FK, CASCADE DELETE, three REAL margin columns) with CRUD pure functions, IPC wiring, and typed preload bridge for analysis-scoped margin overrides that never mutate variant templateOptions
+- Pure exported `resolveEffectiveMargins` with three-tier precedence (analysis override → variant templateOptions → DOCX_MARGIN_DEFAULTS) and non-optional `effectiveMargins: EffectiveMargins` attached to `MergedBuilderData` at merge time
+- Three live margin-read sites (live-PDF, live-DOCX, submission snapshot) routed through the single `effectiveMargins` merge path; frozen margins persisted into `submissions.resumeSnapshot`; snapshot-replay regression test locking frozen-margin rendering
+- Shared MARGIN_FLOOR = 0.4 constant and effectiveMargins type extension on BuilderData — two prerequisite seams for Plan 02 margin slider wiring
+- Three-slider MARGINS section wired to analysis-scoped overrides in OptimizeVariant: debounced IPC persist via analysisLayout.setMargins, seeded from getMargins/effectiveMargins on mount, always-rendered revert control, and live VariantPreview props driven by local slider state
+- Human-verified that the Optimize margin sliders seed, drive the live preview, persist, show merged content, and revert per spec — and closed the one usability gap with a full-screen expand-to-modal preview surface.
+- `src/renderer/src/lib/autoFit.ts`
+- `src/renderer/src/PrintApp.tsx`
+- `src/renderer/src/components/OptimizeVariant.tsx`
+- User confirmed auto-fit orphan-page removal works end-to-end in the running app: disabled on single-page, 2→1 page on click, floor cannot-fit message with no content loss, and persistence.
+- One-liner:
+- One-liner:
+- User confirmed save-as-variant captures the optimized analysis as a new variant and the AI summary suggestion accepts/persists; one gap-closure applied: the saved variant is now named after the job so it's findable.
+
+---
+
 ## v2.5 Portability & Debt Cleanup (Shipped: 2026-06-05)
 
 **Phases completed:** 5 phases, 19 plans

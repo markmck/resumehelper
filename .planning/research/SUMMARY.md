@@ -1,202 +1,235 @@
 # Project Research Summary
 
-**Project:** ResumeHelper — Milestone v2.5 Portability & Debt Cleanup
-**Domain:** Electron desktop app (React 19 + TypeScript + Drizzle + better-sqlite3)
-**Researched:** 2026-04-23
+**Project:** ResumeHelper v2.6 — Per-Variant Text Overrides + Excluded-Bullet Suggestions
+**Domain:** Electron desktop app — polymorphic SQLite override table + AI-powered excluded-bullet surfacing
+**Researched:** 2026-06-05
 **Confidence:** HIGH
+
+---
 
 ## Executive Summary
 
-v2.5 is a narrow, **additive** milestone against a mature codebase: five target deliverables (base resume.json export, variant-merged resume.json export, configurable DB location, DOCX `showSummary` fix, four tech-debt items) with **zero new runtime dependencies**. Every capability required is either already installed (`zod`, `better-sqlite3`, Electron `dialog`/`app`/`shell`) or built into Node. The work is primarily about reusing existing infrastructure — `ResumeJsonSchema` (aiProvider.ts:47), `applyOverrides()` (shared/overrides.ts), `getBuilderDataForVariant()` (handlers/export.ts:16) — and carefully threading one new cross-cutting concern: persisting the DB path **outside** the DB itself in a `userData/db-location.json` bootstrap file.
+ResumeHelper v2.6 extends the existing three-layer data model (base → variant → analysis) with two new capabilities: (1) users can reword text at the variant tier rather than only include/exclude items, and (2) the AI analysis can surface base bullets the active variant omits when a job description specifically demands that experience. All research is grounded directly in source code — no new dependencies are required, every capability is covered by the installed stack, and every integration point is already established by patterns in the existing codebase (`templateVariantItems`, `ensureSchema()`, `buildMergedBuilderData()`, `acceptSuggestion()`, `InlineEdit.tsx`).
 
-Two cross-cutting risks dominate and recur across three of the four research files: **(1) a `showSummary` dual-source-of-truth** where HTML/PDF reads from `template_variant_items` (exclusion sentinel row) while DOCX reads only from `templateOptions` JSON and silently ignores the flag (docxBuilder.ts:59); and **(2) two parallel `getBuilderDataForVariant` implementations** — one in `handlers/export.ts` (no `summaryExcluded`, no skill-additions merge), another in `handlers/templates.ts` (returns `summaryExcluded`), with skill-addition merging living in a *third* place (`handlers/submissions.ts:166-186`). Fixing both is the **same underlying refactor** and it is the single highest-leverage Phase-1 action: reconcile the merge path into one function that both DOCX and the variant JSON export consume.
+The recommended approach is a four-phase build in strict dependency order: (1) schema and data migration as a blocker for everything else, (2) merge-helper extension to apply multi-field and multi-tier overrides with correct precedence, (3) variant reword UI built on top of Phase 2 handlers, (4) excluded-bullet suggestion pipeline (prompt engineering, new Zod schema field, new DB table, new IPC handlers, OptimizeVariant card). Phases 3 and 4 are parallelizable once Phase 2 ships. The single `buildMergedBuilderData()` merge path is the key architectural invariant — all override application happens inside this function so every surface (PDF, DOCX, snapshot, resume.json export) automatically benefits.
 
-The recommended approach is a **5-phase roadmap** that front-loads the merge-path reconciliation (unblocking both variant export and the DOCX fix), parallelizes the independent streams (base export, tech debt), and sequences the DB relocation last because it touches module-level singletons imported by 20+ handler files. The chosen switch mechanism is `app.relaunch(); app.exit(0)` after copy+verify — not an in-process Proxy swap — because the singleton retrofit is out of scope for a debt-cleanup milestone and the UX cost of a ~1s restart matches VS Code/Obsidian conventions users already accept.
+The primary risks are: a schema design decision (generic `entity_id` vs per-entity nullable FK columns) that must be resolved in Phase 1 before any other work proceeds; migration correctness for existing `analysisBulletOverrides` rows; merge-precedence inversion (variant override silently winning over accepted AI suggestions); snapshot coverage gaps for new entity types; and LLM hallucination of bullet IDs in the excluded-bullet suggestion feature. Each risk has a clear mitigation grounded in existing patterns in the codebase.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-Stack work is **entirely additive reuse**: no new packages, zero installs. All APIs needed for v2.5 are present in `package.json` as of milestone start (verified). The single "new" storage mechanism is a 4-line JSON file alongside the DB for path override — not `electron-store`, not a new table.
+No new dependencies. Every capability needed for v2.6 is already provided by the installed stack: `drizzle-orm` for the new table definition and queries, `better-sqlite3` for the `ensureSchema()` migration pattern, `zod` for `ResumeScorerSchema` extension, Vercel AI SDK `generateObject` for the excluded-bullet suggestion call (same pattern as the current scorer), React + TypeScript for UI, and Vitest with `MockLanguageModelV3` for tests. The `CREATE TABLE IF NOT EXISTS` + `ALTER TABLE ... ADD COLUMN` try/catch pattern in `ensureSchema()` handles all schema changes with no additional migration infrastructure.
 
-**Core technologies (all pre-installed):**
-- `electron@^39.2.6` — `dialog.showSaveDialog`, `showOpenDialog({properties:['openDirectory']})`, `app.relaunch()`, `app.exit()`, `shell.showItemInFolder` — already used by existing export handlers
-- `better-sqlite3@^12.8.0` — `.close()`, `PRAGMA wal_checkpoint(TRUNCATE)`, `PRAGMA integrity_check` — sync API is the right fit for copy→verify→switch
-- `zod@^4.3.6` — reuse existing `ResumeJsonSchema` (aiProvider.ts:47-112) as validator on export, same schema used for v2.3 import
-- `drizzle-orm@^0.45.1` — no changes; `ensureSchema()` re-runs idempotently on reopen
-- `node:fs/promises`, `node:path` — built-in, already used throughout main process
-
-**What NOT to use:** `electron-store` (overkill for one setting), `fs-extra` (not installed), `app.setPath('userData', ...)` to move the DB (moves too much — only `app.db` relocates), `fs.copyFile` without prior WAL checkpoint (data loss), in-process Proxy DB hot-swap (singleton retrofit is out of scope).
+**Core technologies (confirmed from package.json + source):**
+- `drizzle-orm` ^0.45.1 — new `entityOverrides` + `analysisExcludedBulletSuggestions` Drizzle table definitions
+- `better-sqlite3` ^12.10.0 — `ensureSchema()` migration pattern; `sqlite.transaction()` wrapping the data migration
+- `zod` ^4.3.6 — extend `ResumeScorerSchema` with `excluded_bullet_suggestions.default([])` for backward compat
+- `ai` (Vercel AI SDK) ^6.0.136 — `generateObject` with expanded schema; same `callResumeScorer` call pattern
+- `react` + TypeScript ^19.2.1 / ^5.9.3 — `InlineEdit.tsx` (multiline=true) reuse for variant reword UI
+- `vitest` ^4.1.2 — `MockLanguageModelV3` covers new prompt/schema tests; `createTestDb()` must be kept in sync
 
 ### Expected Features
 
-**Must have (v2.5 MVP — all P1):**
-- Base `Export JSON` button in Experience tab header (next to Import JSON / Import PDF) — full DB dump, roundtrip-compatible with existing INSERT-only import
-- Per-variant `JSON` button in VariantEditor preview toolbar (next to PDF / DOCX) — three-layer merge, export-only
-- `Database Location` card in Settings with current-path label, Reveal-in-Explorer, Change-location flow with copy→verify→switch→backup→restart confirmation
-- DOCX export honors `showSummary` (one-line fix in `buildResumeDocx` + thread the flag from `export:docx` handler)
-- Tech-debt cleanup: orphan `TEMPLATE_LIST` export, vestigial `compact` prop, dead `tests/setup.ts`, `jobs.test.ts` race + broken `.where(undefined as any)` clause
+**Must have (P1 — v2.6 launch):**
+- Unified `entityOverrides` table (polymorphic shape: `variant_id`, `analysis_id`, `entity_type`, `entity_id`, `field`, `override_text`) with correct NULL semantics and partial unique indexes
+- Migration of all existing `analysisBulletOverrides` rows into the new table (INSERT-SELECT + row-count assertion)
+- Updated `buildMergedBuilderData()` reading from `entityOverrides` with precedence analysis → variant → base
+- Inline reword affordance for bullet text at variant tier (`InlineEdit` pattern, pencil icon on hover)
+- Inline reword affordance for summary at variant tier (gated on non-empty `profileSummary` + `showSummary`)
+- Visual distinction in VariantBuilder: accent left-border/dot for overridden fields; no strikethrough (already means "excluded")
+- Reset-to-base for all overridable fields (DELETE override row → preview refresh)
+- Excluded-bullet suggestion cards in OptimizeVariant (requires prompt change + new Zod field + new table)
 
-**Should have (polish — P2, optional):**
-- `$schema` pointer in exported JSON (improves downstream validator UX, zero cost)
-- "Reveal in Explorer" next to DB path label (standard Electron convention)
-- Network/cloud-folder warning modal when user picks OneDrive/Dropbox/UNC path (heuristic, not a hard block)
+**Should have (P2 — add after core validated):**
+- Inline reword for job title (role field) at variant tier
+- Inline reword for project title + description (requires `projects.description` schema addition first)
+- Staleness indicator when base text updated after a variant override is established
+- Override count badge in VariantEditor builder pane header
 
-**Defer (explicitly out of scope):**
-- Variant JSON roundtrip / import (violates JSON Resume spec, tempts sibling import path)
-- "Export all variants" bulk/zip (N×dialog friction or new dep)
-- Live in-process DB swap without restart (requires Proxy retrofit across 20+ handler imports)
-- In-app DB browser, scheduled auto-backup, cloud sync integration
+**Defer (v2.7+):**
+- Bulk override management UI
+- Override history / audit trail
+- AI-suggested rewording at variant tier (keep AI strictly at analysis tier)
+- Propagate variant override back to base (destroys layer model)
+
+**Anti-features (explicitly rejected):**
+- Variant-tier summary CREATE from scratch without a base summary
+- Batch "accept all" for variant overrides
+- Free-form company name override (misrepresentation risk; allow role/title only)
 
 ### Architecture Approach
 
-Five features graft onto existing Electron/Drizzle/SQLite architecture via one foundational refactor plus four additive layers. The **central architectural finding** is that the codebase currently has three parallel "what goes into a rendered variant?" code paths — `handlers/export.ts:16` (PDF/DOCX consumer, merges bullet overrides only), `handlers/templates.ts:318` (preview consumer, also returns `summaryExcluded`), and `handlers/submissions.ts:166-186` (snapshot consumer, also merges skill additions). v2.5 must unify these into a single authoritative `buildMergedBuilderData(db, variantId, analysisId?)` before the variant JSON export can be trusted.
+The v2.6 architecture extends the single `buildMergedBuilderData()` merge path with a new Layer 2.5 (variant-tier text overrides) inserted between Layer 2 (variant exclusions) and Layer 3 (analysis overrides). A new unified `entityOverrides` table replaces `analysisBulletOverrides`; a separate `analysisExcludedBulletSuggestions` table (mirroring `analysisSkillAdditions`) handles the accept/dismiss lifecycle for excluded-bullet suggestions. All override application stays inside `buildMergedBuilderData()` — the renderer always receives merged data, never applies overrides client-side.
 
 **Major components:**
-1. **`src/shared/resumeJson.ts` (new)** — lifted `ResumeJson` interface (from import.ts:10-75), single source of truth for both import and export
-2. **`src/shared/resumeJsonBuilder.ts` or inlined in export.ts (new)** — `buildBaseResumeJson(db)` and `buildVariantResumeJson(db, variantId, analysisId?)` pure functions; both emit the same shape; validate with `ResumeJsonSchema.parse` before write
-3. **Unified merge helper** — consolidates bullet overrides + skill additions + summary/job exclusions into one function; called by DOCX export, variant JSON export, snapshot builder, and PrintApp data loader
-4. **`src/main/config/appConfig.ts` (new)** — reads/writes `userData/db-location.json`; owns the `dbPath` setting; read at boot before DB opens
-5. **`src/main/db/index.ts` (modified)** — bootstrap path resolution (`readBootstrapOverride() ?? default`); no Proxy wrapper; relaunch after switch
-6. **Settings UI — `DatabaseLocationCard` (new)** — second card in SettingsTab, below AI Configuration; folder picker → confirmation modal → progress state → restart prompt
-7. **`src/main/lib/docxBuilder.ts` (modified)** — widen `templateOptions` to include `showSummary?: boolean` (default `true`); wrap summary paragraph in conditional (one-line destructure + one-line guard)
+
+1. **`entityOverrides` table** (`schema.ts` + `index.ts`) — unified polymorphic override store; two partial unique indexes; ON DELETE CASCADE via per-entity nullable FK columns (not generic `entity_id`)
+2. **`buildMergedBuilderData()` extension** (`mergeHelper.ts`) — two-pass override map (variant-tier first, analysis-tier overwrites); `summaryOverride?: string` added to `MergedBuilderData`; analysis-tier inclusion un-exclusion for excluded bullets
+3. **`analysisExcludedBulletSuggestions` table + handlers** (`schema.ts`, `ai.ts`) — stores LLM suggestions; `acceptExcludedBulletSuggestion` writes to `entityOverrides` with `source='inclusion'`; mirrors `analysisSkillAdditions` pattern exactly
+4. **Variant reword UI** (`VariantBuilder.tsx` + `InlineEdit.tsx`) — hover pencil icon → multiline InlineEdit → IPC `templates:setVariantOverride` → preview refresh
+5. **Excluded-bullet suggestion prompt extension** (`analysisPrompts.ts`, `aiProvider.ts`) — new `## Excluded Bullets` section; `excluded_bullet_suggestions` field with `.default([])` on `ResumeScorerSchema`
+6. **`buildSnapshotForVariant()` extension** (`submissions.ts`) — splice `summaryOverride` into `frozenProfile.summary`
 
 ### Critical Pitfalls
 
-Top five, drawn from PITFALLS.md and cross-referenced against architecture/feature findings:
+1. **Migration column mapping error** — INSERT-SELECT from `analysis_bullet_overrides` must map `bullet_id` → `entity_id` (not `analysis_id`). Prevention: explicit column-by-column INSERT-SELECT; post-migration row-count assertion at `ensureSchema()` startup; keep old table alive, do NOT drop in v2.6.
 
-1. **DOCX `showSummary` divergence (Pitfall 8)** — flag is stored in `template_variant_items` (sentinel row) but DOCX reads `variant.templateOptions` JSON column only. Fix: reconcile merge helper in Phase 1, destructure `showSummary` in `buildResumeDocx:59`, wrap paragraph emission. Test parameterized across HTML + PDF + DOCX so drift cannot return.
+2. **Merge precedence inversion** — variant-tier override applied after analysis-tier clobbers accepted AI suggestions. Prevention: Layer 2.5 (variant text) strictly before Layer 3 (analysis) in `buildMergedBuilderData()`; unit test: same-entity variant + analysis override → analysis text wins.
 
-2. **Variant export silently drops accepted skill additions (Pitfall 3)** — `getBuilderDataForVariant` in `export.ts` does NOT merge accepted rows from `analysis_skill_additions` (only `submissions.ts` does). Naive reuse produces a JSON that doesn't match the PDF the user just saved. Fix: unified merge helper in Phase 1; integration test with variant + analysis + accepted skill asserts both bullet override and skill addition appear in JSON output.
+3. **NULL-column ambiguity breaks merge queries** — `WHERE variant_id = ?` returns no rows when `variant_id` is NULL. All merge queries must use `IS NULL` / `IS NOT NULL` guards. Drizzle: `isNull(entityOverrides.analysisId)` for variant-only lookups.
 
-3. **WAL checkpoint missing before DB copy (Pitfall 5)** — app runs `PRAGMA journal_mode = WAL`; a naive `fs.copyFile` captures the main `.db` but not the `.db-wal` tail, silently losing the last few transactions. Fix: `PRAGMA wal_checkpoint(TRUNCATE)` → `sqlite.close()` → `fs.copyFile` → verify (readonly open + `integrity_check`) → reopen at new path or rollback. Non-negotiable for Phase 34.
+4. **Snapshot freezes base text for new entity types** — if any entity type is not yet handled in `buildMergedBuilderData()`, snapshot captures wrong text silently. Prevention: snapshot integration test (variant override for summary + bullet + project title → submit → assert snapshot JSON contains override text, not base text) is the correctness contract.
 
-4. **Null vs. omit in exported JSON (Pitfall 2)** — Drizzle returns `null` for unset `endDate`; naive `JSON.stringify` emits `"endDate": null`, which strict JSON Resume validators reject. Fix: field-filtering serializer that OMITS keys for null/empty values; YYYY-MM precision retained (valid ISO 8601); unit test runs export through `resume-cli validate` or equivalent ajv check.
+5. **LLM bullet ID hallucination** — `acceptExcludedBulletSuggestion` handler must validate the `bulletId` exists in `job_bullets` AND is currently excluded in the variant before writing to `entityOverrides`. Never trust the renderer payload.
 
-5. **Windows file-handle lock blocks DB copy (Pitfall 6)** — better-sqlite3 holds exclusive handle on open DB; `fs.copyFile` fails with `EBUSY` if the handle isn't released first. Fix: strict sequence checkpoint → close → copy → verify → swap-bootstrap-path → `app.relaunch()`; rollback on any step with `try/finally` that reopens source path.
+---
 
-Two more deserve flagging for Phase 34 planning: **Pitfall 7** (network/OneDrive path breaks WAL silently — detect UNC and cloud-folder names, warn not block) and **Pitfall 12** (`jobs.test.ts` has a latent `.where(undefined as any)` bug that does update-all, and the alleged "race" is almost certainly the global `vi.mock` in the dead `tests/setup.ts` — fix by deleting setup.ts first, then fixing the WHERE clause, then running the suite 10× to prove stability).
+## Design Tension: Generic `entity_id` vs Per-Entity Nullable FK Columns
 
-### Cross-Cutting Reconciliations
+**This is the most consequential Phase 1 decision and must be resolved before any DDL is written.**
 
-Three places where researcher outputs needed reconciliation:
+ARCHITECTURE.md proposes a single generic `entity_id INTEGER` column alongside an `entity_type` discriminator. This is simple and flexible. However, PITFALLS.md explicitly warns that SQLite FK `ON DELETE CASCADE` is per-column — a generic `entity_id` integer with no FK declaration means cascade deletes never fire. Deleting a job leaves orphaned override rows in the table indefinitely.
 
-**A. Variant-merged export + skill additions — ARCHITECTURE vs. PITFALLS.** Architecture said "reuse `applyOverrides()` / `getBuilderDataForVariant` — already merges." Pitfalls said "that only merges bullet overrides; accepted skill additions live in `analysis_skill_additions` and only `buildSnapshotForVariant` merges those." **PITFALLS is correct.** The merge helper must unify the snapshot's skill-addition merge with the export path. Architecture's Q2 answer is right in spirit (reuse the merged view, don't re-merge) but understates that the current merged view itself is incomplete for skill additions. Phase 30 refactor consolidates both.
+PITFALLS.md recommends per-entity nullable FK columns (separate `bullet_id`, `project_bullet_id`, etc.) to enable individual `ON DELETE CASCADE` declarations per parent table. This is the **existing pattern used by `template_variant_items`** in the real schema — the direct precedent established by the codebase.
 
-**B. DB switch mechanism — STACK vs. ARCHITECTURE.** Stack recommended `app.relaunch(); app.exit(0)` as the one-line answer. Architecture proposed Proxy-wrapped `db`/`sqlite` exports to avoid relaunch (Option A), with relaunch as Option B "user-hostile." **STACK wins for v2.5.** Proxy retrofit is exactly the kind of singleton churn this milestone should not bundle with debt cleanup, and `app.relaunch()` is the Chrome/VS Code/Obsidian convention users accept. Architecture's Option A is a good candidate for a future milestone if user feedback demands seamless swap.
+**Recommendation: use per-entity nullable FK columns** (consistent with `template_variant_items` and the existing orphan-handling LEFT JOIN pattern in `ai.ts`). The tradeoffs:
 
-**C. `showSummary` fix scope — single-line vs. refactor.** Stack called it "one-line read in docxBuilder.ts." Architecture said "two-line fix" (docxBuilder + handler pass-through). Pitfalls flagged it needs the reconciled merge helper. **All three are correct at different layers.** The physical code change in `docxBuilder.ts` is one line of destructure + one line of guard. The handler (`export:docx`) must switch to the merged builder (which returns `summaryExcluded`). The merge helper reconciliation is the underlying refactor. All three happen in Phase 30 together.
+| Approach | Pro | Con |
+|----------|-----|-----|
+| Generic `entity_id INTEGER` (ARCHITECTURE.md proposal) | Simpler DDL; no new columns when adding entity types | No FK; no CASCADE; orphan rows accumulate on delete |
+| Per-entity nullable FK columns (PITFALLS.md / codebase precedent) | CASCADE delete fires; FK constraint enforced at DB level; consistent with `template_variant_items` | More columns; DDL change required when adding new entity types |
+
+**The SPEC and Phase 1 implementation must make this call explicitly.**
+
+---
+
+## Cross-Cutting Flags (All Phases Must Know)
+
+1. **`projects` table has NO `description` column** — project-description variant override (P2 feature) requires `ALTER TABLE projects ADD COLUMN description TEXT NOT NULL DEFAULT ''` before any override can be stored. Do not attempt project description override without this migration. Scope explicitly in or out of Phase 1 spec.
+
+2. **`createTestDb()` in `tests/helpers/db.ts` is a manual copy of `ensureSchema()`** — must be updated in lockstep with every new table. If Phase 1 adds `entityOverrides` and `analysisExcludedBulletSuggestions` to `ensureSchema()` but forgets `createTestDb()`, all in-memory DB tests silently run against wrong schema. Add to every phase checklist that touches `ensureSchema()`.
+
+3. **Keep `analysisBulletOverrides` table read-only after migration — do NOT drop in v2.6** — add a post-migration row-count assertion that runs at `ensureSchema()` startup. Drop via explicit `DROP TABLE IF EXISTS` in a v2.7 cleanup phase only.
+
+4. **`ResumeScorerSchema` new field must use `.default([])`** — `excluded_bullet_suggestions` must declare `.default([])` so all existing `MockLanguageModelV3` test fixtures parse without change. Using `.optional()` alone would require updating every mock response.
+
+5. **`summaryOverride` must thread through `buildMergedBuilderData` → `buildSnapshotForVariant`** — `MergedBuilderData` needs `summaryOverride?: string`; `buildSnapshotForVariant()` must splice it into `frozenProfile.summary`; callers building resumeText for LLM scoring must use `summaryOverride ?? profileRow.summary`. A gap here means submission snapshots silently freeze base summary text.
+
+---
 
 ## Implications for Roadmap
 
-### Canonical Phase Sequence
+### Phase 1: Schema + Data Migration
 
-### Phase 30: Merge-Helper Reconciliation + DOCX showSummary Fix
-
-**Rationale:** Reconcile the three parallel merge paths first. Unblocks variant JSON export and the DOCX `showSummary` fix is the natural verification that the reconciliation works end-to-end.
+**Rationale:** Every other phase reads from or writes to `entityOverrides`. Strict blocker.
 
 **Delivers:**
-- Unified `buildMergedBuilderData(db, variantId, analysisId?)` consolidating bullet overrides, skill additions, and summary/job exclusions
-- `summaryExcluded` available on the merged view consumed by DOCX
-- `buildResumeDocx` destructures `showSummary` (default true) and gates summary paragraph
-- `ResumeJson` interface lifted to `src/shared/resumeJson.ts` (prep for Phases 31-32)
-- Parameterized test: HTML + PDF + DOCX × summary on/off × all 5 templates
+- `entityOverrides` Drizzle table in `schema.ts` + `ensureSchema()` CREATE TABLE
+- Two partial unique indexes (variant-only and analysis-scoped)
+- `analysisExcludedBulletSuggestions` Drizzle table + CREATE TABLE
+- Data migration: INSERT-SELECT from `analysisBulletOverrides` → `entityOverrides` in `sqlite.transaction()` with idempotency guard and row-count assertion
+- `createTestDb()` updated in sync
+- `acceptSuggestion()` in `ai.ts` redirected to write `entityOverrides` (atomic cutover)
+- `applyOverrides()` usage retired from `mergeHelper.ts`; Layer 3 query redirected to `entityOverrides`
+- Old `analysisBulletOverrides` kept read-only, not dropped
 
-### Phase 31: Base Resume.json Export
+**Must resolve before spec:** Generic `entity_id` vs per-entity nullable FK columns
 
-**Rationale:** Simpler than variant-merged (no merge path); validates the `ResumeJson` shape + writer before adding the variant layer on top.
+---
 
-**Delivers:**
-- `buildBaseResumeJson(db)` pure function — walks all 11 entity tables
-- `export:resumeJsonBase` IPC handler + preload bridge
-- `Export JSON` button in Experience tab header, filename `${profileName}_Resume.json`
-- Zod validation via `ResumeJsonSchema.parse` before write
-- Field-omission semantics: no `null` or `""` for optional fields
-- Documented as **"lossy-faithful export"**
+### Phase 2: Merge Precedence Extension + Summary Override Threading
 
-### Phase 32: Variant-Merged Resume.json Export
-
-**Rationale:** Depends on Phase 30 (unified merge helper) and Phase 31 (`ResumeJson` shape + writer).
+**Rationale:** Variant reword UI (Phase 3) calls handlers added here. Excluded-bullet acceptance (Phase 4) depends on inclusion un-exclusion logic added here. Both are blocked on this.
 
 **Delivers:**
-- `buildVariantResumeJson(db, variantId, analysisId?)` — calls unified merge helper, filters excluded items, maps to ResumeJson
-- `export:resumeJsonVariant` IPC handler + preload bridge
-- `JSON` button in VariantEditor preview toolbar (peer of PDF / DOCX)
-- Tooltip: "Exports the final rendered resume. Re-importing creates new base entries."
-- Test matrix: all four toggle types (summary, job, bullet, skill) × excluded + included
+- `buildMergedBuilderData()` extended with two-pass override map (Layer 2.5 variant-tier, Layer 3 analysis-tier overwrites)
+- Multi-field override application: `job.role`, `job.company`, `project.name`, all bullet `.text` fields
+- `summaryOverride?: string` added to `MergedBuilderData` type
+- Analysis-tier inclusion un-exclusion: accepted excluded-bullet suggestions flip `bullet.excluded = false` for that analysis
+- `buildSnapshotForVariant()` splices `summaryOverride` into `frozenProfile.summary`
+- `acceptVariantOverride()` / `getVariantOverrides()` / `clearVariantOverride()` handlers in `templates.ts` + IPC registration
+- Variant override write path stamps `template_variants.updated_at` (staleness detection)
+- Unit tests: merge precedence; snapshot summary override; inclusion un-exclusion
 
-### Phase 33: Tech Debt Cleanup
+---
 
-**Rationale:** Parallelizable with Phases 31/32 after Phase 30 lands.
+### Phase 3: Variant Reword UI
 
-**Delivers (four plans in dependency order):**
-- 33-01: Remove orphan `TEMPLATE_LIST` export (full-workspace grep)
-- 33-02: Remove vestigial `compact` prop (tsc + vitest + 5-template render)
-- 33-03: Delete `tests/setup.ts` (grep for direct imports; run full suite 3× pre/post)
-- 33-04: Fix `jobs.test.ts` — replace `.where(undefined as any)`; run suite 10× consecutive
-
-### Phase 34: Configurable SQLite DB Location
-
-**Rationale:** Highest-risk integration — module-level singleton plus Windows file-handle semantics plus WAL sidecar correctness. Last to avoid blocking other work.
+**Rationale:** Pure UI layer on top of Phase 2 handlers. No AI pipeline changes. Parallelizable with Phase 4 after Phase 2 ships.
 
 **Delivers:**
-- `src/main/config/appConfig.ts` — reads/writes `userData/db-location.json`
-- Bootstrap path resolution in `src/main/db/index.ts`
-- `settings:setDbPath` handler — validates, checkpoints WAL, closes, copies, verifies, writes bootstrap, renames old → `.bak`, `app.relaunch()`
-- `Database Location` card in SettingsTab
-- Confirmation + restart-required modals
-- Network/cloud path heuristic warning
-- Rollback on any step; no partial-state orphans
-- Tempfile-based integration tests for checkpoint→copy→verify sequence
+- Hover pencil icon on each bullet row, summary section, and job title row in `VariantBuilder.tsx`
+- `InlineEdit.tsx` (multiline=true) invoked inline; pre-populated with current effective text
+- On save: IPC `templates:setVariantOverride` → preview refresh via `templates:getBuilderData`
+- Visual indicator: accent left-border on overridden fields (NOT strikethrough)
+- Reset-to-base: "Reset" link → `templates:clearVariantOverride` → preview refresh
+- Tier badge: "Variant" label to distinguish from analysis-tier rewrites
+- Preload bridge additions
+- `duplicateVariant()` extended to copy override rows for the new variant
+- Tests: IPC handler round-trip; reset clears override; preview reflects reword; summary gate
 
-### Parallelization Map
+---
 
-| Can run in parallel | After | Because |
-|---------------------|-------|---------|
-| Phase 31 + Phase 33 | Phase 30 | No file overlap; shape lifted by Phase 30 unblocks Phase 31 |
-| Phase 32 + Phase 33 | Phase 31 | Phase 32 depends on shape proven in Phase 31 |
-| Phase 33-01, 33-02 | Phase 30 | No interdep |
-| Phase 33-03 | Phase 33-01, 33-02 | Isolate each debt commit |
-| Phase 33-04 | Phase 33-03 | Removing setup.ts likely fixes the race |
-| **Phase 34** | **Phases 30, 31, 32, 33** | Touches module singletons; last |
+### Phase 4: Excluded-Bullet Suggestions
 
-## Resolved Open Questions
+**Rationale:** Depends on Phase 1 (entityOverrides table) and Phase 2 (inclusion un-exclusion in merge). Parallelizable with Phase 3.
 
-1. **Variant-merged export needs skill-addition merging**, not just `applyOverrides`. Phase 30 unifies them.
-2. **DB path lives outside the DB** — `userData/db-location.json` bootstrap file.
-3. **`app.relaunch(); app.exit(0)`** is the chosen switch mechanism (not Proxy).
-4. **DOCX `showSummary`** = one-line destructure + one-line guard in `buildResumeDocx:59` + handler switch to merged builder (all in Phase 30).
+**Delivers:**
+- `buildScorerPrompt()` extended with `## Excluded Bullets (not on this variant)` section using `[EB{id}]` markers; capped at 20 from partially-excluded jobs only
+- `ResumeScorerSchema` gains `excluded_bullet_suggestions: z.array(...).default([])`
+- `runAnalysis()` computes `excludedBullets` post-merge, passes to scorer, calls `ensureExcludedBulletSuggestions()`
+- `analysisExcludedBulletSuggestions` table populated; accept/dismiss/get handlers in `ai.ts`
+- `acceptExcludedBulletSuggestion()`: validates `bulletId` exists in `job_bullets` AND is currently excluded before writing `entityOverrides`
+- Preload bridge additions
+- UI panel in `OptimizeVariant.tsx`: "Bullets you excluded that match this job" section; card with bullet text, reason, JD keywords; "Include for this job" / "Skip" actions; accepted → green state
+- Excluded-bullet scoring is a separate optional call, NOT bundled into main analysis (user-triggered, not automatic)
+- Tests: MockLanguageModelV3 with `excluded_bullet_suggestions`; hallucinated bulletId rejected; merge un-excludes bullet after acceptance; prompt includes excluded-bullets section
 
-## Remaining Open Questions
+---
 
-1. **Filename conventions** — propose `${profileName}_Resume.json` and `${profileName}_Resume_${variantName}.json`
-2. **NAS / OneDrive graceful degradation** — recommend warn-but-allow
-3. **Exported JSON meta flag** — include `{meta: {source, variant, exportedAt}}` in variant exports?
-4. **Lossy-faithful documentation surface** — code comment + release notes (not UI)
-5. **Base export INSERT-on-reimport** — duplicate risk; acknowledge in modal?
-6. **Old DB cleanup UX** — user-initiated only, not auto-expire
+### Phase Ordering Rationale
+
+- Phase 1 is the strict blocker — no other phase can start without the unified table and migration
+- Phase 2 before Phase 3 and 4 — merge layer changes and new handlers must exist before UI can call them
+- Phases 3 and 4 are parallelizable — Phase 3 is pure UI; Phase 4 is AI pipeline; neither depends on the other
+- Grouping follows the "handler extraction → pure function → unit test" pattern established in v2.4
+
+### Research Flags
+
+**Phases needing design decisions before spec (not deeper research):**
+- **Phase 1:** FK approach (generic `entity_id` vs per-entity nullable columns) — spec must commit before DDL
+- **Phase 1:** `projects.description` column — explicitly in or out of scope; if deferred, scope project-description override out of Phase 2/3
+
+**Phases with well-established patterns (skip research-phase):**
+- **Phase 1:** `ensureSchema()`, `templateVariantItems` FK pattern, skill-category migration — direct codebase precedents
+- **Phase 2:** `buildMergedBuilderData()` extension — structure clear, precedence algorithm fully specified in research
+- **Phase 3:** `InlineEdit.tsx` reuse — no unknowns
+- **Phase 4:** `analysisSkillAdditions` / `acceptSkillAddition` as the carbon-copy analog
+
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Versions verified; zero new packages |
-| Features | HIGH | UX patterns validated against existing codebase |
-| Architecture | HIGH | Every file reference verified to line numbers |
-| Pitfalls | HIGH | WAL/EBUSY/network grounded in official SQLite docs |
+| Stack | HIGH | Verified against package.json + source; no new dependencies required; all patterns confirmed in source files |
+| Features | HIGH | Grounded in VariantBuilder.tsx, OptimizeVariant.tsx, InlineEdit.tsx, mergeHelper.ts; UX copy specifics are MEDIUM (convention-based) |
+| Architecture | HIGH | Real source reading; all integration points named with file:function specificity; DDL and data flow both fully specified |
+| Pitfalls | HIGH | Each pitfall tied to specific source lines; migration and merge ordering risks well-understood from existing codebase patterns |
 
-**Overall confidence:** HIGH
+**Overall confidence: HIGH**
 
-## Sources
+### Gaps to Address
 
-See detailed research files:
-- `.planning/research/STACK.md` — dependency audit + integration points
-- `.planning/research/FEATURES.md` — feature landscape + UX specs + competitor matrix
-- `.planning/research/ARCHITECTURE.md` — integration analysis + file-level change map
-- `.planning/research/PITFALLS.md` — 12 pitfalls + looks-done-but-isn't checklist
-
-**Primary docs:** Electron dialog/app/shell API, SQLite WAL docs, SQLite Over a Network, JSON Resume Schema 1.0.0.
+- **FK design decision** — per-entity nullable FK vs generic `entity_id`: must be recorded as a Key Decision in PROJECT.md at end of Phase 1
+- **`projects.description` migration scope** — explicitly in or out of Phase 1 spec; ambiguity will block Phase 2/3 project-description overrides
+- **Excluded-bullet `[EB{id}]` prompt stability** — validate during Phase 4 that the LLM returns the correct IDs; if not, add secondary text-match resolution path
+- **`duplicateVariant()` gap** — currently copies `templateVariantItems` but not variant-tier overrides from `entityOverrides`; must be addressed in Phase 3 spec (add INSERT-SELECT for overrides in the duplicate transaction) or flagged as a known limitation
 
 ---
-*Research completed: 2026-04-23*
+
+*Research completed: 2026-06-05*
 *Ready for roadmap: yes*

@@ -77,34 +77,38 @@ Full visibility into job applications — which resume version was sent to which
 - ✓ Variant-merged resume.json export — three-layer merge matching PDF/DOCX, export-only, no meta sidecar — v2.5
 - ✓ Configurable SQLite DB location — Settings relocate with checkpoint → copy → verify → bootstrap → backup → restart, rollback, cloud-path warning — v2.5
 - ✓ Tech debt cleanup — removed TEMPLATE_LIST export, vestigial compact prop, dead tests/setup.ts; fixed jobs.test.ts race — v2.5
+- ✓ Unified polymorphic `entityOverrides` table + no-data-loss migration from `analysisBulletOverrides` with startup row-count assertion — v2.6 (Phase 35)
+- ✓ Two-pass merge precedence (analysis → variant → base) with summaryOverride threaded into snapshot/scoring/DOCX/resume.json — v2.6 (Phase 36)
+- ✓ Inline variant-tier reword for bullets, summary, and project title (hover pencil → InlineEdit), accent-border override indicator distinct from excluded strikethrough, revert-to-base, duplicate copies variant-tier overrides — v2.6 (Phase 37)
+- ✓ Excluded-bullet suggestions during analysis — surfaces base bullets the variant omits against JD gaps, accept re-includes them at the analysis tier — v2.6 (Phase 38)
+- ✓ Analysis-scoped margin overrides — dedicated table, three-tier effective-margins resolver (analysis → variant → template default), frozen into the submission snapshot — v2.7 (Phase 39)
+- ✓ Margin sliders + live paginated preview + expand-to-modal readable preview + revert-to-variant in the Optimize screen — v2.7 (Phase 40)
+- ✓ Auto-fit orphan-page removal — reuses the print-preview page measurement, steps margins to a 0.4" floor, reports when it can't fit without removing content — v2.7 (Phase 41)
+- ✓ Save optimized analysis as a new job-named variant — duplicates the variant then bakes in accepted rewrites, re-included bullets, added skills, and margins — v2.7 (Phase 41)
+- ✓ AI suggested job-tailored summary in Optimize (accept/edit/dismiss) written through the existing summaryOverride plumbing — v2.7 (Phase 41)
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-**Milestone v2.6: Per-Variant Text Overrides**
+**Next milestone: TBD** — start with `/gsd:new-milestone` (questioning → research → requirements → roadmap). Candidate from backlog: live re-score-on-accept.
 
-- [ ] Variant-tier text overrides for summary, job title/company line, project title, project description, and bullet text
-- [ ] Unified polymorphic override table with merge precedence analysis → variant → base
-- [ ] Migrate existing analysis bullet overrides into the unified override table
-- [ ] Inline reword UI affordance at the variant tier
-- [ ] Excluded-bullet suggestions during job analysis — surface relevant base bullets the variant omits, accept re-includes them at the analysis tier
+## Current Milestone: v2.7 Optimization Layout Controls
 
-## Current Milestone: v2.6 Per-Variant Text Overrides
-
-**Goal:** Let users reword (not just include/exclude) text at the variant tier — treating variants like git-style branches (base = master, variant = role-family curation + reword, analysis = job-specific final tweak) — and surface base experience the active variant is missing when a job asks for it.
+**Goal:** Let users re-tune resume margins during job optimization — scoped to that analysis, with a live preview and one-click auto-fit — so re-including bullets and accepting rewrites no longer leaves the resume overflowing and looking broken.
 
 **Target features:**
-- Per-variant text overrides across summary, titles/company line, project blurbs, and bullet text
-- A single polymorphic `overrides` table reconciling variant-tier and analysis-tier overrides with precedence analysis → variant → base
-- Migration of existing `analysisBulletOverrides` rows into the unified table
-- Excluded-bullet suggestions during job refining: the analysis sees base bullets the variant excludes, recommends relevant ones against JD gaps, and accepting re-includes them for that analysis only
+- Analysis-scoped margin overrides (`marginTop` / `marginBottom` / `marginSides`) resolved as a layer over the variant's `templateOptions`, frozen into the submission snapshot
+- Margin sliders in the Optimize screen (margins only — not the full accent/skills/showSummary panel)
+- Live paginated preview pane embedded in Optimize that updates as the sliders move
+- Auto-fit button: tighten margins just enough to pull an orphan trailing page back, stop at a minimum margin floor (~0.4"), report when the target is unreachable
+- Revert the analysis margin override back to the variant's margins (mirrors revert-to-base for text)
 
 ## Current State
 
-**Latest shipped:** v2.5 Portability & Debt Cleanup (2026-06-05)
+**Latest shipped:** v2.7 Optimization Layout Controls (2026-06-24) — Phases 39–41 complete, 15 plans, full suite 397 tests passing. Tagged `v2.7`. **Next:** TBD via `/gsd:new-milestone`.
 
-The app is a fully functional resume management tool with AI analysis, three-layer data model, skills chip grid, submission tracking, 5 professional templates, ATS score thresholds, PDF resume import, and job posting URL scraping. Resume data is now portable — base and variant-merged resume.json export — and the SQLite store is relocatable via Settings with integrity-verified migration. A single `buildMergedBuilderData()` feeds all render/export surfaces (HTML/PDF/DOCX/snapshot). Installable via Windows NSIS installer, with 247 tests passing.
+The app is a fully functional resume management tool with AI analysis, three-layer data model, skills chip grid, submission tracking, 5 professional templates, ATS score thresholds, PDF resume import, and job posting URL scraping. Resume data is now portable — base and variant-merged resume.json export — and the SQLite store is relocatable via Settings with integrity-verified migration. A single `buildMergedBuilderData()` feeds all render/export surfaces (HTML/PDF/DOCX/snapshot). v2.6 adds per-variant text overrides on a unified polymorphic `entityOverrides` table (precedence analysis → variant → base) and an inline reword UI at the variant tier — users can reword bullets/summary/project titles in the Variant Builder, see an accent-border indicator on overridden fields, revert to base, and carry overrides through variant duplication. Installable via Windows NSIS installer, with 292 tests passing.
 
 ### Out of Scope
 
@@ -213,4 +217,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-05 after v2.6 milestone started*
+*Last updated: 2026-06-24 after shipping milestone v2.7 (Optimization Layout Controls)*

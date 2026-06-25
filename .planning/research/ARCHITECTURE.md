@@ -1,444 +1,707 @@
 # Architecture Research
 
-**Domain:** Electron desktop app — v2.5 Portability & Debt Cleanup integration
-**Researched:** 2026-04-23
-**Confidence:** HIGH (all findings cross-referenced against source; no training-data assertions)
+**Domain:** ResumeHelper v2.6 — Per-Variant Text Overrides + Excluded-Bullet Suggestions
+**Researched:** 2026-06-05
+**Confidence:** HIGH — grounded in real source files, no speculation
 
-## Scope
+---
 
-This is **integration research** for a subsequent milestone, not a greenfield architecture study. The question is not "what should an Electron resume app look like?" but "how do five specific v2.5 features graft onto ResumeHelper's existing Electron + Drizzle + three-layer-merge architecture, and where are the friction points?"
+## Context: What Already Exists
 
-Features analyzed:
-1. Resume.json export — base (full DB dump)
-2. Resume.json export — variant-merged (three-layer merge → serialize)
-3. Configurable SQLite DB location (copy → verify → switch)
-4. DOCX `showSummary` toggle honored
-5. Tech debt cleanup (TEMPLATE_LIST, compact prop, tests/setup.ts, jobs.test.ts race)
-
-## Current Architecture Snapshot (verified)
-
-### Layer layout (relevant subset)
+The v2.5 codebase has a single authoritative merge path:
 
 ```
-src/
-├── main/
-│   ├── index.ts                  # app.whenReady → registerAllHandlers → createWindow
-│   ├── db/
-│   │   ├── index.ts              # Singleton `db` + `sqlite` exports, ensureSchema() runs at import time
-│   │   └── schema.ts             # Drizzle table definitions
-│   ├── handlers/                 # ipcMain.handle wiring + extracted pure functions
-│   │   ├── index.ts              # registerAllHandlers() — single registration list
-│   │   ├── export.ts             # getBuilderDataForVariant(db, variantId, analysisId?) + export:pdf/docx/snapshotPdf
-│   │   ├── import.ts             # import:parseResumeJson/confirmReplace/parseResumePdf/confirmAppend
-│   │   ├── templates.ts          # ALSO has getBuilderDataForVariant (returns summaryExcluded) — DIVERGENCE
-│   │   ├── settings.ts           # getAiSettings / setAiSettings / listModels / testAi
-│   │   └── (jobs, bullets, skills, projects, profile, submissions, etc.)
-│   └── lib/
-│       ├── docxBuilder.ts        # buildResumeDocx() — pure function, 525 lines
-│       ├── aiProvider.ts
-│       ├── pdfResumePrompt.ts
-│       └── jobPostingUrlPrompt.ts
-├── shared/
-│   └── overrides.ts              # applyOverrides(bullets, overrides) — the three-layer merge primitive
-├── preload/
-│   ├── index.ts                  # contextBridge exposing window.api namespaces
-│   └── index.d.ts                # Source of truth for Builder* types
-└── renderer/src/
-    ├── PrintApp.tsx              # Single render target for preview + PDF export + snapshot
-    ├── components/templates/
-    │   ├── resolveTemplate.ts    # TEMPLATE_MAP + orphan TEMPLATE_LIST export
-    │   ├── types.ts              # ResumeTemplateProps — has vestigial `compact?: boolean`
-    │   └── (Classic|Modern|Jake|Minimal|Executive)Template.tsx
+buildMergedBuilderData(db, variantId, analysisId?)   ← src/main/lib/mergeHelper.ts
+  Layer 1: base data (jobs, bullets, projects, skills, ...)
+  Layer 2: variant exclusions via templateVariantItems (excluded boolean)
+  Layer 3: analysisBulletOverrides → applyOverrides() rewrites bullet .text
+          analysisSkillAdditions → pushes accepted skills into the array
+  → MergedBuilderData
+
+Consumers (ALL call buildMergedBuilderData):
+  templates:getBuilderData     → VariantBuilder preview
+  export:pdf/docx              → src/main/handlers/export.ts
+  buildSnapshotForVariant()    → src/main/handlers/submissions.ts
+  runAnalysis()                → src/main/handlers/ai.ts (no analysisId, variant-only)
+  buildVariantResumeJson()     → src/main/lib/variantResumeBuilder.ts
 ```
 
-### Key patterns in play
+`applyOverrides()` lives in `src/shared/overrides.ts` and today only handles bullet-text substitution via a `Map<bulletId, overrideText>`. It is called from `mergeHelper.ts` lines 295-297 after fetching `analysisBulletOverrides` rows.
 
-| Pattern | Location | Implication for v2.5 |
-|---------|----------|----------------------|
-| Handler extraction `(db: Db, ...args)` | `src/main/handlers/*.ts` | New export functions MUST follow this — it's why 143 tests can run without IPC |
-| Singleton `db` + `sqlite` from `src/main/db/index.ts` | Imported module-wide | **Blocker for DB relocation** — imports capture the reference at load time |
-| `ensureSchema()` runs at module import | `src/main/db/index.ts:307` | Re-init on DB swap is non-trivial — see "DB connection lifecycle" below |
-| `templateOptions` as JSON text column | `template_variants.templateOptions` | v2.5 settings will need a *different* storage mechanism (see Q5 answer) |
-| Three-layer merge via `applyOverrides()` | `src/shared/overrides.ts` | **Reusable as-is** for variant-merged resume.json export |
-| Snapshot payload shape | `export:snapshotPdf` handler, lines 310–353 | Already a resume-like JSON; overlaps with resume.json target shape |
-
-## Answers to Integration Questions
-
-### Q1. Where should resume.json export pure functions live?
-
-**Recommendation:** Mirror the import pattern exactly.
-
-```
-src/main/handlers/export.ts
-├── getBuilderDataForVariant(db, variantId, analysisId?)    # EXISTING
-├── buildBaseResumeJson(db): ResumeJson                      # NEW — full DB dump
-├── buildVariantResumeJson(db, variantId, analysisId?):      # NEW — uses getBuilderDataForVariant
-│       ResumeJson
-└── registerExportHandlers() registers:
-    ├── export:resumeJsonBase         # NEW ipcMain.handle — save dialog + writeFile
-    └── export:resumeJsonVariant      # NEW ipcMain.handle — save dialog + writeFile
+The existing override table:
+```sql
+analysis_bullet_overrides (
+  id, analysis_id NOT NULL FK, bullet_id NOT NULL FK,
+  override_text NOT NULL, source, suggestion_id, created_at,
+  UNIQUE(analysis_id, bullet_id)
+)
 ```
 
-**Why here, not a new file:**
-- `export.ts` already owns the save-dialog + writeFile pattern for PDF/DOCX. Splitting resume.json into its own handler file would create a 4th export channel in the preload bridge for no modularity gain.
-- `getBuilderDataForVariant` is already the upstream producer. `buildVariantResumeJson` is a thin serializer on top of its output.
-- Mirrors `ResumeJson` interface already declared at the top of `import.ts` (lines 10–75) — that interface is the **de facto shape spec**. Lift it to `src/shared/resumeJson.ts` so both import and export reference the same type.
+---
 
-**Why NOT mirror `importResumeFromPdf` structurally:**
-The PDF import has `parse` + `confirmAppend` as two IPC channels because the renderer shows a confirmation modal between them. Export has no such flow — it's a single save-dialog-then-write call. Two handlers (base/variant) is the right granularity.
+## Part A: Unified `overrides` Table — Exact Shape
 
-### Q2. Reuse `applyOverrides()` for variant merge → serialize?
+### Decision: Replace, not extend
 
-**Yes, but with a caveat.** The three-layer merge is already done inside `getBuilderDataForVariant` before data is returned (see `export.ts:181–195` and `templates.ts:299–313`). Do NOT re-merge — that function already produces the merged view used by preview/PDF/DOCX.
+`analysisBulletOverrides` covers exactly one entity type (`job_bullet`) and exactly one scope (analysis). The new table must cover: `job_bullet`, `project_bullet`, `summary`, `job_title`, `job_company`, `project_name`, and any future scalar field — at both the variant tier and the analysis tier.
 
-**Correct data flow for `buildVariantResumeJson`:**
+A single polymorphic table is the correct choice (confirmed by milestone brief). Extending `analysisBulletOverrides` with nullable columns would create an invalid hybrid that cannot express variant-scoped overrides cleanly.
 
-```
-buildVariantResumeJson(db, variantId, analysisId?)
-  │
-  ├── calls getBuilderDataForVariant(db, variantId, analysisId)
-  │         → returns BuilderData with overrides already applied
-  │         → includes `excluded: boolean` on every row
-  │         → (in templates.ts version, also returns summaryExcluded)
-  │
-  ├── gets profile row + templateOptions
-  │
-  ├── filters out excluded items (.filter(x => !x.excluded))
-  │
-  └── serializes to ResumeJson shape:
-        basics (from profile, applying summaryExcluded)
-        work[] (from included jobs + included bullets)
-        skills[] (from included skills, re-grouped by categoryName)
-        projects[], education[], volunteer[], awards[],
-        publications[], languages[], interests[], references[]
+### Proposed DDL
+
+```sql
+CREATE TABLE IF NOT EXISTS `entity_overrides` (
+  `id`             integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  `variant_id`     integer REFERENCES `template_variants`(`id`) ON DELETE cascade,
+  `analysis_id`    integer REFERENCES `analysis_results`(`id`) ON DELETE cascade,
+  `entity_type`    text NOT NULL,
+  `entity_id`      integer NOT NULL,
+  `field`          text NOT NULL,
+  `override_text`  text NOT NULL,
+  `source`         text NOT NULL DEFAULT 'user',
+  `created_at`     integer NOT NULL DEFAULT (unixepoch()),
+  UNIQUE (`variant_id`, `analysis_id`, `entity_type`, `entity_id`, `field`)
+);
 ```
 
-**Friction: there are TWO `getBuilderDataForVariant` functions.** One in `export.ts` (returns no `summaryExcluded`), one in `templates.ts` (returns it). The export path uses the export.ts version. This is pre-existing divergence — see `src/main/handlers/export.ts:16` vs `src/main/handlers/templates.ts:318`. **v2.5 will want the templates.ts version** (or reconcile them) so `summaryExcluded` round-trips. Tech debt already implicit here that the planner should flag.
+### NULL semantics — critical rule
 
-### Q3. DB connection lifecycle on path change
+| variant_id | analysis_id | Meaning |
+|-----------|-------------|---------|
+| NOT NULL  | NULL        | Variant-tier override — applies across all analyses for this variant |
+| NOT NULL  | NOT NULL    | Analysis-tier override — overrides the variant-tier value for this specific analysis |
+| NULL      | NOT NULL    | INVALID — forbidden by application logic (analysis always has a variant) |
+| NULL      | NULL        | INVALID — must have at least one scope |
 
-**This is the hardest integration in the milestone.** The current architecture has two hard dependencies on DB being open at import time:
+The UNIQUE constraint uses `UNIQUE(variant_id, analysis_id, entity_type, entity_id, field)`. SQLite NULLs are distinct in UNIQUE constraints, so `(variantId=1, analysisId=NULL, ...)` and `(variantId=1, analysisId=5, ...)` are unique independently — correct behavior.
 
-1. `src/main/db/index.ts:8-13` opens the DB **as module side-effect**:
-   ```ts
-   const dbPath = path.join(app.getPath('userData'), 'app.db')
-   const sqlite = new Database(dbPath)
-   export const db = drizzle(sqlite, { schema })
-   ```
-2. 18+ handler files do `import { db } from '../db'` (or `sqlite`) at the top. The references are **bound at import time**. Reassigning `db` in `db/index.ts` after a path change does NOT update these bindings — ES module exports are live bindings only for the module that declares them, and re-exporting a `let` works in theory but is brittle for consumers doing `const { db } = require(...)` style usage.
+Because SQLite treats NULL != NULL in UNIQUE indexes, a partial index is needed for the variant-only case to prevent duplicate variant-tier rows:
 
-**Three viable designs, ranked:**
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS `entity_overrides_variant_only_uidx`
+  ON `entity_overrides` (`variant_id`, `entity_type`, `entity_id`, `field`)
+  WHERE `analysis_id` IS NULL;
 
-**(A) Proxy-wrapped export (recommended).** Change `src/main/db/index.ts` to export a Proxy that forwards all property access to an internal, replaceable `currentDb` reference. Consumers keep writing `import { db } from '../db'`. Add a `reopenDb(newPath: string)` function that:
-```
-1. currentDb → run any final flushes, then sqlite.close()
-2. Copy old file → newPath (fs.copyFile)
-3. Verify: open newPath read-only, PRAGMA integrity_check, SELECT COUNT(*) from jobs
-4. On failure → restore original, throw
-5. Open new Database(newPath), pragma WAL, run ensureSchema()
-6. Replace currentDb internals (Proxy now forwards to the new instance)
-7. Persist newPath in the dbPath setting (see Q5)
-```
-Minimal handler changes. Electron docs and better-sqlite3 docs both support this pattern (close + new Database on a different path).
-
-**(B) App relaunch after switch.** After copy + verify, persist new path, then `app.relaunch(); app.exit(0)`. Simpler but user-hostile: loses unsaved renderer state, analysis mid-scroll, etc.
-
-**(C) Dependency-inject `db` into handlers at register time.** Most architecturally clean, but requires changing every `registerXHandlers()` signature and the 20+ files that import `db` directly. **Out of scope for a debt-cleanup milestone** — don't bundle this churn with v2.5.
-
-**Caching gotchas identified:**
-- `WAL` mode creates `app.db-wal` and `app.db-shm` sidecar files. Migration must copy all three (or checkpoint + copy main file only). Do `sqlite.pragma('wal_checkpoint(TRUNCATE)')` before copy.
-- `better-sqlite3` holds OS file handles — on Windows, the source file can't be deleted while open. Close before fs.copyFile (not rename — we want to keep the backup).
-- `ensureSchema()` runs ALTER TABLE in try/catch. Safe to re-run on the new file. File-based Drizzle migrations (`migrate(db, { migrationsFolder })` at `db/index.ts:300`) are also idempotent.
-- `dialog.showOpenDialog({ properties: ['openDirectory'] })` is the right picker — user picks a folder, we append `app.db`. Don't let them pick a file; filenames must be consistent.
-- On failure mid-migration, the original DB was closed but not yet replaced. Need a recovery path: reopen original before rethrowing.
-
-**Data flow:**
-```
-Settings UI → dbPath:change IPC
-    ↓
-validate(newFolder) — writable? enough space?
-    ↓
-sqlite.pragma('wal_checkpoint(TRUNCATE)')
-sqlite.close()
-    ↓
-fs.copyFile(oldPath, newPath)
-fs.copyFile(oldPath + '-wal', newPath + '-wal')  # if exists
-    ↓
-verify: new Database(newPath, { readonly: true })
-        → PRAGMA integrity_check
-        → quick sanity SELECT
-        → close
-    ↓
-ON FAILURE: reopen oldPath, return error
-ON SUCCESS: open newPath writable, ensureSchema(),
-            swap Proxy target, persist setting, return { success, oldPath (for backup toast) }
+CREATE UNIQUE INDEX IF NOT EXISTS `entity_overrides_analysis_uidx`
+  ON `entity_overrides` (`analysis_id`, `entity_type`, `entity_id`, `field`)
+  WHERE `analysis_id` IS NOT NULL;
 ```
 
-### Q4. Where is `showSummary` read in DOCX vs. HTML — divergence point
+These two partial indexes replace the composite UNIQUE on the table itself for the two valid cases.
 
-**Confirmed divergence located.** This is the critical finding:
+### entity_type enumeration
 
-**HTML/PDF path (working):**
-- Storage: `template_variant_items` row with `item_type='summary'`, `excluded=1` (no `*_id` columns used)
-- `src/main/handlers/templates.ts:315-318` — `getBuilderDataForVariant` detects the row and returns `summaryExcluded: boolean`
-- `src/renderer/src/PrintApp.tsx:170-171` — `setShowSummary(!(builderData.summaryExcluded ?? false))`
-- `src/renderer/src/components/templates/ClassicTemplate.tsx:121` (and all 5 templates) — `{showSummary && profile?.summary && (<div>...)}`
+```
+'job_bullet'        entity_id = job_bullets.id,      field = 'text'
+'project_bullet'    entity_id = project_bullets.id,   field = 'text'
+'summary'           entity_id = 1 (sentinel),          field = 'text'
+'job_title'         entity_id = jobs.id,              field = 'role'
+'job_company'       entity_id = jobs.id,              field = 'company'
+'project_name'      entity_id = projects.id,          field = 'name'
+```
 
-**DOCX path (broken / missing):**
-- `src/main/handlers/export.ts:278-305` — `export:docx` handler builds `templateOptions` from `variant.templateOptions` JSON column, then calls `buildResumeDocx(builderData, profileRow, layoutTemplate, templateOptions)`
-- `src/main/lib/docxBuilder.ts:55-60` — `buildResumeDocx` signature accepts `templateOptions: { marginTop, marginBottom, marginSides, skillsDisplay, accentColor }` — **no `showSummary` field**
-- `src/main/lib/docxBuilder.ts:122-130` — unconditionally emits the summary paragraph if `profileRow?.summary` is truthy:
-  ```ts
-  ...(profileRow?.summary ? [
-    new Paragraph({ children: [new TextRun({ text: profileRow.summary, ... })], ... }),
-  ] : []),
-  ```
+Using separate entity_type values for `job_title` vs `job_company` (both on jobs.id) avoids ambiguity. The `field` column is technically redundant given type-per-field naming, but keeping it allows future multi-field entities without a new entity_type and provides self-documentation.
 
-**The root-cause asymmetry:** `showSummary` is stored in `template_variant_items` (as an exclusion row), NOT in `template_variants.templateOptions` (the JSON column). The DOCX handler reads the JSON column; the HTML handler reads via `getBuilderDataForVariant` which reads `template_variant_items`. The snapshot path (`export:snapshotPdf`, line 393) does have `showSummary` in its payload because the snapshot freezes merged state — that's the *only* DOCX-adjacent code that currently knows about the flag.
+### source values
 
-**Two-line fix, specifically:**
+```
+'user'          — user typed directly into the reword UI
+'ai_suggestion' — user accepted an LLM rewrite suggestion
+'inclusion'     — analysis accepted an excluded-bullet inclusion suggestion
+```
 
-1. `src/main/handlers/export.ts:299` (the `export:docx` handler):
-   - Switch to using the `templates.ts` version of `getBuilderDataForVariant` (which returns `summaryExcluded`), OR add the same exclusion-lookup to the `export.ts` version (reconciling the divergence).
-   - Pass `showSummary: !builderData.summaryExcluded` through templateOptions or a new param.
+### Migration of analysisBulletOverrides
 
-2. `src/main/lib/docxBuilder.ts`:
-   - Widen `templateOptions` type to include `showSummary?: boolean` (default true).
-   - Wrap the summary paragraph in `(showSummary ?? true) && profileRow?.summary ? [...] : []`.
+This is a data migration, not just a schema migration. The existing rows must survive.
 
-**Build order consequence:** The variant-merged resume.json export (Q1/Q2) wants the same `summaryExcluded` value to know whether to emit `basics.summary`. So **reconcile the two `getBuilderDataForVariant` functions first** — fixing DOCX `showSummary` and enabling variant export are the *same* underlying refactor.
+**Migration approach — inline in `ensureSchema()`, wrapped in a transaction:**
 
-### Q5. Migration of settings table for new `dbPath` setting
+```sql
+-- Step 1: Create new table (CREATE TABLE IF NOT EXISTS — idempotent)
+-- Step 2: Migrate existing rows (INSERT OR IGNORE — idempotent)
+INSERT OR IGNORE INTO entity_overrides
+  (variant_id, analysis_id, entity_type, entity_id, field, override_text, source, created_at)
+SELECT
+  ar.variant_id,          -- NOT NULL per analysisResults schema
+  abo.analysis_id,
+  'job_bullet',
+  abo.bullet_id,
+  'text',
+  abo.override_text,
+  abo.source,
+  abo.created_at
+FROM analysis_bullet_overrides abo
+JOIN analysis_results ar ON ar.id = abo.analysis_id;
+-- Step 3: Keep analysis_bullet_overrides table intact for the transition phase
+--         (drop it only after all reads/writes are fully migrated)
+```
 
-**Do NOT add `dbPath` to the DB.** It has a chicken-and-egg problem: you can't store "where the DB lives" inside the DB you're about to relocate.
+The migration runs inside a `sqlite.transaction()` in `ensureSchema()` guarded by:
+```sql
+SELECT COUNT(*) FROM analysis_bullet_overrides WHERE id NOT IN (
+  SELECT eo.entity_id FROM entity_overrides eo
+  WHERE eo.entity_type = 'job_bullet' AND eo.analysis_id = analysis_bullet_overrides.analysis_id
+)
+```
+If count is 0, skip — idempotent.
 
-**Three storage options, recommendation bolded:**
+**schema.ts change:** Add `entityOverrides` Drizzle table definition. Keep `analysisBulletOverrides` in schema.ts until the old table is dropped (a later phase). Remove it from schema.ts only when `DROP TABLE IF EXISTS analysis_bullet_overrides` is added to `ensureSchema()`.
 
-**(A) `electron-store` or plain JSON in `app.getPath('userData')/config.json`.** ⭐ **Recommended.** The app-data directory is *always* stable (`%APPDATA%/<name>`) regardless of where the SQLite file moves. Matches Electron conventions. Read at app start, fall back to default path if missing. Zero DB coupling. `electron-store` is a thin wrapper; plain `fs.promises.writeFile` + `JSON.parse` is also fine for one setting.
+**No dual-write needed** — once `mergeHelper.ts` reads from `entity_overrides`, the old table is read-only legacy. `acceptSuggestion()` in `ai.ts` writes to `entity_overrides` from day one of the migration phase.
 
-**(B) Command-line arg or env var.** Awful UX; rules out a Settings UI toggle.
+---
 
-**(C) New row in `ai_settings`.** Works but conceptually wrong — can't read the setting until the DB is open, and we need the setting to decide which DB to open.
+## Part B: applyOverrides / buildMergedBuilderData Changes
 
-**What about other future settings?** There's no current `user_preferences` table. `ai_settings` is the only user-preference-like table. If v2.5+ adds more settings (theme, etc.), the JSON config file scales fine for a handful. If it grows past ~10 fields, consider migrating `ai_settings` out of the DB too, for the same "settings must survive DB swap" reason. **Not in v2.5 scope.**
+### What changes in mergeHelper.ts
 
-**Migration implication for existing users:** None. First launch after v2.5 with no `config.json` → use default path (`userData/app.db`) → same behavior as today. User-visible migration = "Settings → DB location" UI only. Zero forced migration.
+Layer 3 must be rewritten to query `entity_overrides` instead of `analysisBulletOverrides`, and must apply overrides across all entity types, not just bullets.
 
-## New vs. Modified Files
-
-### New files
-
-| File | Purpose |
-|------|---------|
-| `src/shared/resumeJson.ts` | `ResumeJson` interface (lifted from `import.ts`), shared by import + export |
-| `src/shared/resumeJsonBuilder.ts` *(optional)* | If `buildBaseResumeJson` / `buildVariantResumeJson` grow past ~150 lines, extract here; otherwise inline in `export.ts` |
-| `src/main/config/appConfig.ts` | Read/write `userData/config.json` — owns `dbPath` setting |
-| `src/renderer/src/components/SettingsDbLocation.tsx` | Settings UI section for DB location picker + migrate button |
-
-### Modified files
-
-| File | Change | Reason |
-|------|--------|--------|
-| `src/main/db/index.ts` | Wrap `db`/`sqlite` exports in Proxy; add `reopenDb(newPath)`, `getCurrentDbPath()`; read initial path from `appConfig` | Enable path switching (Q3) |
-| `src/main/handlers/export.ts` | Add `buildBaseResumeJson`, `buildVariantResumeJson`; register `export:resumeJsonBase`, `export:resumeJsonVariant`; fix `export:docx` to pass `showSummary` | Q1, Q2, Q4 |
-| `src/main/handlers/templates.ts` | Reconcile `getBuilderDataForVariant` with `export.ts` version OR have `export.ts` call into it | Remove duplication; unblock Q2 + Q4 |
-| `src/main/lib/docxBuilder.ts` | Add `showSummary?: boolean` to `templateOptions`; gate summary paragraph emission | Q4 |
-| `src/main/handlers/settings.ts` | Add `settings:getDbPath`, `settings:setDbPath` handlers (which call `reopenDb`) | Wire Q3+Q5 |
-| `src/main/handlers/import.ts` | Import `ResumeJson` from `src/shared/resumeJson.ts` instead of local declaration | Dedup with export |
-| `src/preload/index.ts` | Add `window.api.export.resumeJsonBase/Variant`, `window.api.settings.getDbPath/setDbPath` | IPC bridge |
-| `src/preload/index.d.ts` | Add types for new API surface | TypeScript |
-| `src/renderer/src/components/templates/resolveTemplate.ts` | **Remove** `TEMPLATE_LIST` export (orphan, confirmed unused outside this file) | Debt cleanup |
-| `src/renderer/src/components/templates/types.ts:28` | **Remove** `compact?: boolean` from `ResumeTemplateProps` | Debt cleanup (confirmed vestigial) |
-| `tests/setup.ts` | Either **delete** (file is currently orphaned — not referenced in `vitest.config.ts`'s `setupFiles` which doesn't exist) or wire it via `test.setupFiles: ['./tests/setup.ts']` in `vitest.config.ts` | Debt cleanup |
-| `tests/unit/handlers/jobs.test.ts` | Investigate race under `--pool=threads`; likely root cause is shared in-memory DB state bleeding across parallel test files since `createTestDb()` uses `:memory:` per-call but the vestigial `tests/setup.ts` mocks `src/main/db` with a single shared instance | Debt cleanup |
-| `vitest.config.ts` | Wire `setupFiles` if keeping `tests/setup.ts`; OR add `pool: 'forks'` / `poolOptions.threads.singleThread: true` as a band-aid if deletion alone doesn't fix the race | Debt cleanup |
-
-### Notable non-changes
-
-- `src/shared/overrides.ts` — `applyOverrides()` unchanged. Already does what variant export needs.
-- `src/main/db/schema.ts` — No schema changes. `dbPath` lives outside DB. `showSummary` storage stays in `template_variant_items` (no migration needed).
-- Renderer template components — DOCX is a separate builder; `showSummary` fix is main-process only.
-
-## Suggested Build Order
-
-Optimize for (a) unblocking dependencies early, (b) maximizing parallelizable tech-debt work.
-
-### Phase 1 (sequential — foundational)
-
-1. **Reconcile the two `getBuilderDataForVariant` functions.**
-   - Pick the `templates.ts` version (returns `summaryExcluded`).
-   - Make `export.ts` call it instead of duplicating.
-   - This single refactor unblocks both DOCX `showSummary` and variant-merged resume.json export.
-   - Risk: low — 143 existing tests will catch regressions in exclusion handling.
-
-2. **Lift `ResumeJson` interface to `src/shared/resumeJson.ts`.**
-   - Used by both import and export. Single source of truth.
-
-### Phase 2 (parallelizable)
-
-These three work streams do not touch each other after Phase 1:
-
-- **Stream A — Resume.json export:** `buildBaseResumeJson`, `buildVariantResumeJson`, IPC wiring, Settings/Variant-builder UI button.
-- **Stream B — DOCX showSummary:** `docxBuilder.ts` type widening + conditional; `export:docx` handler passes the flag through.
-- **Stream C — Tech debt (all independent):** TEMPLATE_LIST removal, compact prop removal, tests/setup.ts decision, jobs.test.ts race.
-
-### Phase 3 (sequential — highest risk)
-
-4. **Configurable DB location.**
-   - Must be last because it touches module-level side effects (`src/main/db/index.ts`) that every handler imports.
-   - Implement Proxy wrapper + `reopenDb()` + `appConfig` + settings UI.
-   - Gate with thorough testing on Windows specifically (handle-locking semantics differ from POSIX).
-
-### Rationale for NOT doing DB relocation first
-
-Even though it looks foundational, doing it first creates merge pain: every other stream touches handler files, and those files import `db`. Changing the `db` export shape mid-milestone causes conflicts. Do DB relocation after the export work stabilizes.
-
-## Patterns to Follow
-
-### Pattern 1: Handler extraction with `Db` first param
-
-**Already established (v2.4).** All new export functions must follow this. Example from `settings.ts:13`:
+**Precedence algorithm — analysis → variant → base:**
 
 ```typescript
-export function getAiSettings(db: Db) {
-  const row = db.select().from(aiSettings).where(eq(aiSettings.id, 1)).get()
-  ...
+// Fetch all relevant overrides in one query (two rows max per field per entity)
+const overrideRows = db.select().from(entityOverrides)
+  .where(
+    or(
+      // variant-tier: applies to this variant regardless of analysis
+      and(eq(entityOverrides.variantId, variantId), isNull(entityOverrides.analysisId)),
+      // analysis-tier: applies only to this specific analysis
+      analysisId != null
+        ? and(eq(entityOverrides.variantId, variantId), eq(entityOverrides.analysisId, analysisId))
+        : sql`0`
+    )
+  )
+  .all()
+
+// Build a lookup: key = `${entityType}:${entityId}:${field}` → overrideText
+// Analysis-tier wins over variant-tier when both exist for same key
+const overrideMap = new Map<string, string>()
+
+// Pass 1: variant-tier (lower priority)
+for (const row of overrideRows.filter(r => r.analysisId == null)) {
+  overrideMap.set(`${row.entityType}:${row.entityId}:${row.field}`, row.overrideText)
+}
+// Pass 2: analysis-tier (higher priority, overwrites)
+for (const row of overrideRows.filter(r => r.analysisId != null)) {
+  overrideMap.set(`${row.entityType}:${row.entityId}:${row.field}`, row.overrideText)
 }
 
-// Registration:
-ipcMain.handle('settings:getAi', () => getAiSettings(db))
+function getOverride(type: string, id: number, field: string): string | undefined {
+  return overrideMap.get(`${type}:${id}:${field}`)
+}
 ```
 
-Apply verbatim to `buildBaseResumeJson(db)`, `buildVariantResumeJson(db, variantId, analysisId?)`, `reopenDb(newPath)`.
+**Application points within buildMergedBuilderData:**
 
-### Pattern 2: Shared types in `src/shared/`
+```typescript
+// After building jobsWithBullets:
+for (const job of jobsWithBullets) {
+  job.role    = getOverride('job_title',   job.id, 'role')    ?? job.role
+  job.company = getOverride('job_company', job.id, 'company') ?? job.company
+  for (const bullet of job.bullets) {
+    bullet.text = getOverride('job_bullet', bullet.id, 'text') ?? bullet.text
+  }
+}
 
-**Established.** `src/shared/overrides.ts` declares `BulletOverride` + `applyOverrides()` and both main + renderer import it. Apply the same for `ResumeJson`.
+// After building projectsWithBullets:
+for (const project of projectsWithBullets) {
+  project.name = getOverride('project_name', project.id, 'name') ?? project.name
+  for (const bullet of project.bullets) {
+    bullet.text = getOverride('project_bullet', bullet.id, 'text') ?? bullet.text
+  }
+}
 
-### Pattern 3: Settings survive DB swap — store outside DB
+// summary override — profile.summary is fetched separately in callers,
+// but the override lives here because it's variant/analysis scoped:
+// Return summaryOverride: string | undefined from buildMergedBuilderData
+// so callers can splice it in when building resumeText / snapshot.
+```
 
-**New pattern for v2.5.** Any setting that controls *where data lives* or *whether the DB is reachable* cannot live in the DB. Write to `app.getPath('userData')/config.json`.
+**MergedBuilderData type change:**
+
+```typescript
+export type MergedBuilderData = {
+  // ... existing fields ...
+  showSummary: boolean
+  summaryOverride?: string   // NEW — variant/analysis-tier reword of profile.summary
+}
+```
+
+Callers that use `summary` (snapshot, PDF, DOCX) pick up `summaryOverride ?? profileRow.summary`.
+
+### What changes in applyOverrides (src/shared/overrides.ts)
+
+`applyOverrides()` today is a bullet-only function. It can be retired or generalized. Given it's only called from `mergeHelper.ts`, the cleanest move is to inline the logic into `mergeHelper.ts`'s new `getOverride()` helper and delete `applyOverrides()` — or keep it as a pure utility for the bullet case to avoid test churn. Decision: keep signature intact but delegate to the new `getOverride` map internally. The exported `BulletOverride` and `SkillAddition` interfaces in `src/shared/overrides.ts` stay; add `EntityOverride` interface there.
+
+---
+
+## Part C: Excluded-Bullet Suggestions in the Analysis Run
+
+### What the LLM needs
+
+`runAnalysis()` in `src/main/handlers/ai.ts` currently calls:
+```typescript
+const merged = await buildMergedBuilderData(db, variantId)  // no analysisId
+```
+This gives only bullets that are INCLUDED in the variant. The LLM scores against those bullets.
+
+For excluded-bullet suggestions, the LLM needs to see the excluded bullets separately so it can say: "Bullet B42 is excluded from your variant but matches a gap in the JD — consider re-including it for this job."
+
+**What to pass the LLM:**
+
+```typescript
+// After building merged (included bullets), also build excluded set:
+const allBullets = ... // already fetched in mergeHelper Layer 1
+const includedBulletIds = new Set(merged.jobs.flatMap(j => j.bullets.filter(b => !b.excluded).map(b => b.id)))
+const excludedBullets = allBullets.filter(b => !includedBulletIds.has(b.id))
+
+// Add to scorer prompt:
+const excludedBulletsText = excludedBullets.map(b => `[EB${b.id}] ${b.text}`).join('\n')
+```
+
+The scorer prompt gets a new section appended:
+
+```
+## Excluded Bullets (not on this variant — consider suggesting re-inclusion)
+[EB42] Led migration of legacy monolith to microservices architecture
+[EB17] Reduced CI pipeline duration by 40% through parallelization
+...
+```
+
+### New Zod schema for suggestions
+
+Extend `ResumeScorerSchema` in `src/main/lib/aiProvider.ts`:
+
+```typescript
+export const ResumeScorerSchema = z.object({
+  // ... existing fields ...
+  excluded_bullet_suggestions: z.array(
+    z.object({
+      bullet_id: z.number(),        // matches [EB{id}] marker
+      bullet_text: z.string(),       // original text for UI display without a second query
+      reason: z.string(),            // why it's relevant to this JD
+      target_keywords: z.array(z.string()),  // JD keywords it addresses
+    })
+  ).default([]),
+})
+```
+
+Adding `.default([])` means existing test mocks with `rewrite_suggestions: []` continue to pass — no backward-compat break.
+
+### Storage — new table
+
+Excluded-bullet suggestions are analysis-scoped and user-actionable (accept/dismiss). They follow the same pattern as `analysisSkillAdditions`:
+
+```sql
+CREATE TABLE IF NOT EXISTS `analysis_excluded_bullet_suggestions` (
+  `id`            integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  `analysis_id`   integer NOT NULL REFERENCES `analysis_results`(`id`) ON DELETE cascade,
+  `bullet_id`     integer NOT NULL REFERENCES `job_bullets`(`id`) ON DELETE cascade,
+  `bullet_text`   text NOT NULL,
+  `reason`        text NOT NULL DEFAULT '',
+  `target_keywords` text NOT NULL DEFAULT '[]',
+  `status`        text NOT NULL DEFAULT 'pending',  -- 'pending' | 'accepted' | 'dismissed'
+  `created_at`    integer NOT NULL DEFAULT (unixepoch()),
+  UNIQUE (`analysis_id`, `bullet_id`)
+);
+```
+
+### How accept persists an inclusion override
+
+When the user accepts an excluded-bullet suggestion:
+
+1. Update `analysis_excluded_bullet_suggestions.status = 'accepted'` for that (analysisId, bulletId)
+2. Insert into `entity_overrides`:
+   ```typescript
+   db.insert(entityOverrides).values({
+     variantId: analysisResult.variantId,   // from analysisResults row
+     analysisId: analysisId,
+     entityType: 'job_bullet',
+     entityId: bulletId,
+     field: 'text',
+     overrideText: bulletText,              // original text — no reword, re-inclusion only
+     source: 'inclusion',
+   }).onConflictDoUpdate({ ... }).run()
+   ```
+3. The bullet is now present in `entity_overrides` with the analysis scope. When `buildMergedBuilderData(db, variantId, analysisId)` runs, the bullet's text resolves to `overrideText` (the original text). But the bullet is still `excluded: true` in the variant layer — the override text alone does not un-exclude it.
+
+**Critical: un-excluding the bullet at the analysis tier.**
+
+The current model only has exclusion at the variant tier (via `templateVariantItems`). An analysis-tier inclusion must override the exclusion. This requires a small extension to `buildMergedBuilderData`:
+
+```typescript
+// NEW: fetch analysis-tier inclusion overrides
+const analysisInclusionBulletIds = new Set<number>()
+if (analysisId != null) {
+  const inclusionRows = db.select({ entityId: entityOverrides.entityId })
+    .from(entityOverrides)
+    .where(and(
+      eq(entityOverrides.analysisId, analysisId),
+      eq(entityOverrides.entityType, 'job_bullet'),
+      eq(entityOverrides.source, 'inclusion'),
+    ))
+    .all()
+  for (const row of inclusionRows) analysisInclusionBulletIds.add(row.entityId)
+}
+
+// When building jobsWithBullets, override excluded flag:
+bullets: (bulletsByJobId.get(job.id) ?? []).map(b => ({
+  id: b.id,
+  text: getOverride('job_bullet', b.id, 'text') ?? b.text,
+  sortOrder: b.sortOrder,
+  excluded: excludedBulletIds.has(b.id) && !analysisInclusionBulletIds.has(b.id),
+  //         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  //         variant says excluded           analysis inclusion overrides it
+})),
+```
+
+This is clean — the variant still excludes the bullet (immutable), but the analysis layer says "include anyway for this job." Snapshots freeze the merged result, so the snapshot will have `excluded: false` for that bullet when `analysisId` was provided.
+
+### New IPC handlers in ai.ts
+
+```typescript
+// Store suggestions after analysis run (called at end of runAnalysis)
+export function ensureExcludedBulletSuggestions(db, analysisId, suggestions)
+
+// Accept — writes entity_overrides + updates status
+export function acceptExcludedBulletSuggestion(db, analysisId, bulletId)
+
+// Dismiss — updates status only
+export function dismissExcludedBulletSuggestion(db, analysisId, bulletId)
+
+// Retrieve for UI
+export function getExcludedBulletSuggestions(db, analysisId)
+```
+
+IPC channel names follow existing pattern: `ai:acceptExcludedBulletSuggestion`, etc.
+
+---
+
+## Part D: Snapshot Correctness
+
+**No special snapshot work required.** Snapshots are correct because:
+
+1. `buildSnapshotForVariant(db, variantId, analysisId?)` calls `buildMergedBuilderData(db, variantId, analysisId)`.
+2. `buildMergedBuilderData` now applies all override tiers (variant + analysis) before returning.
+3. The returned `MergedBuilderData` has overridden `.text` values already baked in, and `.excluded` flags correctly reflect analysis-tier inclusions.
+4. `buildSnapshotForVariant` spreads the result directly into `resumeSnapshot` JSON.
+5. `summaryOverride` from `MergedBuilderData` must be spliced into `frozenProfile.summary` inside `buildSnapshotForVariant`:
+
+```typescript
+const frozenProfile = profileRow ? {
+  name: profileRow.name,
+  email: profileRow.email,
+  phone: profileRow.phone,
+  location: profileRow.location,
+  linkedin: profileRow.linkedin,
+  summary: merged.summaryOverride ?? profileRow.summary ?? undefined,
+} : undefined
+```
+
+The snapshot is a frozen JSON blob — any override text present at submit time is frozen verbatim. No post-hoc lookup from live override tables. This is already how bullet overrides work today.
+
+**Edge case — orphaned overrides in snapshots:** If a bullet's override row is deleted after a snapshot was taken, the snapshot is unaffected (it stores the merged text, not references). Existing behavior. No change.
+
+**Variant-tier overrides and snapshot identity:** If the user rewrites a variant-tier bullet text and then submits, the snapshot captures the reworded text. The raw base text is not in the snapshot. This is the desired behavior — the snapshot represents what was sent.
+
+---
+
+## Part E: System Overview
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                           Renderer (React)                                  │
+│  VariantBuilder  VariantEditor  OptimizeVariant  AnalysisResults            │
+│  [new] InlineRewordUI           [new] ExcludedBulletSuggestions             │
+└───────────────────────────────┬────────────────────────────────────────────┘
+                                │ IPC (contextBridge)
+┌───────────────────────────────▼────────────────────────────────────────────┐
+│                         Main Process (Electron)                              │
+│                                                                              │
+│  handlers/ai.ts          handlers/templates.ts    handlers/submissions.ts   │
+│  [mod] runAnalysis()     [unchanged merge call]   [unchanged merge call]     │
+│  [new] acceptVariantOverride()                                               │
+│  [new] getVariantOverrides()                                                 │
+│  [new] ensureExcludedBulletSuggestions()                                    │
+│  [new] acceptExcludedBulletSuggestion()                                     │
+│  [new] dismissExcludedBulletSuggestion()                                    │
+│  [new] getExcludedBulletSuggestions()                                       │
+│                                                                              │
+│  lib/mergeHelper.ts  ←————————————————— MODIFIED                            │
+│  [mod] buildMergedBuilderData()                                              │
+│        Layer 3 reads entity_overrides (replaces analysisBulletOverrides)    │
+│        Applies variant-tier + analysis-tier overrides                        │
+│        Honors analysis-tier inclusion un-exclusions                          │
+│                                                                              │
+│  lib/aiProvider.ts  ←——————————————————— MODIFIED                           │
+│  [mod] ResumeScorerSchema + excluded_bullet_suggestions field                │
+│  [mod] buildScorerPrompt() — new excluded bullets section                   │
+│                                                                              │
+│  shared/overrides.ts  ←————————————————— MODIFIED (interface additions)     │
+│  [mod] Add EntityOverride interface                                          │
+│  [keep] applyOverrides() — may be retired or kept as utility                │
+│                                                                              │
+│  db/schema.ts  ←———————————————————————— MODIFIED                           │
+│  [new] entityOverrides table                                                 │
+│  [new] analysisExcludedBulletSuggestions table                              │
+│  [keep] analysisBulletOverrides — until migration verified + dropped        │
+│                                                                              │
+│  db/index.ts  ←————————————————————————— MODIFIED                           │
+│  [new] ensureSchema: CREATE TABLE entity_overrides + partial indexes        │
+│  [new] ensureSchema: CREATE TABLE analysis_excluded_bullet_suggestions      │
+│  [new] ensureSchema: migration of analysisBulletOverrides rows              │
+└────────────────────────────────────────────────────────────────────────────┘
+                                │
+                     SQLite (better-sqlite3)
+                     entity_overrides  (NEW)
+                     analysis_excluded_bullet_suggestions  (NEW)
+                     analysis_bullet_overrides  (EXISTING — migration source)
+```
+
+---
+
+## Part F: Component Boundaries — New vs Modified
+
+### New components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `entityOverrides` Drizzle table | `src/main/db/schema.ts` | ORM definition for unified override table |
+| `analysisExcludedBulletSuggestions` Drizzle table | `src/main/db/schema.ts` | ORM definition for suggestion table |
+| `acceptVariantOverride()` | `src/main/handlers/templates.ts` | Write variant-tier override to entity_overrides |
+| `getVariantOverrides()` | `src/main/handlers/templates.ts` | Read all variant overrides for UI display |
+| `ensureExcludedBulletSuggestions()` | `src/main/handlers/ai.ts` | Store LLM excluded-bullet suggestions post-analysis |
+| `acceptExcludedBulletSuggestion()` | `src/main/handlers/ai.ts` | Accept inclusion + write entity_overrides |
+| `dismissExcludedBulletSuggestion()` | `src/main/handlers/ai.ts` | Update suggestion status to dismissed |
+| `getExcludedBulletSuggestions()` | `src/main/handlers/ai.ts` | Retrieve for OptimizeVariant UI |
+| Variant reword inline UI | `src/renderer/src/components/VariantEditor.tsx` (new section) | Click-to-reword for each overridable field |
+| Excluded bullet panel | `src/renderer/src/components/OptimizeVariant.tsx` (new section) | Surface re-inclusion suggestions |
+
+### Modified components
+
+| Component | File | Change |
+|-----------|------|--------|
+| `buildMergedBuilderData()` | `src/main/lib/mergeHelper.ts` | Layer 3 rewrites to query entity_overrides; applies multi-field overrides; analysis-tier inclusion un-exclusion |
+| `MergedBuilderData` type | `src/main/lib/mergeHelper.ts` | Add `summaryOverride?: string` |
+| `buildSnapshotForVariant()` | `src/main/handlers/submissions.ts` | Splice `summaryOverride` into frozen profile.summary |
+| `runAnalysis()` | `src/main/handlers/ai.ts` | Pass excluded bullets to scorer prompt; call `ensureExcludedBulletSuggestions` after storing results |
+| `ResumeScorerSchema` | `src/main/lib/aiProvider.ts` | Add `excluded_bullet_suggestions` array field |
+| `buildScorerPrompt()` | `src/main/lib/analysisPrompts.ts` | New section in prompt for excluded bullets |
+| `src/shared/overrides.ts` | `src/shared/overrides.ts` | Add `EntityOverride` interface; `applyOverrides` may be retired |
+| `ensureSchema()` | `src/main/db/index.ts` | New tables; partial indexes; migration block |
+| `createTestDb()` | `tests/helpers/db.ts` | Mirror schema additions (must stay in sync) |
+
+---
+
+## Part G: Data Flow
+
+### Variant-tier reword flow
+
+```
+User edits text in VariantEditor
+  → IPC: templates:setVariantOverride(variantId, entityType, entityId, field, text)
+  → acceptVariantOverride(db, variantId, null, entityType, entityId, field, text)
+  → INSERT OR REPLACE INTO entity_overrides (variant_id=V, analysis_id=NULL, ...)
+  → IPC response: { success: true }
+  → VariantEditor re-fetches preview via templates:getBuilderData(variantId)
+  → buildMergedBuilderData applies variant-tier override → overridden text in preview
+```
+
+### Analysis-tier reword flow (existing bullet rewrites, migrated)
+
+```
+User clicks "Accept" on a rewrite suggestion in OptimizeVariant
+  → IPC: ai:acceptSuggestion(analysisId, bulletId, text)  [channel name unchanged]
+  → acceptSuggestion(db, analysisId, bulletId, text)
+  → INSERT OR REPLACE INTO entity_overrides (variant_id=V, analysis_id=A, entity_type='job_bullet', ...)
+  → Preview re-renders via buildMergedBuilderData(db, variantId, analysisId)
+  → Analysis-tier override wins over variant-tier for this bullet
+```
+
+### Excluded-bullet suggestion flow
+
+```
+runAnalysis():
+  1. buildMergedBuilderData(db, variantId) → includedBullets
+  2. Compute excludedBullets = allBullets - includedBullets
+  3. Build scorer prompt with excluded bullets section
+  4. callResumeScorer() returns excluded_bullet_suggestions[]
+  5. ensureExcludedBulletSuggestions(db, analysisId, suggestions)
+     → INSERT INTO analysis_excluded_bullet_suggestions (idempotent)
+
+User views OptimizeVariant:
+  → IPC: ai:getExcludedBulletSuggestions(analysisId)
+  → Returns pending suggestions with bullet text + reason
+
+User accepts inclusion:
+  → IPC: ai:acceptExcludedBulletSuggestion(analysisId, bulletId)
+  → acceptExcludedBulletSuggestion(db, analysisId, bulletId):
+      UPDATE status='accepted' in analysis_excluded_bullet_suggestions
+      INSERT entity_overrides (source='inclusion', overrideText=originalText)
+  → Preview re-fetches with analysisId
+  → buildMergedBuilderData detects inclusion override → bullet.excluded = false
+  → Bullet appears in preview/export/snapshot
+```
+
+### Snapshot correctness flow
+
+```
+createSubmission(db, { variantId, analysisId }):
+  → buildSnapshotForVariant(db, variantId, analysisId)
+  → buildMergedBuilderData(db, variantId, analysisId)
+      variant-tier overrides applied (job/project text rewrites)
+      analysis-tier overrides applied (bullet rewrites + inclusions)
+      analysis-tier inclusions un-exclude bullets
+  → frozen profile with summaryOverride spliced in
+  → JSON.stringify(snapshot) → stored in submissions.resume_snapshot
+  → Snapshot is immutable: contains merged text, not override references
+```
+
+---
+
+## Part H: Suggested Build Order
+
+Dependencies constrain sequencing. Every later phase depends on the schema and merge changes from earlier phases.
+
+### Phase 1: Schema + Migration (blocker for everything)
+
+**Deliver:**
+- `entity_overrides` table DDL in `schema.ts` + `index.ts` (`ensureSchema`)
+- Two partial unique indexes
+- `analysis_excluded_bullet_suggestions` table DDL
+- Migration block: copy `analysisBulletOverrides` rows → `entity_overrides`
+- Update `createTestDb()` in `tests/helpers/db.ts` to include new tables
+- `acceptSuggestion()` in `ai.ts` writes to `entity_overrides` (not `analysisBulletOverrides`)
+- `mergeHelper.ts` Layer 3 reads from `entity_overrides` (precedence-aware)
+- `applyOverrides()` usage retired in `mergeHelper.ts`
+- `dismissSuggestion()` and `getOverrides()` updated to read `entity_overrides`
+- Tests: migration idempotency, precedence (analysis wins over variant wins over base)
+
+**Why first:** Everything else — variant UI, excluded suggestions, snapshot — reads from `entity_overrides`. No UI is possible without this.
+
+### Phase 2: Merge Precedence — Multi-field Support
+
+**Deliver:**
+- `buildMergedBuilderData` applies overrides to `job.role`, `job.company`, `project.name`, `profile.summary` (via `summaryOverride`)
+- `MergedBuilderData` type gains `summaryOverride?: string`
+- `buildSnapshotForVariant` splices `summaryOverride` into frozen profile
+- `acceptVariantOverride()` handler + IPC registration in `templates.ts`
+- `getVariantOverrides()` handler + IPC registration
+- Analysis-tier inclusion un-exclusion logic in `buildMergedBuilderData`
+- Tests: multi-field override precedence, snapshot summary override, inclusion un-exclusion
+
+**Why second:** Variant reword UI (Phase 3) calls `acceptVariantOverride`. Excluded-bullet suggestions (Phase 4) need the inclusion un-exclusion logic in merge.
+
+### Phase 3: Variant Reword UI
+
+**Deliver:**
+- Inline reword affordance in `VariantEditor.tsx` for: summary, job role/company, project name, bullet text
+- Preload bridge: `templates:setVariantOverride`, `templates:getVariantOverrides`
+- Display current override text vs base text
+- Revert-to-base action (DELETE from entity_overrides)
+- Visual indicator when a field has a variant-tier override
+- Tests: handler round-trip, revert clears override, preview reflects reword
+
+**Why third:** Pure UI built on top of Phase 2 handlers. No AI pipeline changes needed here.
+
+### Phase 4: Excluded-Bullet Suggestions
+
+**Deliver:**
+- `buildScorerPrompt()` gains excluded-bullets section (with `[EB{id}]` markers)
+- `ResumeScorerSchema` gains `excluded_bullet_suggestions` field with `.default([])`
+- `runAnalysis()` computes `excludedBullets`, passes to prompt, calls `ensureExcludedBulletSuggestions()`
+- New handlers: `ensureExcludedBulletSuggestions`, `acceptExcludedBulletSuggestion`, `dismissExcludedBulletSuggestion`, `getExcludedBulletSuggestions`
+- Preload bridge for new channels
+- UI panel in `OptimizeVariant.tsx`: "Re-include for this job?" suggestions
+- Tests: schema additions in MockLanguageModelV3 response; acceptance writes entity_overrides; merge un-excludes bullet
+
+**Why fourth:** Depends on Phase 1 (entity_overrides table), Phase 2 (inclusion un-exclusion in merge). Does not block Phase 3.
+
+### Dependency graph
+
+```
+Phase 1: Schema + Migration
+  ├── Phase 2: Merge Precedence
+  │     ├── Phase 3: Variant Reword UI
+  │     └── Phase 4: Excluded-Bullet Suggestions
+  └── (Phase 4 also depends on Phase 2)
+```
+
+Phases 3 and 4 are parallelizable after Phase 2 ships.
+
+---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Adding `dbPath` to `ai_settings` or a new DB table
+### Anti-Pattern 1: Dual-writing to both tables during transition
 
-**Why bad:** Chicken-and-egg — can't query the DB to find out where the DB is.
-**Do instead:** JSON file in `userData/` (see Q5).
+**What people do:** Write new overrides to both `entity_overrides` and `analysisBulletOverrides` during the migration phase so reads can fall back.
 
-### Anti-Pattern 2: Re-running `applyOverrides()` inside the export serializer
+**Why it's wrong:** Creates two sources of truth. A dismiss on one table doesn't remove from the other. Merge reads one table and misses the other.
 
-**Why bad:** `getBuilderDataForVariant` already merges. Second merge is a no-op at best, a double-override-application bug at worst.
-**Do instead:** Trust the BuilderData. Filter by `excluded` and serialize.
+**Do this instead:** Cut over reads to `entity_overrides` atomically in Phase 1 (same PR that migrates data). Keep `analysisBulletOverrides` as a read-only artifact until explicitly dropped. Never write new rows to it after the cutover.
 
-### Anti-Pattern 3: Storing `showSummary` in both `template_variant_items` AND `templateOptions` JSON
+### Anti-Pattern 2: Using NULL entity_id for the summary override
 
-**Why bad:** Two sources of truth. Current asymmetry already hurts — don't entrench it.
-**Do instead:** Keep `template_variant_items` exclusion row as the single storage. DOCX reads it via the reconciled `getBuilderDataForVariant` (Phase 1, step 1).
+**What people do:** Use `entity_id = NULL` for the summary because there's no profile-summary entity ID.
 
-### Anti-Pattern 4: Using `app.relaunch()` for DB path change
+**Why it's wrong:** SQLite partial indexes behave unexpectedly with multiple NULL-keyed rows. The UNIQUE constraint won't protect against duplicate summary overrides.
 
-**Why bad:** Discards renderer state (unsaved edits, scroll position, active analysis). User-hostile.
-**Do instead:** In-process reopen via Proxy-wrapped exports.
+**Do this instead:** Use `entity_id = 1` as a sentinel (matches the profile row's `id = 1`). It's consistent and unique.
 
-### Anti-Pattern 5: Forgetting WAL sidecars in copy
+### Anti-Pattern 3: Applying variant overrides in the UI instead of merge
 
-**Why bad:** `better-sqlite3` + WAL creates `app.db-wal` and `app.db-shm`. Copying only `app.db` while WAL contains uncheckpointed writes = data loss.
-**Do instead:** `sqlite.pragma('wal_checkpoint(TRUNCATE)')` before copy, then close, then copy the main file. After checkpoint-truncate the WAL file is empty and safe to ignore.
+**What people do:** Fetch variant overrides in the renderer and patch display values client-side, skipping mergeHelper.
 
-## Data Flow: DB Migration (definitive sequence)
+**Why it's wrong:** PDF/DOCX/snapshot consumers would not see the overrides. The single-merge-path invariant is broken.
 
-```
-[Settings UI] User clicks "Change DB location"
-    ↓ dialog.showOpenDialog({ properties: ['openDirectory'] })
-    ↓ newFolder
-    ↓ IPC: settings:setDbPath(newFolder)
+**Do this instead:** All override application happens in `buildMergedBuilderData`. The renderer only reads the merged result. This is the existing architectural invariant.
 
-[Main: setDbPath handler]
-    ↓ newPath = path.join(newFolder, 'app.db')
-    ↓ validate: newPath !== currentPath; folder writable; >10MB free
-    ↓
-[reopenDb(newPath)]
-    ↓ sqlite.pragma('wal_checkpoint(TRUNCATE)')
-    ↓ sqlite.close()           # Windows: releases file handle
-    ↓ fs.copyFile(currentPath, newPath)
-    ↓ verify = new Database(newPath, { readonly: true })
-    ↓ verify.pragma('integrity_check')  → expect 'ok'
-    ↓ verify.prepare('SELECT COUNT(*) FROM jobs').get()  # sanity
-    ↓ verify.close()
-    ↓ if verification fails:
-    │    new Database(currentPath)  # reopen original
-    │    throw
-    ↓ newSqlite = new Database(newPath)
-    ↓ newSqlite.pragma('journal_mode = WAL')
-    ↓ ensureSchema() against newSqlite
-    ↓ Proxy target ← newSqlite / drizzle(newSqlite, { schema })
-    ↓ appConfig.set('dbPath', newPath)
-    ↓ return { success: true, backupPath: currentPath }
+### Anti-Pattern 4: Storing excluded_bullet_suggestions in analysis_results.suggestions JSON
 
-[Settings UI]
-    ↓ Toast: "DB moved. Backup at {backupPath}. Delete when confident."
-```
+**What people do:** Piggyback new suggestion types into the existing `suggestions` text column on `analysis_results`.
 
-## Integration Points
+**Why it's wrong:** The existing `suggestions` column holds `RewriteSuggestion[]` typed by the renderer. Mixing types in a JSON column requires version-sensitive parsing and breaks existing tests that assert on the suggestions shape.
 
-### External
+**Do this instead:** Separate table `analysis_excluded_bullet_suggestions` with explicit status column, mirroring `analysisSkillAdditions`.
 
-| Service | Integration | Notes |
-|---------|-------------|-------|
-| `dialog.showSaveDialog` | resume.json export | Reuse existing pattern from `export:pdf` / `export:docx` |
-| `dialog.showOpenDialog({ properties: ['openDirectory'] })` | DB path picker | New |
-| `safeStorage` | Not used by v2.5 | Only AI key encryption uses it today |
-| OS file system | Copy + handle-release | Windows-specific handle behavior — test on Windows |
+---
 
-### Internal boundaries
+## Integration Points Reference
 
-| Boundary | Communication | v2.5 consideration |
-|----------|---------------|--------------------|
-| Main ↔ Renderer | IPC via preload `contextBridge` | 4 new channels (2 export, 2 settings) |
-| `src/shared/` ↔ main + renderer | Direct import | `resumeJson.ts` new module; `overrides.ts` reused |
-| `export.ts` ↔ `templates.ts` | Currently duplicated `getBuilderDataForVariant` | **Must reconcile in Phase 1, step 1** |
-| `db/index.ts` module singleton ↔ 18+ consumer handlers | Named imports | Proxy wrapping preserves call sites |
+| Operation | File:Function | IPC Channel | New/Modified |
+|-----------|--------------|-------------|-------------|
+| Read merged data (all surfaces) | `mergeHelper.ts:buildMergedBuilderData` | via `templates:getBuilderData` | Modified |
+| Write variant-tier override | `templates.ts:acceptVariantOverride` | `templates:setVariantOverride` | New |
+| Read variant overrides for UI | `templates.ts:getVariantOverrides` | `templates:getVariantOverrides` | New |
+| Accept analysis rewrite (migrated) | `ai.ts:acceptSuggestion` | `ai:acceptSuggestion` | Modified (target table) |
+| Dismiss analysis rewrite (migrated) | `ai.ts:dismissSuggestion` | `ai:dismissSuggestion` | Modified (target table) |
+| Get analysis overrides (migrated) | `ai.ts:getOverrides` | `ai:getOverrides` | Modified (source table) |
+| Run analysis (extended) | `ai.ts:runAnalysis` | `ai:analyze` | Modified (prompt + suggestions) |
+| Store excluded suggestions | `ai.ts:ensureExcludedBulletSuggestions` | internal, called by runAnalysis | New |
+| Accept excluded-bullet inclusion | `ai.ts:acceptExcludedBulletSuggestion` | `ai:acceptExcludedBulletSuggestion` | New |
+| Dismiss excluded suggestion | `ai.ts:dismissExcludedBulletSuggestion` | `ai:dismissExcludedBulletSuggestion` | New |
+| Read excluded suggestions for UI | `ai.ts:getExcludedBulletSuggestions` | `ai:getExcludedBulletSuggestions` | New |
+| Freeze snapshot with overrides | `submissions.ts:buildSnapshotForVariant` | via `submissions:create` | Modified |
 
-## Tech Debt Mapping (to files, with confidence)
-
-| Debt item | File + line | Confidence | Notes |
-|-----------|-------------|------------|-------|
-| Orphan `TEMPLATE_LIST` export | `src/renderer/src/components/templates/resolveTemplate.ts:21-26` | HIGH — grep confirmed only this file references it | Safe to delete the export; the `TEMPLATE_MAP` stays |
-| Vestigial `compact` prop | `src/renderer/src/components/templates/types.ts:28` | HIGH — prop defined in `ResumeTemplateProps` but no template component consumes it | Delete line 28; TS will surface any hidden consumers |
-| Dead `tests/setup.ts` | `tests/setup.ts` + `vitest.config.ts` | HIGH — `vitest.config.ts` has no `setupFiles` entry; the file is orphaned and only mocked DB leaks if accidentally imported | Delete the file. Individual tests already call `createTestDb()` per test. |
-| `jobs.test.ts` race under thread pool | `tests/unit/handlers/jobs.test.ts` + `vitest.config.ts` | MEDIUM — likely interaction between orphaned `tests/setup.ts` mock and per-test `createTestDb()` calls | Deleting `tests/setup.ts` likely fixes the race. Verify with `npm test` before and after. Fallback: `poolOptions.threads.singleThread: true`. |
-
-## Scaling Considerations
-
-Not a growth-scaling question (desktop app, 1 user). But v2.5 has three *correctness-scaling* risks:
-
-| Concern | Risk at typical use | Mitigation |
-|---------|---------------------|------------|
-| Large DB files during migration copy | 50MB DB with lots of analyses | `fs.copyFile` is atomic; no streaming needed at this scale |
-| Variant export missing override round-trip | User edits bullets via AI, exports resume.json, re-imports → would lose override-vs-base distinction | Document explicitly: variant export is export-only (already noted in PROJECT.md Active). Re-import creates a new base with overrides flattened in. |
-| Concurrent DB operations during reopenDb | Renderer makes IPC call mid-swap | Proxy target swap is synchronous. In-flight IPC completes on old handle before swap; new calls use new handle. Brief (<1s) UI freeze acceptable. |
+---
 
 ## Sources
 
-**Primary (this codebase — all paths absolute):**
-- `D:/Projects/resumeHelper/src/main/db/index.ts` (lines 1-13 for singleton pattern, 307 for ensureSchema)
-- `D:/Projects/resumeHelper/src/main/handlers/export.ts` (lines 16-209 for getBuilderDataForVariant, 278-305 for export:docx)
-- `D:/Projects/resumeHelper/src/main/handlers/templates.ts` (lines 290-332 for the parallel getBuilderDataForVariant returning summaryExcluded)
-- `D:/Projects/resumeHelper/src/main/handlers/import.ts` (lines 10-75 for ResumeJson interface)
-- `D:/Projects/resumeHelper/src/main/handlers/settings.ts` (lines 13-60 for handler-extraction pattern)
-- `D:/Projects/resumeHelper/src/main/handlers/index.ts` (registerAllHandlers aggregation)
-- `D:/Projects/resumeHelper/src/main/lib/docxBuilder.ts` (lines 55-60 for signature, 122-130 for unconditional summary emission)
-- `D:/Projects/resumeHelper/src/shared/overrides.ts` (applyOverrides definition)
-- `D:/Projects/resumeHelper/src/renderer/src/PrintApp.tsx` (lines 170-171 for showSummary read)
-- `D:/Projects/resumeHelper/src/renderer/src/components/templates/resolveTemplate.ts` (line 21 for TEMPLATE_LIST orphan)
-- `D:/Projects/resumeHelper/src/renderer/src/components/templates/types.ts` (line 28 for compact prop)
-- `D:/Projects/resumeHelper/tests/setup.ts` (orphaned per vitest.config.ts missing setupFiles)
-- `D:/Projects/resumeHelper/vitest.config.ts` (no setupFiles entry confirms orphan)
-- `D:/Projects/resumeHelper/.planning/PROJECT.md` (v2.5 target features and Key Decisions context)
-
-**No external sources required** — this is integration analysis against a known codebase; all answers derive from code inspection.
+- `src/main/db/schema.ts` — existing table definitions including `analysisBulletOverrides` UNIQUE constraint
+- `src/main/db/index.ts` — `ensureSchema()` migration pattern (ALTER TABLE in try/catch, transaction-wrapped data migrations)
+- `src/main/lib/mergeHelper.ts` — complete three-layer merge implementation
+- `src/shared/overrides.ts` — `applyOverrides()` signature and `BulletOverride` interface
+- `src/main/handlers/ai.ts` — `acceptSuggestion`, `runAnalysis`, `ensureSkillAdditions` patterns
+- `src/main/handlers/templates.ts` — `setItemExcluded` and `buildMergedBuilderData` call sites
+- `src/main/handlers/submissions.ts` — `buildSnapshotForVariant`, `summaryOverride` splicing point
+- `src/main/lib/aiProvider.ts` — `ResumeScorerSchema`, `generateObject` pattern, `.default([])` compatibility
+- `src/main/lib/analysisPrompts.ts` — prompt construction pattern for new excluded-bullets section
+- `tests/helpers/db.ts` — `createTestDb()` pattern that must be kept in sync with `ensureSchema()`
+- `src/preload/index.d.ts` — `BuilderJob`, `BuilderProject`, `MergedBuilderData` consumer interfaces
 
 ---
-*Architecture integration research for v2.5 Portability & Debt Cleanup*
-*Researched: 2026-04-23*
+
+*Architecture research for: ResumeHelper v2.6 Per-Variant Text Overrides*
+*Researched: 2026-06-05*

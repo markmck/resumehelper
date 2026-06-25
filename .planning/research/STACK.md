@@ -1,221 +1,191 @@
-# Stack Research — v2.5 Portability & Debt Cleanup
+# Stack Research
 
-**Domain:** Electron desktop app — adding resume.json export and configurable SQLite DB location to an existing ResumeHelper install
-**Researched:** 2026-04-23
-**Confidence:** HIGH
+**Domain:** Electron desktop app — v2.6 Per-Variant Text Overrides + Excluded-Bullet Suggestions
+**Researched:** 2026-06-05
+**Confidence:** HIGH (all findings grounded in actual source code, no external lookups required)
 
-## Executive Summary
+---
 
-**Zero new runtime dependencies required.** Every capability needed for v2.5 is either already installed or built into Electron/Node. The stack work is entirely about reusing existing infrastructure:
+## Verdict: No New Dependencies
 
-- **Resume.json export** — reuse `ResumeJsonSchema` from `src/main/lib/aiProvider.ts` (already defined for v2.3 import), `dialog.showSaveDialog` (already used by export:pdf/docx), `fs.writeFile` (already used by PDF/DOCX), and `JSON.stringify` (built-in).
-- **Variant-merged export** — reuse `getBuilderDataForVariant()` from `src/main/handlers/export.ts` (already does the three-layer merge for PDF/DOCX), then map `BuilderData` → resume.json shape via a new pure function.
-- **DB path migration** — reuse `better-sqlite3`'s `.close()`, Node `fs.copyFile`, SQLite `PRAGMA integrity_check` (built-in, no package), `app.setPath('userData', ...)` or a custom path indirection, and `app.relaunch() + app.exit()` for the switch.
+Every capability needed for v2.6 is already provided by the installed stack. This is pure schema
+work, application logic, and prompt engineering inside existing patterns.
 
-**What this milestone adds:** a new Zod schema variant (output-shape) or reuse of the existing `ResumeJsonSchema` as a validator before write, a small settings table/column for `db_path_override`, and a new IPC surface. No new packages.
+---
 
-## Recommended Stack
+## Existing Stack (Confirmed from package.json + source)
 
-### Core Technologies (all pre-installed)
+| Technology | Installed Version | Role in v2.6 |
+|------------|------------------|--------------|
+| `drizzle-orm` | ^0.45.1 | New `overrides` table definition + migration DATA move via `db.insert` |
+| `better-sqlite3` | ^12.10.0 | `ALTER TABLE ... ADD COLUMN` in try/catch pattern for bootstrap migration; raw `sqlite.exec` for data migration transaction |
+| `zod` | ^4.3.6 | Existing Zod schemas in `aiProvider.ts` expand to include excluded-bullet suggestion shape |
+| `ai` (Vercel AI SDK) | ^6.0.136 | `generateObject` with expanded `ResumeScorerSchema` to emit excluded-bullet suggestions — same call pattern already used in `callResumeScorer` |
+| `@ai-sdk/anthropic` / `@ai-sdk/openai` | ^3.0.63 / ^3.0.48 | No change — provider-agnostic `LanguageModel` interface unchanged |
+| `react` + TypeScript | ^19.2.1 / ^5.9.3 | Renderer-side UI for variant-tier inline reword affordance — existing component patterns |
+| `vitest` | ^4.1.2 | Existing `MockLanguageModelV3` pattern covers new prompt/schema tests |
 
-| Technology | Version (installed) | Purpose | Why This (Already) Fits |
-|------------|---------------------|---------|-------------------------|
-| `electron` | `^39.2.6` | `dialog.showSaveDialog`, `app.getPath('userData')`, `app.setPath`, `app.relaunch`, `app.exit` | All needed APIs are first-party; already used by export handlers in `src/main/handlers/export.ts` |
-| `better-sqlite3` | `^12.8.0` | Close current handle, open new handle at new path, run `PRAGMA integrity_check` | Synchronous API makes the copy→verify→switch sequence straightforward; no promise juggling |
-| `drizzle-orm` | `^0.45.1` | Re-point ORM at the new sqlite handle after switch | Current singleton in `src/main/db/index.ts` (line 13: `drizzle(sqlite, { schema })`) is the only coupling point |
-| `zod` | `^4.3.6` | Validate exported JSON against `ResumeJsonSchema` before writing | Already imported by `src/main/lib/aiProvider.ts`; same schema used for v2.3 import |
-| `node:fs` (built-in) | n/a | `copyFile`, `writeFile`, `stat`, `unlink` for DB copy + JSON export | Already used by `src/main/handlers/export.ts` (line 4) and `import.ts` (line 2) |
-| `node:path` (built-in) | n/a | Path join/normalize for DB target directory | Already used throughout main process |
+---
 
-### Supporting Libraries (all pre-installed, no additions)
+## What v2.6 Needs and How Existing Pieces Cover It
 
-| Library | Version | Purpose | When Used in v2.5 |
-|---------|---------|---------|-------------------|
-| existing `ResumeJsonSchema` export in `aiProvider.ts` | n/a | Single source of truth for resume.json shape | Validate on export before write; emit `.schema({ type: 'resume.json', version: '1.0.0' })` banner (see below) |
-| existing `applyOverrides` helper | n/a | Three-layer merge for variant-merged export | `src/shared/overrides.ts` — already merges base bullets with analysis overrides for PDF/DOCX export |
-| existing `getBuilderDataForVariant` helper | n/a | Produces the exact object shape PDF/DOCX use | `src/main/handlers/export.ts:16` — guarantees variant export matches what user sees in preview |
+### (a) Unified Polymorphic Overrides Table + Migration
 
-### Development Tools (already configured)
+**What is needed:**
 
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| `vitest` `^4.1.2` | Unit tests for export mapping + DB migration pre-flight checks | v2.4's `createTestDb()` helper handles in-memory DB; add file-system fixtures for copy+verify tests |
-| `@types/better-sqlite3` `^7.6.13` | Types for `Database#close`, `pragma`, `prepare` | Already installed |
+1. A new `overrides` table in `schema.ts` (Drizzle table definition) covering all entity types
+   and tiers in a single polymorphic shape.
+2. The new table added to `ensureSchema()` in `db/index.ts` via `CREATE TABLE IF NOT EXISTS`.
+3. A data migration that reads every existing `analysisBulletOverrides` row and writes it into
+   the new `overrides` table, then (optionally) keeps the old table for a release cycle or drops
+   it when no code references it.
 
-## Installation
+**How existing stack covers it:**
 
-```bash
-# Nothing to install. All dependencies are already in package.json.
-```
+- **Drizzle `sqliteTable`** — The `schema.ts` pattern for defining nullable FK columns is already
+  established by `templateVariantItems`, which uses exactly the same polymorphic multi-FK shape
+  (one row type, many nullable entity-id columns). The new `overrides` table follows that same
+  pattern: nullable `variant_id`, nullable `analysis_id`, `entity_type TEXT`, `entity_id INTEGER`,
+  `field TEXT`, `override_text TEXT`.
+- **`ensureSchema()` bootstrap pattern** — `db/index.ts` already runs `CREATE TABLE IF NOT EXISTS`
+  for every table and then a list of `ALTER TABLE ... ADD COLUMN` try/catch statements. The new
+  table goes into the same `sqlite.exec(...)` block. No new migration infrastructure needed.
+- **Data migration pattern** — The skill-category migration in `ensureSchema()` (lines 317–342 of
+  `db/index.ts`) is the exact model to follow: wrap in `sqlite.transaction()`, read old rows with
+  `sqlite.prepare(...).all()`, insert into new table, mark old rows migrated. Run once, idempotent
+  guard via a sentinel check (e.g., check `overrides` row count vs `analysisBulletOverrides` count,
+  or add a boolean migrated column to the old table). No new libraries needed.
+- **`applyOverrides()` in `src/shared/overrides.ts`** — This function currently takes a flat
+  `BulletOverride[]`. It will need to be generalized to accept the new polymorphic shape and apply
+  by `(entity_type, entity_id, field)` key. This is pure TypeScript refactoring — no new library.
+- **`buildMergedBuilderData()` in `mergeHelper.ts`** — Currently reads from `analysisBulletOverrides`
+  for Layer 3. After migration it reads from `overrides` filtered by `analysis_id IS NOT NULL` for
+  analysis-tier rows and by `variant_id IS NOT NULL` for variant-tier rows. The merge precedence
+  logic (analysis wins over variant wins over base) is three Map lookups in sequence — pure code.
 
-## Integration Points (Where Each Feature Plugs In)
+**Drizzle ORM conflict target note:** `acceptSuggestion` in `ai.ts` uses
+`.onConflictDoUpdate({ target: [analysisBulletOverrides.analysisId, analysisBulletOverrides.bulletId] })`.
+The new `overrides` table needs a UNIQUE constraint on `(variant_id, analysis_id, entity_type, entity_id, field)`
+(NULLs excluded from uniqueness in SQLite, so variant-tier and analysis-tier rows won't collide on
+the same entity). Drizzle's `onConflictDoUpdate` supports multi-column targets — already used in
+`ai.ts`, no API gap.
 
-### 1. Resume.json Export (Base — Full DB Dump)
+---
 
-**New file:** `src/main/handlers/exportJson.ts` (mirrors `handlers/import.ts` structure)
+### (b) Excluded-Bullet Suggestions During Job Analysis
 
-```
-ipcMain.handle('export:resumeJson', async () => {
-  const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Export resume.json',
-    defaultPath: 'resume.json',
-    filters: [{ name: 'JSON Files', extensions: ['json'] }],
-  })
-  if (canceled || !filePath) return { canceled: true }
+**What is needed:**
 
-  const data = buildResumeJsonFromDb(db)       // NEW pure function
-  const validated = ResumeJsonSchema.parse(data) // reuse existing Zod schema
-  await fs.writeFile(filePath, JSON.stringify(validated, null, 2), 'utf-8')
-  return { canceled: false, filePath }
-})
-```
+1. During `runAnalysis()`, after building the variant-merged resume, also collect the bullets that
+   the variant EXCLUDES from the base experience.
+2. Pass those excluded bullets to the LLM (appended to the scorer prompt) with a new instruction:
+   "Here are bullets this variant omits — recommend any that are relevant to the JD gaps."
+3. The LLM returns a new field alongside `rewrite_suggestions` — a list of excluded-bullet
+   re-include suggestions with `bullet_id` and `reason`.
+4. Persisting "accepted re-include" decisions: an accepted suggestion adds a row to `overrides`
+   (analysis tier, `entity_type = 'bullet'`, `entity_id = bulletId`, `field = 'included'`,
+   `override_text = 'true'`) — or alternatively a simpler boolean column in a new
+   `analysis_bullet_inclusions` table, mirroring how `analysisSkillAdditions` works.
+5. `buildMergedBuilderData()` Layer 3 checks for analysis-tier inclusion overrides on excluded
+   bullets and re-includes them.
 
-**Key decision:** The inverse mapping of `import:confirmReplace` — walk each table, emit the resume.json shape. The `ResumeJsonSchema` (aiProvider.ts:47-112) defines the exact fields.
+**How existing stack covers it:**
 
-**Gotcha (from reading `import.ts`):** current `ResumeJsonSchema` requires all 11 sections and all string fields as non-optional. When mapping from DB, coerce `null` → `''` for dates and strings (import already does this via `?? ''`). If any exported object fails Zod parse, that's a data-integrity signal worth surfacing to the user, not swallowing.
+- **Excluded-bullet enumeration** — `buildMergedBuilderData()` already produces `excluded: true`
+  on bullets in `jobsWithBullets`. The `runAnalysis` handler calls `buildMergedBuilderData(db, variantId)`
+  (no `analysisId` at this point). Collecting excluded bullets is a simple filter: after the
+  merge, iterate `merged.jobs`, then `job.bullets`, collect those with `excluded === true`.
+  No new library.
+- **Prompt expansion** — `buildScorerPrompt()` in `analysisPrompts.ts` currently takes
+  `(resumeText, parsedJob)`. Add a third optional `excludedBullets` parameter, appended as a new
+  section in the prompt string. Same string-building pattern already used throughout the file.
+- **Schema extension** — `ResumeScorerSchema` in `aiProvider.ts` is a Zod object. Add a new
+  optional field: `excluded_bullet_suggestions: z.array(z.object({ bullet_id: z.number(), reason: z.string() })).optional()`. The Vercel AI SDK `generateObject` call auto-retries on schema
+  mismatch — the optional field means old LLM responses without the field still parse cleanly.
+- **Persistence** — The `analysisSkillAdditions` table and its accept/dismiss handler pattern in
+  `ai.ts` is the direct analog. A parallel `analysis_bullet_inclusions` table
+  (`id, analysis_id, bullet_id, reason, status`) follows identical structure. Handlers
+  `acceptBulletInclusion` / `dismissBulletInclusion` are carbon-copies of `acceptSkillAddition` /
+  `dismissSkillAddition`. Alternatively, route through the new unified `overrides` table with
+  `field = 'included'` — either approach uses only existing Drizzle + better-sqlite3.
+- **Merge integration** — `buildMergedBuilderData()` Layer 3 already iterates `job.bullets` to
+  apply text overrides. Add a second pass: for any bullet with `excluded === true`, check the
+  inclusion override set; if present and accepted, flip `excluded` to `false`. This is 5–8 lines
+  of pure TypeScript inside the existing merge function.
 
-### 2. Resume.json Export (Variant-Merged — Three-Layer)
+---
 
-**Same handler file:** `src/main/handlers/exportJson.ts`
+## What NOT to Add
 
-```
-ipcMain.handle('export:resumeJsonForVariant', async (_, variantId: number, analysisId?: number) => {
-  const { canceled, filePath } = await dialog.showSaveDialog({ ... })
-  if (canceled || !filePath) return { canceled: true }
+| Do Not Add | Why |
+|------------|-----|
+| Any ORM migration library (e.g. `drizzle-kit` push, `knex`, `umzug`) | Established decision: `CREATE TABLE IF NOT EXISTS` + `ALTER TABLE` try/catch in `ensureSchema()`. File-based migrations were ruled fragile. |
+| A JSON-patch or deep-merge library | The merge logic is simple enough to express in 3 Map lookups. Adding a dep for this is pure overhead. |
+| A state management library (Redux, Zustand, Jotai) | Existing renderer uses local React state + IPC. Variant-tier override edits are per-field IPC writes, same pattern as `acceptSuggestion`. |
+| A rich text editor library | The reword UI is a plain `<textarea>` or `<input>` — same `InlineEdit.tsx` component pattern already in the codebase. |
+| A prompt-builder or template library | `analysisPrompts.ts` builds prompts as template literals. That's sufficient and consistent. |
+| Additional AI provider packages | Provider-agnostic `LanguageModel` interface via `getModel()` already covers Claude and OpenAI. |
 
-  const builderData = await getBuilderDataForVariant(db, variantId, analysisId)
-  const profileRow  = db.select().from(profile).where(eq(profile.id, 1)).get()
-  const data        = builderDataToResumeJson(builderData, profileRow) // NEW pure function
-  const validated   = ResumeJsonSchema.parse(data)
-  await fs.writeFile(filePath, JSON.stringify(validated, null, 2), 'utf-8')
-  return { canceled: false, filePath }
-})
-```
+---
 
-**Key decision:** Reuse `getBuilderDataForVariant` (export.ts:16) — the same function that feeds DOCX export. This guarantees "per-variant export matches preview/PDF" with **zero divergence risk**. Filter out `.excluded` items, then map to resume.json shape.
+## Integration Points in Existing Code
 
-**Export-only, no roundtrip guarantee** (per milestone goal): the merged view flattens the three-layer model, so re-importing would drop the variant/override metadata. Document this in the exported JSON header comment or a `meta` sibling field (NOTE: resume.json spec's standard `meta` field is reserved for `canonical`/`version`/`lastModified` — fine to reuse).
+| File | What Changes |
+|------|-------------|
+| `src/main/db/schema.ts` | Add `overrides` table definition (Drizzle `sqliteTable`) |
+| `src/main/db/index.ts` | Add `CREATE TABLE IF NOT EXISTS overrides` in `ensureSchema()`; add data migration block to copy `analysisBulletOverrides` rows; add `ALTER TABLE` entries if new columns needed on existing tables |
+| `src/shared/overrides.ts` | Generalize `applyOverrides()` to work with `(entity_type, entity_id, field)` key; update `BulletOverride` type |
+| `src/main/lib/mergeHelper.ts` | Replace `analysisBulletOverrides` query with `overrides` query; add variant-tier override layer (between current Layer 2 and Layer 3); add analysis-tier re-inclusion pass for excluded bullets |
+| `src/main/lib/analysisPrompts.ts` | Extend `buildScorerPrompt()` to accept and embed excluded bullet list |
+| `src/main/lib/aiProvider.ts` | Extend `ResumeScorerSchema` with optional `excluded_bullet_suggestions` field |
+| `src/main/handlers/ai.ts` | Collect excluded bullets post-merge; pass to scorer; persist inclusion decisions; add `acceptBulletInclusion` / `dismissBulletInclusion` handlers |
+| `src/renderer/src/components/OptimizeVariant.tsx` | Surface excluded-bullet suggestions alongside existing gap/skill cards |
+| New: `src/renderer/src/components/[VariantRewordUI].tsx` | Inline reword affordance at variant tier — follows `InlineEdit.tsx` pattern, IPC writes to `overrides` table |
 
-### 3. Configurable SQLite DB Location
+---
 
-**Schema change** — add to `src/main/db/index.ts` ALTER block (line 237+):
+## Migration Strategy for `analysisBulletOverrides` Data
 
-```sql
--- New row in existing ai_settings-style pattern, OR a new settings table
-CREATE TABLE IF NOT EXISTS `app_settings` (
-  `id` integer PRIMARY KEY NOT NULL,
-  `db_path_override` text  -- null = use default app.getPath('userData')/app.db
-);
-INSERT OR IGNORE INTO `app_settings` (`id`) VALUES (1);
-```
+The skill-tag-to-skill_categories migration in `db/index.ts` (lines 317–342) is the template:
 
-**Boot-time path resolution** — `src/main/db/index.ts:8`:
+1. Check if migration is needed: `SELECT COUNT(*) FROM analysis_bullet_overrides WHERE migrated != 1`
+   (add `migrated INTEGER DEFAULT 0` column via `ALTER TABLE` try/catch, or just use
+   `SELECT COUNT(*) FROM overrides WHERE analysis_id IS NOT NULL AND entity_type = 'bullet'`
+   compared to `analysisBulletOverrides` count as the idempotency guard).
+2. Wrap in `sqlite.transaction()`.
+3. Read all `analysisBulletOverrides` rows with `sqlite.prepare(...).all()`.
+4. Insert each into `overrides` with `entity_type = 'bullet'`, `entity_id = bullet_id`,
+   `field = 'text'`, `variant_id = NULL`, `analysis_id = analysis_id`.
+5. The old table stays (no DROP) — existing `onConflictDoUpdate` references in `ai.ts` can be
+   updated to point to `overrides` in the same PR, or kept temporarily while the new table is
+   primary.
 
-```ts
-// Pseudocode — current line 8 is `const dbPath = path.join(app.getPath('userData'), 'app.db')`
-// New: read override from a tiny bootstrap config file (NOT from DB — chicken/egg)
-const overridePath = readBootstrapOverride() // reads userData/db-location.json
-const dbPath = overridePath ?? path.join(app.getPath('userData'), 'app.db')
-```
+---
 
-**Key decision:** Store the override path in a small JSON file at `app.getPath('userData')/db-location.json`, NOT in the DB itself (you can't read the override from the DB you haven't opened yet). Writing `db-location.json` is the last step of the switch.
+## Confidence Assessment
 
-**Migration flow (from Settings UI):**
+| Area | Confidence | Basis |
+|------|------------|-------|
+| No new dependencies needed | HIGH | Every required capability verified against actual installed packages and source patterns |
+| Schema design (polymorphic overrides) | HIGH | `templateVariantItems` in `schema.ts` is the direct analog already in production |
+| Data migration approach | HIGH | Skill-category migration in `db/index.ts` lines 317–342 is the exact proven pattern |
+| Prompt expansion | HIGH | `analysisPrompts.ts` uses plain string building; schema extension via Zod optional field is standard |
+| Merge layer extension | HIGH | `buildMergedBuilderData()` structure is clear and the extension points are explicit |
+| UI pattern | HIGH | `InlineEdit.tsx` + IPC write pattern covers variant-tier reword; `OptimizeVariant.tsx` covers suggestion display |
 
-```
-1. User picks new directory via dialog.showOpenDialog({ properties: ['openDirectory'] })
-2. Target path = path.join(picked, 'app.db')
-3. Pre-flight: refuse if target exists (unless user confirms overwrite)
-4. Pre-flight: verify write-permission (fs.access(picked, fs.constants.W_OK))
-5. Checkpoint current DB:    sqlite.pragma('wal_checkpoint(TRUNCATE)')
-6. Close current handle:      sqlite.close()
-7. Copy file:                 await fs.copyFile(currentDbPath, targetPath)
-   (Also copy -wal and -shm sidecars if present — see Pitfall 1)
-8. Open copy read-only:       const test = new Database(targetPath, { readonly: true })
-9. Run integrity check:       test.pragma('integrity_check') // must return [{ integrity_check: 'ok' }]
-10. Close test handle:        test.close()
-11. Persist override:         fs.writeFileSync(bootstrapPath, JSON.stringify({ dbPath: targetPath }))
-12. Relaunch:                 app.relaunch(); app.exit(0)
-```
-
-**Why relaunch and not reopen in-place:** the `db` and `sqlite` exports in `src/main/db/index.ts` are module-level singletons imported by ~20 handler files. Reopening would require a reactive/DI pattern retrofit. Relaunch is one line and is how Chrome, VS Code, and Slack handle similar user-data migrations.
-
-### 4. DOCX showSummary Toggle
-
-Already has `templateOptions.showSummary` on the variant (see `src/main/handlers/export.ts:311`). The v2.5 fix is a one-line read in `src/main/lib/docxBuilder.ts` — not a stack addition. Listed here only because the milestone mentions it; no new dependency.
-
-## Alternatives Considered
-
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| Zod 4 reuse of `ResumeJsonSchema` | New `ResumeJsonExportSchema` with optional fields | If future resume.json spec fields diverge between import/export, split them. Not now — same shape both ways. |
-| `JSON.stringify(obj, null, 2)` | `json-stable-stringify` package | If deterministic key ordering matters for diff/review. Not needed — Node's V8 stringify is already insertion-ordered and stable for plain objects in modern Electron. |
-| Bootstrap JSON file for DB override | Electron `Store`/`electron-store` package | If we had dozens of user prefs. We have one — a JSON file is 4 lines, zero deps. |
-| `app.relaunch()` after DB switch | Hot-swap DB handle in-place with module reload | Would require converting `db`/`sqlite` exports to a DI container. Large refactor risk for little UX gain (restart is ~1s). |
-| `PRAGMA integrity_check` | `PRAGMA quick_check` | `integrity_check` verifies UNIQUE/index consistency which is exactly what matters after a file copy. User's DB is small (single-user resume data) so the O(N log N) cost is milliseconds. |
-| `fs.copyFile` | Stream copy via `createReadStream` | Only matters for GB-scale files. Our DB is KB–low-MB. |
-
-## What NOT to Use
-
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| New schema library (Ajv, Yup, Valibot) | `zod@^4.3.6` is already the project's validation layer | Reuse `ResumeJsonSchema` |
-| `fs-extra` for directory ops | Not installed; Node 22's built-in `fs/promises` covers every case we need | Built-in `node:fs/promises` |
-| `electron-store` for DB path persistence | Adds a dep for one setting; also writes to userData (same place as our bootstrap file) | 4-line `fs.readFileSync` + `JSON.parse` bootstrap |
-| In-place DB hot-swap (close + reopen without relaunch) | `db` and `sqlite` are singleton module exports imported by 20+ files; retrofit is a rabbit hole | `app.relaunch(); app.exit(0)` |
-| `app.setPath('userData', ...)` to move the DB | `userData` also contains AI settings (via `safeStorage`), logs, cache — moving all of it is surprising | Move only `app.db` (and its WAL/SHM sidecars); keep userData at default |
-| Synchronous `Database#close()` without checkpoint | WAL file may contain uncommitted data that a naïve file copy misses | `PRAGMA wal_checkpoint(TRUNCATE)` before close |
-| `fs.copyFile(db, target)` alone in WAL mode | The `.db-wal` and `.db-shm` sidecars hold recent writes until checkpoint | Copy all three, OR checkpoint+close first (preferred) |
-
-## Stack Patterns by Variant
-
-**If export is base (full DB dump):**
-- Walk each Drizzle table once
-- Map to resume.json shape (inverse of `import:confirmReplace`)
-- Validate with `ResumeJsonSchema.parse`
-- `JSON.stringify(..., null, 2)` for human-readable diffing
-
-**If export is variant-merged:**
-- Call `getBuilderDataForVariant(db, variantId, analysisId)` — same function PDF/DOCX use
-- Filter `item.excluded === true`
-- Map `BuilderJob`/`BuilderSkill`/etc. → resume.json shape
-- Validate + write identically to base export
-
-**If DB file is on a network drive:**
-- `integrity_check` still works but may be slow
-- `fs.copyFile` will block for the transfer — acceptable given the sync UX (user already clicked "move")
-- Document "SMB/network drives supported but slow first-open" in Settings help text
-
-## Version Compatibility
-
-| Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| `better-sqlite3@12.8.0` | Electron 39 (Node 22) | Native module; rebuilt automatically by `electron-builder install-app-deps` postinstall script (already in package.json) |
-| `zod@4.3.6` | Existing `ResumeJsonSchema` usage in aiProvider.ts:47 | No change — same major version |
-| `drizzle-orm@0.45.1` | `better-sqlite3@12` | Already integrated; re-pointing singleton at a new `Database(path)` instance is supported by design |
-| Electron `app.relaunch()` | Windows NSIS installer (v2.4) | Works identically under NSIS — new process spawned with same argv. No extra config. |
-
-## Quality Gate Compliance
-
-- **Versions current:** Every version cited is what's in `package.json` as of this milestone start (verified against file at line 26-40). No speculative bumps proposed.
-- **Rationale explains WHY:** Every "reuse X" recommendation traces back to a specific file/line in the existing codebase; every "avoid Y" explains the concrete failure mode.
-- **Integration with pdf-parse/Zod/Drizzle considered:** Export is the inverse of pdf-parse+Zod import; uses the identical `ResumeJsonSchema`. Drizzle's singleton pattern drives the relaunch-vs-hot-swap decision.
-- **No speculative additions:** Zero new npm packages. Only new code is in `src/main/handlers/exportJson.ts` (new) and small edits to `src/main/db/index.ts` (bootstrap path resolution).
+---
 
 ## Sources
 
-- `D:/Projects/resumeHelper/package.json` — verified installed versions (HIGH)
-- `D:/Projects/resumeHelper/src/main/lib/aiProvider.ts` lines 47-112 — confirmed `ResumeJsonSchema` already exists and covers all 11 resume.json sections (HIGH)
-- `D:/Projects/resumeHelper/src/main/handlers/import.ts` lines 1-455 — mapping patterns for resume.json ↔ DB tables, profile UPDATE semantics, JSON.parse error handling (HIGH)
-- `D:/Projects/resumeHelper/src/main/handlers/export.ts` lines 1-305 — existing `dialog.showSaveDialog` usage, `getBuilderDataForVariant` three-layer merge, `applyOverrides` call site (HIGH)
-- `D:/Projects/resumeHelper/src/main/db/index.ts` lines 1-308 — current `dbPath` construction, `app.getPath('userData')` usage, ALTER TABLE migration pattern for adding `app_settings` (HIGH)
-- [Electron dialog API](https://www.electronjs.org/docs/latest/api/dialog) — `showSaveDialog` returns `{ canceled, filePath, bookmarks }` (HIGH)
-- [Electron app API](https://www.electronjs.org/docs/latest/api/app) — `app.setPath`, `app.relaunch`, `app.exit`, `app.getPath('userData')` (HIGH)
-- [SQLite WAL documentation](https://sqlite.org/wal.html) — `-wal`/`-shm` sidecars, checkpoint semantics before file copy (HIGH)
-- [better-sqlite3 issue #376](https://github.com/WiseLibs/better-sqlite3/issues/376) — confirmed WAL sidecars not always cleaned on close; checkpoint + close is the reliable pattern (MEDIUM; older thread but still-open behavior)
-- [SQLite pragma reference — integrity_check](https://www.sqlite.org/pragma.html) — returns `'ok'` on clean DB; verifies index/UNIQUE consistency (HIGH)
-- [SQLite pragma reference — quick_check](https://www.sqlite.org/pragma.html) — considered and rejected; skips the checks we care about after a file copy (HIGH)
+- `src/main/db/schema.ts` — current table definitions; `analysisBulletOverrides` and `templateVariantItems` as design precedents
+- `src/main/db/index.ts` — `ensureSchema()` migration pattern; skill-category data migration at lines 317–342
+- `src/main/lib/mergeHelper.ts` — three-layer merge; integration points for variant-tier and re-inclusion passes
+- `src/shared/overrides.ts` — `applyOverrides()` current interface; extension target
+- `src/main/handlers/ai.ts` — `acceptSuggestion`, `acceptSkillAddition` patterns; `runAnalysis` flow showing where excluded-bullet collection slots in
+- `src/main/lib/aiProvider.ts` — `ResumeScorerSchema` (Zod extension point); `generateObject` call pattern
+- `src/main/lib/analysisPrompts.ts` — `buildScorerPrompt` signature; prompt string construction pattern
+- `package.json` — confirmed installed versions of all packages
 
 ---
-*Stack research for: v2.5 Portability & Debt Cleanup (subsequent milestone — additions to existing Electron/React/Drizzle/SQLite stack)*
-*Researched: 2026-04-23*
+*Stack research for: ResumeHelper v2.6 Per-Variant Text Overrides + Excluded-Bullet Suggestions*
+*Researched: 2026-06-05*

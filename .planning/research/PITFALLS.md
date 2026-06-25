@@ -1,301 +1,209 @@
-# Pitfalls Research — v2.5 Portability & Debt Cleanup
+# Pitfalls Research
 
-**Domain:** Electron desktop app (React + TypeScript + Drizzle + better-sqlite3) — adding JSON export, DB path relocation, DOCX parity fix, and debt cleanup
-**Researched:** 2026-04-23
-**Confidence:** HIGH (codebase inspection + official SQLite/JSON Resume docs verified)
+**Domain:** Polymorphic override table migration + "suggest excluded content" LLM feature in a three-layer Electron/SQLite resume app
+**Researched:** 2026-06-05
+**Confidence:** HIGH — grounded in actual source files: schema.ts, mergeHelper.ts, ai.ts, templates.ts, submissions.ts, db/index.ts (bootstrap migration path)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: resume.json export silently loses profile fields the schema supports
+### Pitfall 1: Migration Drops analysisBulletOverrides Rows Silently
 
 **What goes wrong:**
-The app's `profile` table stores only 6 fields: `name`, `email`, `phone`, `location` (flat string), `linkedin`, `summary`. The JSON Resume spec's `basics` object is richer: `label`, `image`, `url`, full `location` sub-object (`address`, `postalCode`, `city`, `countryCode`, `region`), and `profiles` as an array of `{network, username, url}`. A naive base export writes only what's in the DB, making the exported file appear "complete" but missing the data a resume.json consumer expects. Worse, a user who imports a rich resume.json, edits in the app, and re-exports will discover the non-linkedin profiles and address metadata were silently dropped during import (see `src/main/handlers/import.ts:149` — only `profiles[0].url` is kept).
+The migration from `analysis_bullet_overrides` into a unified `overrides` table uses INSERT-SELECT. If the unified table has a UNIQUE constraint on `(scope, entity_type, entity_id, variant_id, analysis_id)` and the source data maps to the same logical key (e.g., two overrides for the same `bulletId × analysisId`), the INSERT silently ignores duplicates via ON CONFLICT DO NOTHING. Because `analysis_bullet_overrides` already has a UNIQUE `(analysis_id, bullet_id)` constraint, duplicates aren't a real concern — but if the INSERT-SELECT maps columns incorrectly (e.g., `entity_id` receives `analysis_id` instead of `bullet_id`), every row migrates with a wrong FK, and queries return zero overrides. The old table still exists during testing and nothing obviously breaks until the old table is dropped.
 
 **Why it happens:**
-The import path was written for the subset of fields the schema UI exposes. Export is the first time this asymmetry becomes visible, so the missing fields feel like a regression even though the data was never in the DB.
+The `overrides` table is polymorphic — columns that carry entity identity depend on `entity_type`. A simple INSERT-SELECT must assign `entity_id = bullet_id` for rows where `entity_type = 'job_bullet'`. Getting the column mapping wrong is easy because the old table's column name (`bullet_id`) and the new table's column name (`entity_id`) diverge.
 
 **How to avoid:**
-- Document in `PROJECT.md` and the export code that base export is "lossy-faithful" to the current DB schema — it emits exactly what the DB stores, nothing synthesized.
-- Before export, emit schema `$schema` pointer (`https://raw.githubusercontent.com/jsonresume/resume-schema/master/schema.json`) so downstream validators immediately flag truncation if the user expects spec parity.
-- For `basics.location`, wrap the flat string in `{city: location}` rather than emitting a bare string (spec violation if kept flat).
-- For `basics.url`, emit empty string or omit rather than silently mapping linkedin into it (the two concepts are distinct).
-- In a comment on the export function, enumerate the known-dropped fields: `label`, `image`, `basics.url`, `location.address/postalCode/countryCode/region`, `profiles[1..]`, `profiles[].network`, `profiles[].username`, skill `level`, project `description/url/startDate/endDate`, etc.
+- Write the INSERT-SELECT explicitly: `INSERT INTO overrides (scope, entity_type, entity_id, analysis_id, variant_id, override_text, source) SELECT 'analysis', 'job_bullet', bullet_id, analysis_id, NULL, override_text, source FROM analysis_bullet_overrides`.
+- Add a post-migration assertion: `SELECT COUNT(*) FROM overrides WHERE entity_type = 'job_bullet'` must equal `SELECT COUNT(*) FROM analysis_bullet_overrides`. Run this in the bootstrap migration block and log a console.error (not a throw) if counts diverge.
+- Keep `analysis_bullet_overrides` alive (do NOT drop it) until at least one full app launch + smoke-test cycle. Drop in a subsequent release.
 
 **Warning signs:**
-- User imports a rich resume.json and notices their GitHub/Twitter profile disappeared.
-- A resume.json validator (e.g., [resume-cli validate](https://github.com/jsonresume/resume-cli)) reports schema violations on exported files.
+- Override count in merged output drops to zero after DB migration.
+- `getOverrides()` returns empty array where it previously returned rows.
+- `applyOverrides()` in `mergeHelper.ts` (line 296) runs but the override map is empty.
 
-**Phase to address:** Phase 30 (Resume.json Base Export) — scope must explicitly call out lossy fidelity. Do NOT promise round-trip.
+**Phase to address:** Migration phase (Phase 1 of v2.6) — the INSERT-SELECT and post-migration assertion belong in `ensureSchema()` or a dedicated migration block alongside the existing `alterStatements` pattern.
 
 ---
 
-### Pitfall 2: Date format mismatch — app uses `YYYY-MM`, spec wants ISO 8601 with no silent coercion
+### Pitfall 2: NULL-Column Ambiguity in the Polymorphic Table Breaks Merge Queries
 
 **What goes wrong:**
-The app stores dates as `YYYY-MM` strings (see `truncDate` in `import.ts:77`). JSON Resume spec requires ISO 8601, which formally is `YYYY-MM-DD` with `YYYY-MM` accepted in practice. More concerning: the app stores `endDate` as NULL for current positions, but spec expects either an ISO date or omission of the key. Emitting `"endDate": null` triggers validation failures in strict consumers, while emitting `"endDate": ""` is double-wrong.
+A single `overrides` table covering job bullets, summary text, project titles, job title/company line, and project descriptions must use nullable FK columns or a nullable `entity_id` integer plus an `entity_type` discriminator. If the merge query does `WHERE entity_id = ? AND entity_type = ?` but also includes `AND variant_id = ?` or `AND analysis_id = ?`, rows where those FK columns are NULL (base scope, no variant/analysis) never match because `NULL = NULL` is false in SQL. The query silently returns no override, so base text is shown even when a variant-tier override exists.
 
 **Why it happens:**
-Drizzle returns NULL for unset `endDate` columns; a naive `JSON.stringify` serializes that as `null`. The code author assumes "null ~= missing" but the spec treats them differently.
+The existing `applyOverrides()` in `shared/overrides.ts` is written for a non-nullable `bulletId`. When the unified table adds nullable `variant_id` and `analysis_id` (NULL = base scope, value = that tier's scope), any WHERE clause using `=` against those columns will never match NULL rows.
 
 **How to avoid:**
-- In the export builder, use a field-filtering serializer: if the column is null/empty, OMIT the key entirely rather than emitting `null` or `""`.
-- For dates, keep `YYYY-MM` — it validates as ISO 8601 date — but document the precision limit in the exported file's lineage comment if emitted.
-- Write a unit test: import a resume.json with full `YYYY-MM-DD` dates, re-export, assert the dates round-trip as `YYYY-MM` (acknowledged precision loss) and no keys become `null`.
+- Use `IS NULL` / `IS NOT NULL` guards in all merge queries, not `=`. In Drizzle, use `isNull(overrides.variantId)` and `isNull(overrides.analysisId)` for base-scope lookups.
+- Prefer a non-nullable `scope` enum column (`'base' | 'variant' | 'analysis'`) alongside the nullable FK columns. The enum eliminates ambiguity; the FK is a lookup aid only.
+- Add a CHECK constraint: `CHECK (scope = 'base' OR (scope = 'variant' AND variant_id IS NOT NULL) OR (scope = 'analysis' AND analysis_id IS NOT NULL))` enforced at the DB level.
+- Update `applyOverrides()` in `shared/overrides.ts` and the Layer 3 block in `mergeHelper.ts` (lines 278-297) to handle each scope with explicit IS NULL comparisons.
 
 **Warning signs:**
-- Running exported file through `resume-cli validate` or `ajv` against the official schema produces "type: expected string, got null" errors.
-- User's published jsonresume.org theme renders "null" in date fields.
+- Variant-tier overrides entered in the UI don't appear in the preview or PDF export.
+- `buildMergedBuilderData(db, variantId)` called without `analysisId` shows no rewrites.
+- SQL query in `getOverrides()` (currently raw SQLite prepare on line 174 of ai.ts) returns rows correctly but Drizzle query doesn't.
 
-**Phase to address:** Phase 30 (Base Export) — the JSON builder utility must use omit-over-null semantics from day one, before variant-merged export depends on it.
+**Phase to address:** Schema design phase (Phase 1) — the NULL semantics must be decided before writing any merge query.
 
 ---
 
-### Pitfall 3: Variant-merged export silently drops accepted skill additions
+### Pitfall 3: Merge Precedence Inversion — Variant Override Wins Over Analysis Override
 
 **What goes wrong:**
-Accepted skill additions live in `analysis_skill_additions` (status='accepted'), NOT in the `skills` table. The submission snapshot code (`submissions.ts:166-186`) knows to pull them in, but a new `exportVariantJson(variantId, analysisId)` function written from scratch will reuse `getBuilderDataForVariant` (which does NOT merge skill additions — see `export.ts:16-209`) and emit a resume missing the exact skills the user accepted via AI suggestions. The result is a JSON export that doesn't match the PDF the user just saved.
+The intended precedence is `analysis > variant > base`. If `buildMergedBuilderData` applies variant-tier overrides _after_ analysis-tier overrides, the variant reword silently clobbers the analysis rewrite the user accepted. The user sees their accepted AI suggestion disappear from the preview when they open the analysis screen again.
 
 **Why it happens:**
-`getBuilderDataForVariant` merges bullet overrides (three-layer bullet merge) but skill additions live in a separate table with a separate merge code path, and that path currently only runs inside `buildSnapshotForVariant`. The asymmetry is invisible to someone looking at `getBuilderDataForVariant` and assuming "this is the merged view."
+Today's Layer 3 in `mergeHelper.ts` only applies analysis overrides (lines 278-297). When variant overrides are added, the natural place to insert them is "after exclusions, before analysis" — Layer 2.5. If a developer instead appends variant override application after the existing Layer 3 analysis block (because that's where the existing override code lives), the order is wrong.
 
 **How to avoid:**
-- Extract a single merged-view builder function (e.g., `buildMergedBuilderData(db, variantId, analysisId)`) that does BOTH bullet overrides AND skill additions. Call it from `getBuilderDataForVariant`, `buildSnapshotForVariant`, AND the new JSON export.
-- Add an integration test: create a variant, run an analysis, accept a skill addition and a bullet override, then verify the JSON export contains both. Test should fail if either merge is missing.
-- In the export handler, add an assertion: if `analysisId` is passed but the returned skills don't include any accepted additions from that analysis (and the DB has some), log an error. This catches the "merge path forgotten" regression in the next feature that reuses the code.
+- Enforce the merge order in code comments and structure: Layer 1 = base, Layer 2 = variant exclusions, Layer 2.5 = variant text rewrites, Layer 3 = analysis overrides.
+- Write a unit test: `buildMergedBuilderData(db, variantId, analysisId)` where bullet 1 has a variant override "Variant wording" and an analysis override "Analysis wording" — assert the result is "Analysis wording".
+- The single `buildMergedBuilderData()` function is the only merge path (confirmed by Phase 30 D-01), so fixing it here fixes all surfaces: HTML/PDF/DOCX/snapshot.
 
 **Warning signs:**
-- Unit-test scenario: variant with 5 base skills + 2 accepted additions should export 7 skills, not 5.
-- User reports: "The PDF has React in it but the JSON export doesn't."
+- Accepted AI suggestions vanish in preview when the variant also has a reword for the same bullet.
+- Unit test for the merge function (currently in tests) passes in isolation but export output differs.
 
-**Phase to address:** Phase 31 (Variant-Merged JSON Export) — REFACTOR merge helper FIRST (pre-plan or plan 31-01), then build export on top of it.
+**Phase to address:** Merge-helper phase (Phase 2) — add the new layer and the precedence unit test before wiring any UI.
 
 ---
 
-### Pitfall 4: Variant-merged export ignores job-level and summary toggles because they live in `template_variant_items`, not `templateOptions`
+### Pitfall 4: Snapshot Freezes Base Text, Not the Overridden Text, for New Override Types
 
 **What goes wrong:**
-`showSummary` is stored as a sentinel row in `template_variant_items` where `item_type='summary'` (see `submissions.ts:43-48`). Job-level exclusions are also in that table (`item_type='job'`). A variant-merged JSON export that only reads `templateOptions` JSON will emit the profile summary AND all jobs even when the user toggled them off — because those toggles are driven by DB rows, not the JSON column.
+`buildSnapshotForVariant()` in `submissions.ts` calls `buildMergedBuilderData(db, variantId, analysisId)` and freezes the merged result. Today this works because the only overrides are bullet text overrides (Layer 3 analysis). When variant-tier overrides are added (summary text, job title/company line, project title, project description), any surface that `buildMergedBuilderData` doesn't yet apply variant overrides to will be frozen at base text rather than overridden text. The submission snapshot will show "Software Engineer at Acme" instead of "Senior Consultant at Acme" — silently, with no error.
 
 **Why it happens:**
-The original design put some toggles in `templateOptions` (JSON column: `accentColor`, `skillsDisplay`, margins) and others in `template_variant_items` (per-row excluded flag). There's no single source-of-truth for "what to include in this variant." The dual-home pattern was fine when the only consumers were the renderer (PrintApp) and the DOCX builder, because both go through `getBuilderDataForVariant` which consults both. But a new JSON export function written from scratch may only reach for one.
+The snapshot trusts `buildMergedBuilderData` to have applied all layers. If Layer 2.5 (variant text overrides) isn't implemented yet when the snapshot code ships, or if it is implemented but doesn't cover a new entity type (e.g., project description), the snapshot freezes the wrong text.
 
 **How to avoid:**
-- Reuse `getBuilderDataForVariant` as the authoritative "give me the filtered dataset" function. It already computes `excludedJobIds`, `excludedBulletIds`, etc., from `template_variant_items`.
-- For the summary toggle specifically, replicate the `summaryRow` lookup from `buildSnapshotForVariant:42-48` verbatim. DO NOT read `variant.templateOptions.showSummary` as the primary source — that value is only populated AT SNAPSHOT TIME and may be stale on the variant row.
-- In the JSON export: if `showSummary === false`, delete `basics.summary` from the output object (omit, not empty string).
-- Write a test: toggle off job-level on a variant, export, verify the job is absent from `work[]`.
+- Treat the entity coverage of `buildMergedBuilderData` as a contract: every entity type that can have a variant override must have its override applied _inside_ `buildMergedBuilderData`, not in a caller.
+- Write a snapshot integration test: create a variant override for summary + bullet + project title, submit, read back the snapshot JSON, assert override text is present (not base text).
+- Add a "snapshot coverage" checklist to the phase definition: summary, job title, company, project title, project description, bullet text — each verified in the snapshot.
 
 **Warning signs:**
-- User toggles off a job in the variant builder, exports JSON, the excluded job still appears.
-- User toggles off the summary, exports JSON, summary still present.
+- Snapshot JSON contains base text for an entity type that the active variant overrides.
+- Submission detail screen shows the base phrasing rather than the variant wording.
+- Resume export and submission snapshot diverge (snapshot shows base, PDF shows override, or vice versa).
 
-**Phase to address:** Phase 31 — test matrix must include all four toggle types (summary, job, bullet, skill) exclusion + one inclusion.
+**Phase to address:** Snapshot verification phase (Phase 3, after merge-helper) — the snapshot integration test must gate the feature as complete.
 
 ---
 
-### Pitfall 5: SQLite DB copy without WAL checkpoint corrupts target on relocation
+### Pitfall 5: Staleness Detection Misses Variant Override Changes
 
 **What goes wrong:**
-The app runs `PRAGMA journal_mode = WAL` (see `src/main/db/index.ts:11`). In WAL mode, a write lives in the `.db-wal` sidecar file until checkpointed into the main `.db`. If the user picks a new DB location and the app naively does `fs.copyFile(oldPath, newPath)`, the copy captures the main DB WITHOUT the uncommitted WAL tail — recent writes (the last analysis run, the last accept/dismiss click) are silently lost in the copied DB. If the user then switches and deletes the old DB, that data is gone.
+The existing staleness detection (PROJECT.md decision "On-demand staleness detection") compares `analysis.createdAt` against `bullet.updatedAt` and `variant.updatedAt`. Today, editing a bullet's base text stamps `jobBullets.updatedAt`; toggling an item stamps `templateVariants.updatedAt` (templates.ts line 422). Variant-tier overrides stored in the new `overrides` table have their own `createdAt`/`updatedAt` — but those timestamps are not yet part of the staleness comparison. If a user rewrites the summary in a variant _after_ running analysis, the analysis won't be flagged stale because only `variant.updatedAt` (from `setItemExcluded`) is checked, not `overrides.updatedAt`.
 
 **Why it happens:**
-SQLite docs explicitly warn: "If a database file is separated from its WAL file, transactions that were previously committed to the database might be lost, or the database file might become corrupted." ([sqlite.org/wal.html](https://sqlite.org/wal.html)) The dev usually doesn't notice because the WAL was empty in testing.
+The staleness check reads from `analysisResults.createdAt` vs. a known set of stamped columns. Adding a new override table doesn't automatically extend the check — it must be explicitly wired.
 
 **How to avoid:**
-- Before copying, run `PRAGMA wal_checkpoint(TRUNCATE);` on the source DB. This flushes ALL pages from WAL into main and truncates the WAL to zero bytes. The main DB file then contains everything committed.
-- Prefer SQLite's backup API (`sqlite.backup(newPath)` in better-sqlite3) over `fs.copyFile`. The backup API handles concurrent writes correctly, locks appropriately, and produces a consistent copy.
-- If using `fs.copyFile`, close the DB handle first (`sqlite.close()`), copy, then reopen — but this requires the app to have no active writes mid-copy (achievable because we run single-process).
-- NEVER copy the `.db-wal` and `.db-shm` files separately — the shm file is process-specific (contains pointers to the current process's mapped memory) and should not travel.
+- When an override is created or updated in the `overrides` table, also call `UPDATE template_variants SET updated_at = now() WHERE id = ?` for variant-scoped overrides (mirrors the existing pattern in `setItemExcluded`).
+- For analysis-scoped overrides, stamp `analysis_results.updated_at` (add the column if missing) or rely on the existing `createdAt` comparison since re-running analysis always creates a new row.
+- Add a staleness test: insert a variant override _after_ the analysis `createdAt`, assert the stale-analysis flag is true.
 
 **Warning signs:**
-- User moves DB, relaunches, discovers their last analysis is missing.
-- `better-sqlite3` throws "database disk image is malformed" after reopening a copied DB.
-- Copy operation "succeeds" but the new DB is missing recent rows.
+- User rewrites the summary at the variant tier; the analysis banner shows "up to date".
+- No stale warning appears after variant overrides are added post-analysis.
 
-**Phase to address:** Phase 32 (Configurable DB Location) — the copy step MUST use either `wal_checkpoint(TRUNCATE)` + `fs.copyFile` OR the backup API. This is non-negotiable and should be tested with a scenario that writes, copies mid-transaction, and asserts row count on the target.
+**Phase to address:** Staleness phase (Phase 2, alongside merge-helper) — the variant override write path must stamp `variant.updatedAt`.
 
 ---
 
-### Pitfall 6: DB relocation holds open handle — Windows file locking blocks the copy and the switch
+### Pitfall 6: Override Points at an Excluded or Deleted Entity
 
 **What goes wrong:**
-On Windows, `better-sqlite3` keeps an exclusive file handle on the open DB. If the user clicks "Move DB" and the app tries to `fs.copyFile` or delete the old file while the handle is open, Windows returns `EBUSY` / `EPERM`. Linux is forgiving (allows read copies while file is open); Windows is not. Worse, after a failed copy, the app may end up with a partially-written new file AND an intact old file AND no clear way to recover.
+A user creates a variant override for a bullet, then excludes that bullet from the variant (or deletes the job entirely). The override row remains in `overrides` with a valid `entity_id`, but `buildMergedBuilderData` already filters excluded bullets from the output via `excludedBulletIds`. The override is never applied (the bullet isn't in the output), which is correct — but the orphaned override row also is never cleaned up, accumulating silently. When the user later re-includes the bullet, the old override reappears, which may be intentional (good) or surprising (confusing) depending on context.
+
+For the more serious case: the entity is _deleted_ (job deleted via CASCADE, bullet CASCADE-deleted from `job_bullets`). The old `analysis_bullet_overrides` table relied on `ON DELETE cascade` from `job_bullets`. The new unified `overrides` table must also have the same cascade — but with polymorphic FKs, SQLite's FK cascade is per-column. If `entity_id` is a generic integer with no FK, the cascade won't fire.
 
 **Why it happens:**
-The close → copy → open dance is easy to forget, and Electron main-process errors during DB operations often appear as unhandled promise rejections that surface as "silent failures" in the UI.
+Polymorphic FK tables in SQLite can't express a single `entity_id` column that cascades from multiple parent tables. Each parent table requires a separate nullable FK column (the same pattern used in `template_variant_items`). If the design uses a generic `entity_id` integer instead, there is no FK, and cascades don't happen.
 
 **How to avoid:**
-- Sequence: (1) Show confirm dialog → (2) Checkpoint WAL → (3) Close DB handle (`sqlite.close()`) → (4) Copy source to target → (5) VERIFY target (open it read-only, run `PRAGMA integrity_check`, count a few tables) → (6) Delete source OR rename to `.bak` → (7) Update persisted config (user's chosen path) → (8) Reopen DB at new path.
-- Make step 6 OPT-IN: default behavior is to keep the old DB as `.bak` for safety. Add "Delete original" as an explicit checkbox in the dialog.
-- If any step fails after step 4, roll back: delete the partial target, reopen the source, and surface the error. Do NOT leave the app in an "orphan handles, partial copies" state.
-- Use a try/finally that guarantees the DB is reopened at SOME path (source if rollback, target if success).
+- Mirror the `template_variant_items` approach: use separate nullable FK columns (`bullet_id`, `project_bullet_id`, `summary` sentinel, etc.) with individual ON DELETE CASCADE declarations. Do not use a single generic `entity_id` integer.
+- Add a `getOverrides()` equivalent that LEFT JOINs the entity table and sets `isOrphaned = true` when the entity no longer exists (existing pattern in `ai.ts` lines 174-195 for `analysis_bullet_overrides`). Extend this to all entity types.
+- For excluded-but-not-deleted entities: decide the policy explicitly — "override is retained and reactivated if bullet is re-included" or "override is cleared when bullet is excluded". Document the decision in PROJECT.md Key Decisions.
 
 **Warning signs:**
-- `EBUSY` errors during copy on Windows.
-- App hangs/crashes after the "Move" button is clicked.
-- Target file exists but is 0 bytes or malformed after a failed copy.
+- Deleting a job leaves override rows in the `overrides` table with no matching `job_bullets` row.
+- Re-including a previously excluded bullet shows an unexpected variant reword.
+- `getOverrides()` returns rows where the entity no longer exists in its parent table.
 
-**Phase to address:** Phase 32 — the orchestration (checkpoint → close → copy → verify → switch) needs to be its own named function with explicit error boundaries. Add an integration test using a tempfile that simulates `EBUSY` mid-copy.
+**Phase to address:** Schema design phase (Phase 1) — FK cascade strategy must be decided in the CREATE TABLE, not retrofitted.
 
 ---
 
-### Pitfall 7: User picks network drive / NAS — WAL mode breaks silently
+### Pitfall 7: AI Suggests a Base Bullet That Is Already in the Variant (False "Missing" Signal)
 
 **What goes wrong:**
-SQLite's WAL mode requires shared-memory (`.db-shm`) coordination, which doesn't work over NFS, SMB, or other network filesystems. The SQLite docs ([sqlite.org/wal.html](https://sqlite.org/wal.html)) warn: "All processes using a database must be on the same host computer; WAL does not work over a network filesystem." The app sets WAL unconditionally. If the user picks a NAS or OneDrive path, one of two things happens: (a) SQLite silently falls back to some journaling mode but locking is fragile and corruption risk is high, or (b) write operations intermittently fail with "database is locked" or produce corrupted data. fcntl file locking is broken on many NFS implementations, so even writes that APPEAR to succeed may race.
+The excluded-bullet suggestion feature feeds the LLM base bullets that the active variant excludes, asking it to recommend ones relevant to JD gaps. If the LLM's context includes bullets that are excluded from the _variant_ but included at the _base_, and the prompt does not clearly distinguish "these are excluded from your current variant" from "these are missing from your resume entirely", the LLM may suggest a bullet the user intentionally omitted (e.g., omitted because it's irrelevant to this role family). The user accepts it, the bullet reappears at the analysis tier — contradicting the variant's curation intent.
 
 **Why it happens:**
-OneDrive, Dropbox, and Google Drive folders look like local paths — the user thinks `C:\Users\Me\OneDrive\ResumeHelper\app.db` is fine but it's a synced filesystem with its own locking semantics. Worst case: OneDrive grabs the file for sync mid-write and the DB is corrupted.
+The LLM cannot independently check what is in the variant vs. the base. The prompt author must construct the context correctly. If the prompt says "here are bullets you don't have" without specifying "excluded from this variant, not from your career history", the LLM's framing of the suggestion is wrong.
 
 **How to avoid:**
-- In the DB-relocation dialog, detect and WARN for known-risky paths:
-  - Network UNC paths (`\\server\share\...`)
-  - Paths containing `OneDrive`, `Dropbox`, `Google Drive`, `iCloud`
-  - Mapped network drives (on Windows, check `GetDriveType` — `DRIVE_REMOTE`)
-- Show a modal: "This location appears to be a synced or network folder. Your DB may corrupt if a sync service modifies files while the app is running. Are you sure?" — NOT a hard block; the user owns the choice.
-- Add to the Settings screen a persistent banner if the current DB is at a risky path.
-- Alternative if the user insists: offer "DELETE journal mode" instead of WAL for network paths (slower, but safer on netFS). Requires `PRAGMA journal_mode = DELETE` at open time based on path heuristic.
+- In the prompt for excluded-bullet suggestions, explicitly label the two sets: "INCLUDED IN THIS VARIANT: [bullets]" and "EXCLUDED FROM THIS VARIANT (but exist in your base experience): [bullets]". Ask the LLM to suggest from the EXCLUDED set only when a JD gap can be addressed by that specific content.
+- Limit the excluded bullets fed to the LLM to those belonging to jobs/projects _not_ entirely excluded at the job/project level. Entire-job exclusions are intentional curation — only per-bullet exclusions are "soft omissions" worth suggesting.
+- Add a UI confirmation: when accepting a suggestion for an excluded bullet, show "This bullet is currently excluded from your [variant name] variant. Accept to include it for this analysis only?"
 
 **Warning signs:**
-- "database is locked" errors when two app sessions run simultaneously (e.g., user opens the app on two devices synced via OneDrive).
-- Intermittent "malformed database" errors after cloud sync runs.
-- Data rollback where recent rows vanish after the cloud service resolves conflicts.
+- User accepts a suggestion but the bullet is also excluded in the variant; the accepted re-include at analysis tier conflicts with the variant exclusion.
+- The analysis score improves but the suggestion involves a bullet from a job the user intentionally removed from the variant.
 
-**Phase to address:** Phase 32 — path heuristic warning should ship in the first plan of this phase, not as polish.
+**Phase to address:** Prompt engineering phase (Phase 4, excluded-bullet suggestion feature) — the prompt construction must distinguish variant-excluded from base-missing.
 
 ---
 
-### Pitfall 8: DOCX `showSummary` divergence — the toggle was never wired into `buildResumeDocx`
+### Pitfall 8: LLM Fabricates a Bullet That Doesn't Exist in the DB (Hallucination)
 
 **What goes wrong:**
-In `src/main/lib/docxBuilder.ts:123`, the summary paragraph is conditionally emitted based on `profileRow?.summary` being truthy. The `templateOptions.showSummary` boolean is passed into `buildResumeDocx` via the options bag but is NEVER destructured or read. Every HTML template (`ClassicTemplate.tsx:121`, `ModernTemplate.tsx:117`, etc.) checks `showSummary && profile?.summary`. DOCX exports with the toggle "off" still include the summary; HTML/PDF exports do not. The user's job-specific variant that hides the summary leaks it into the Word doc.
-
-**Why it was missed in the first place:**
-Two reasons, both traceable from the code:
-1. The DOCX builder predates the `showSummary` toggle. When `showSummary` was added in v2.1 (as a per-variant control), only the HTML templates were touched — the DOCX builder lives in the MAIN process (`src/main/lib/`) and uses a different code path that was out-of-sight during that PR.
-2. `templateOptions` is destructured in `buildResumeDocx:59` but only `marginTop`, `marginBottom`, `marginSides`, `skillsDisplay`, `accentColor` are pulled out. `showSummary` is silently discarded because TypeScript doesn't complain about unused object properties.
-
-The retrospective v2.1 lesson #1 ("Test the deletion path — when removing code, verify what else depended on the deleted infrastructure") applies here in mirror: when ADDING code, verify what else should honor it.
-
-**How to avoid the drift returning:**
-- Add `showSummary` to the destructured options in `buildResumeDocx:59`, default to `true`.
-- Guard the summary paragraph emission: `...(showSummary && profileRow?.summary ? [...] : [])`.
-- Verify in `buildSnapshotForVariant` that the snapshot's `templateOptions.showSummary` reflects the `template_variant_items` summary sentinel (it does — see `submissions.ts:48-53`).
-- Add a parameterized test: for each of [HTML render, PDF export, DOCX export], toggle `showSummary` and assert summary presence. One test matrix, three backends.
-- Document in `types.ts` as a comment: "All template render paths (HTML/PDF/DOCX) MUST honor this flag."
-
-**Warning signs:**
-- User toggles off summary, exports DOCX, summary appears.
-- Diff between PDF and DOCX visual output for the same variant.
-
-**Phase to address:** Phase 33 (DOCX showSummary fix) — single-plan phase, but test must cover HTML parity so future drift is caught.
-
----
-
-### Pitfall 9: Removing `TEMPLATE_LIST` breaks stale imports that type-check but aren't in grep results
-
-**What goes wrong:**
-`TEMPLATE_LIST` is exported from `src/renderer/src/components/templates/resolveTemplate.ts:21` but grep finds zero readers in `src/`. BUT: the export could be reached via (a) dynamic imports using the module as a namespace, (b) re-exports through barrel files, (c) JSX string-prop lookups that don't grep as an identifier, (d) Nyquist planning/verification templates or scripts that reference it by name. A blind deletion based on `grep TEMPLATE_LIST` passing with no results can hide a single obscure consumer.
+When the LLM is asked to suggest excluded bullets, it is given a list of real bullet IDs + text. The LLM may respond with a bullet ID that was not in the provided list (hallucinated) or with a modified text that it presents as a "suggestion" for a bullet that doesn't match the source text. If the accept path writes `entity_id = <hallucinated id>` to the `overrides` table, the merge query finds no matching bullet in the DB, and the accepted suggestion silently disappears from output — or worse, matches an unrelated bullet with the same numeric ID.
 
 **Why it happens:**
-The v2.1 retrospective notes: "Template dropdown accidentally deleted — Plan 16-01 removed the template dropdown along with the old themes code. The plan didn't account for the new dropdown sharing infrastructure with the old one." This is the same class of mistake — assuming grep visibility equals usage visibility.
+The existing fabrication-prevention guardrail (PROJECT.md constraint: "AI suggests rewording of existing bullets, never fabricates") is enforced at the prompt level and the Zod schema for `generateObject`. The excluded-bullet suggestion is a _different_ LLM call with a different schema, and the same guardrail needs to be explicitly carried over — it's not automatic.
 
 **How to avoid:**
-- Before deletion, run ALL of: `rg "TEMPLATE_LIST"` in the entire workspace including `.claude/`, `dist/`, `src/preload/`, `tests/`, `scripts/`. Grep the built output too if any dev tools reference it.
-- Check barrel files (`index.ts`, `index.tsx`) for `export * from './resolveTemplate'` and verify no downstream uses it.
-- Delete, run `tsc --noEmit`, run `vitest`, manually exercise the variant builder to build a variant from scratch (which is where TEMPLATE_LIST would plausibly be consumed by a dropdown).
-- Commit the deletion ISOLATED — one commit, one change. If UAT surfaces a regression, revert is trivial.
+- Use `generateObject` with a Zod schema for excluded-bullet suggestions just as for bullet rewrites. The schema must constrain returned `bulletId` values to an enum of the IDs provided in context (`z.union([z.literal(id1), z.literal(id2), ...])`), or validate post-response.
+- After receiving the LLM response, validate: every suggested `bulletId` must exist in the excluded bullets set that was passed in. Reject any suggestion whose ID is not in that set before writing to the DB.
+- The accept-path IPC handler must re-verify the `bulletId` exists in `job_bullets` _and_ is currently excluded in the variant before writing to `overrides`. Do not trust the renderer's payload blindly.
 
 **Warning signs:**
-- Variant builder's template dropdown shows only "classic" or fails to render templates.
-- Runtime error "TEMPLATE_LIST is not defined" in a rarely-exercised code path.
+- An accepted suggestion writes an `entity_id` to `overrides` that has no corresponding row in `job_bullets`.
+- Accepted suggestions appear in the UI but don't render in the resume preview.
+- The Zod schema for the suggestion response doesn't include `bulletId` validation.
 
-**Phase to address:** Phase 34 (Tech debt cleanup) — first plan of the phase, isolated commit.
+**Phase to address:** Prompt engineering + IPC handler phase (Phase 4) — the validate-before-write guard belongs in the IPC handler, not just the prompt.
 
 ---
 
-### Pitfall 10: Removing `compact` prop breaks template JSX that spreads `...props`
+### Pitfall 9: Token Cost Blows Up When All Excluded Bullets Are Fed to the LLM
 
 **What goes wrong:**
-`compact?: boolean` is in `ResumeTemplateProps` (`types.ts:28`). Grep finds only the type definition — no runtime reader. BUT every template spreads `...props` into `filterResumeData({ profile, accentColor, skillsDisplay, showSummary, ...props })` (see `ClassicTemplate.tsx:28`, etc.). If `filterResumeData` internally reads `compact`, or if any test harness passes `compact={true}`, removing the prop type will cause TS compile errors in currently-valid test files.
+A variant for a "Senior Engineer" role might exclude 40–60 bullets from various earlier jobs (intentional curation). Feeding all 60 excluded bullets to the LLM in the analysis call alongside the full job posting text pushes the context into high-cost territory and may approach context limits for shorter-context models. The analysis call already sends the full variant text; adding the excluded set on top could double or triple token usage with no user-visible cap.
 
 **Why it happens:**
-"Grep for readers" is incomplete when props flow through spread operators. The type system is the only thing catching it after removal, but only for call sites that use the named prop.
+The feature requires giving the LLM both the included bullets (for scoring) and the excluded bullets (for suggestion). Neither set is currently bounded. On a large career history, both sets can be large.
 
 **How to avoid:**
-- Before removal, grep the ENTIRE codebase (including `.claude/worktrees/` if active) for `compact=` and `compact:` with content output. Confirmed: only the type definition has it (`types.ts:28`).
-- Check `filterResumeData` source — does it read `props.compact`? If yes, the prop is NOT vestigial, it's implicitly used.
-- Remove, run `tsc --noEmit`, manually render each of the 5 templates in the variant builder, run all tests.
-- If `filterResumeData` destructures `compact`, remove from BOTH places in one commit.
+- Gate excluded-bullet suggestions as a _separate, optional LLM call_ after the main analysis, not bundled into the primary scoring call. The user pays for it explicitly ("Find missing bullets" button rather than automatic).
+- Cap the excluded bullets sent: limit to bullets from jobs/projects that are _partially_ excluded (at least one bullet included from that job), not from jobs that are entirely excluded. This reduces noise and token count.
+- If the variant excludes more than N bullets (e.g., 20), truncate to the top N most recently dated bullets (most career-relevant) and log a `console.warn` so the developer knows truncation occurred.
+- Expose token estimation (character count heuristic, e.g., chars/4) in the UI before the call, or at least document the cost in release notes.
 
 **Warning signs:**
-- TypeScript error on template test fixtures after removal.
-- Rendered output looks different on one template (if `compact` was silently altering layout).
+- Analysis calls for users with large career histories take significantly longer or error with rate limit / context length errors.
+- The main analysis + excluded-bullet suggestion combined exceeds 32K tokens.
+- No token budget cap exists in the prompt construction code.
 
-**Phase to address:** Phase 34 — second plan or combined with TEMPLATE_LIST.
-
----
-
-### Pitfall 11: `tests/setup.ts` deletion breaks nothing BUT `vitest.config.ts` may already reference it
-
-**What goes wrong:**
-`tests/setup.ts` exists and mocks `src/main/db` globally. The v2.4 retrospective says: "tests/setup.ts dead file — created in Phase 26 as 'for future use' but never wired. Handler tests use direct injection instead. Should have been omitted." But verify: `vitest.config.ts` lines 11-23 do NOT reference `setupFiles`, so the file is loaded but never auto-run as a setup. Deleting it should be safe. HOWEVER: individual test files may `import from '../../setup'` or similar — grep first.
-
-**Why it happens:**
-A "setup" file that's not in `setupFiles` may still be imported directly from test files that copy-pasted an early pattern. Fresh developers writing tests see the file and assume it should be imported.
-
-**How to avoid:**
-- Before deleting: `rg "tests/setup|from.*setup'" tests/` to catch any test file that directly imports it.
-- Before deleting: check `vitest.config.ts` for any `setupFiles`, `globalSetup`, or `globals` references that name it. Currently absent, but verify.
-- The mock it provides (`vi.mock('../../src/main/db')`) may be unused (handler tests take `db` as a param) but could silently affect tests that DO import `../db` transitively. Run the full suite before and after deletion and compare results.
-- If deletion passes, add a lint or docblock comment to `tests/helpers/db.ts` stating "this is the DB strategy; no global setup needed."
-
-**Warning signs:**
-- Test count changes after deletion (some tests were relying on the mock).
-- Previously green tests fail with "Cannot find module ../../src/main/db" — an indirect importer was depending on the mock.
-
-**Phase to address:** Phase 34 — third plan, after TEMPLATE_LIST and compact. Low risk but verify no cascade.
-
----
-
-### Pitfall 12: `jobs.test.ts` race — the existing code has a latent bug AND the "race" is likely worker-pool shared state
-
-**What goes wrong:**
-Look at `tests/unit/handlers/jobs.test.ts:18`:
-```ts
-await db.update(jobBullets).set({ sortOrder: 2 }).where(undefined as any)
-```
-This is NOT a race, it's broken code: `.where(undefined)` in Drizzle updates ALL rows (it's equivalent to no WHERE clause). The cast `as any` hides the type error. The test "passes" because the subsequent assertion doesn't depend on sortOrder being correct — but the test body lies about what it's testing.
-
-The race DESCRIPTION in the project ("Race condition in jobs.test.ts under concurrent thread pool") suggests the real symptom is that when vitest runs tests in parallel threads, one thread's `createTestDb()` output interleaves with another. This is NOT possible with `:memory:` DBs since each call creates a distinct private in-memory instance. So what's the actual race?
-
-Two likely root causes:
-1. **The global `vi.mock('../../src/main/db')` in `tests/setup.ts`** is loaded per test file but the mock factory runs once per worker. If it's shared state via module-level `createTestDb()` (`tests/setup.ts:10` calls `createTestDb()` at top level), two tests in the SAME worker share one DB. Tests insert rows, query, and step on each other's state.
-2. **The `await db.update(...).where(undefined)` update-all** in the second test DOES mutate DB state. If that DB is shared across test cases in the worker, subsequent tests see pre-polluted rows.
-
-Re-introducing a different race: if the "fix" is to move `createTestDb()` to a per-test `beforeEach` hook but forget that `vi.mock` caches the module-level db, we'd fix one layer and leave the mock pointing at a stale DB.
-
-**Why it happens:**
-Module-level mocks that instantiate state (not just mock functions) are a known anti-pattern. The test INSIDE each `it` calls `createTestDb()` correctly to get a fresh DB, but handlers imported from `src/main/handlers/jobs.ts` will pick up the mocked `db` from `tests/setup.ts` — NOT the per-test DB.
-
-BUT: looking at the test file, each `it` calls handlers directly with the per-test `db` argument (e.g., `listJobs(db)`). Good. So handlers aren't using the mock. BUT: if `src/main/handlers/jobs.ts` module-time imports `../db` (which calls `vi.mock → createTestDb()` once), any module-level code in `jobs.ts` that runs against `db` at import time would use the mock's singleton DB.
-
-**How to avoid (and how NOT to re-introduce):**
-- Fix the `.where(undefined)` bug first — replace with proper Drizzle filter or delete the line if its purpose is unclear. Read the test intent, write a correct version.
-- Delete `tests/setup.ts` (per the v2.4 retrospective) — handler tests don't need the mock since they use the `db: Db` first-param pattern. The global mock is likely the race source. Verify by running tests with `--pool=threads --poolOptions.threads.singleThread=false` before and after.
-- If removing the mock breaks tests, the true fix is one of: (a) use `vi.mock` with a factory that returns fresh DB per import (not singleton), (b) use `vi.doMock` per test file for true isolation, (c) inject `db` into all handler call sites (which is already the pattern).
-- Do NOT "fix" by serializing tests (`poolOptions.singleThread`) — that hides the bug and slows the suite.
-- Write a regression test that runs the same handler test twice in a loop — if the second iteration fails due to state from the first, the isolation is still broken.
-
-**Warning signs:**
-- Tests pass individually but fail in the suite.
-- Tests pass on first run, fail on second (`vitest --run` twice in quick succession).
-- Test output shows more rows than seeded — the DB is accumulating state.
-- `poolOptions.threads` changes alter pass/fail outcome.
-
-**Phase to address:** Phase 34 — last plan of the phase, because it depends on removing `tests/setup.ts` first. Should include running the full suite 3× in a row on CI-equivalent pool settings to prove no flakiness.
+**Phase to address:** Prompt engineering phase (Phase 4) — the call separation and bullet cap must be in the initial implementation, not added later after users report costs.
 
 ---
 
@@ -303,13 +211,11 @@ BUT: looking at the test file, each `it` calls handlers directly with the per-te
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Emit `null` for missing JSON fields instead of omitting | Faster to write — just `JSON.stringify(row)` | Schema validators fail; consumers see `null` as a literal value | Never — always omit optional fields |
-| Copy DB files without checkpointing WAL | One-liner `fs.copyFile(src, dest)` | Silent data loss of last few transactions | Never for user data; OK for dev scratch DBs |
-| Two sources of truth for one toggle (`template_variant_items` + `templateOptions.showSummary`) | Started as incremental feature addition | Drift between consumers that read different sources | Only in transitional phases with explicit migration ticket |
-| "Keep for future use" dead files (tests/setup.ts) | No immediate breakage | Future devs re-import, reintroduce coupling | Never — delete, resurrect via git if needed |
-| Using `vi.mock` for DB with module-level instantiation | Easy to set up global stub | Cross-test state pollution in same worker | Never for anything with writable state; OK for pure function mocks |
-| Exporting `TEMPLATE_LIST` "just in case" a UI needs it | Preempts one line of future work | Confuses grep, makes deletion scary | Never — add on first use |
-| `compact?: boolean` prop added for "consistency" | Matches shape of related types | Dead code that grows complexity of type | Never — add when first template needs it |
+| Keep `analysis_bullet_overrides` table alongside new `overrides` table | Zero migration risk, rollback trivial | Dual read paths; `applyOverrides()` and merge code must query two tables or the old table becomes stale | Only during the migration phase — drop in v2.7 after verification |
+| Generic `entity_id` integer without FK (no per-entity columns) | Simpler schema, one column instead of many nullable FKs | No CASCADE on delete; orphaned override rows accumulate; `isOrphaned` detection requires joining every possible entity table | Never — follow `template_variant_items` pattern with per-entity nullable columns |
+| Bundle excluded-bullet suggestion into the main analysis call | Fewer IPC round-trips, one LLM call | Token cost doubles; errors in suggestion call kill the main analysis result | Never — keep as a separate optional call |
+| Omit `scope` enum column, rely on NULL analysis of FK columns alone | Fewer columns | Query author must remember NULL-means-base semantics; mistakes cause silent wrong-tier reads | Acceptable only if CHECK constraint enforces NULL invariants and all queries are centralized in `buildMergedBuilderData` |
+| Skip snapshot integration test for new override types | Faster initial ship | Snapshot silently freezes base text for newly added entity types; discovered at submit time | Never for new entity type coverage — snapshot test is the correctness contract |
 
 ---
 
@@ -317,14 +223,11 @@ BUT: looking at the test file, each `it` calls handlers directly with the per-te
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| JSON Resume schema | Treating the schema as a strict round-trip target | Document as one-way "lossy-faithful" export; surface what's dropped |
-| JSON Resume dates | Emitting `"endDate": null` for ongoing positions | OMIT the endDate key entirely — jsonresume spec treats missing key as "ongoing" |
-| JSON Resume basics.location | Emitting location as a flat string | Wrap as object: `{city: flatLocationString}` (spec requires object) |
-| better-sqlite3 WAL + relocation | `fs.copyFile` an open, WAL-mode DB | Checkpoint TRUNCATE → close → copy → verify → reopen |
-| better-sqlite3 + network paths | Allowing any user-selected path | Detect UNC / OneDrive / Dropbox / mapped drives; warn before copy |
-| Electron file dialogs | Not pre-validating target directory (exists, writable) | `fs.access(parentDir, fs.constants.W_OK)` before opening dialog; validate after pick |
-| Vitest + better-sqlite3 | Global `vi.mock` of the db module with instantiated DB | Per-test `createTestDb()`; inject db as first handler param |
-| docx library + templateOptions | Destructuring only "used" options, discarding others | Explicit destructure with documented defaults for EVERY option the HTML honors |
+| Drizzle + SQLite NULL comparisons | Using `eq(overrides.variantId, variantId)` returns no rows when `variantId` is NULL | Use `isNull(overrides.variantId)` for scope=base queries; `eq()` only for non-null lookups |
+| `ensureSchema()` migration block | INSERT-SELECT migration runs every app launch; if idempotency isn't enforced, rows are duplicated on every restart | Guard with `WHERE NOT EXISTS (SELECT 1 FROM overrides WHERE ...)` or check row count before migrating |
+| `applyOverrides()` in `shared/overrides.ts` | Called from both main process and (via IPC) implicitly via renderer — adding variant-tier call to renderer code breaks the "single merge path" principle | All override application stays inside `buildMergedBuilderData()` in main process only; renderer receives merged data |
+| `duplicateVariant()` in templates.ts | Copies `templateVariantItems` rows but doesn't copy variant-tier overrides from the new `overrides` table | Add `INSERT INTO overrides SELECT ... WHERE variant_id = ?` with new variant's ID in the duplicate transaction |
+| Snapshot re-render for old submissions | Old snapshots were frozen with only bullet overrides; new snapshot shape has additional override types | Old submissions fall back to `resumeSnapshot` JSON as-is (existing fallback behavior confirmed in PROJECT.md); no change needed, but verify shape is backward-compatible |
 
 ---
 
@@ -332,20 +235,9 @@ BUT: looking at the test file, each `it` calls handlers directly with the per-te
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Checkpointing on every write before DB copy | Slow copy for large DBs | Only `wal_checkpoint(TRUNCATE)` once immediately before copy | Not a perf issue at current scale (single-user, sub-MB DB) |
-| Reading entire DB into JSON for export | Memory spike on huge resumes | Stream JSON via incremental writer | Only breaks at 100+ jobs/bullets — beyond realistic single-user scope |
-| Synchronous `fs.copyFileSync` blocks Electron main | UI freezes during DB move | Use async `fs.promises.copyFile` or SQLite backup API | Any DB > 10 MB or slow target disk |
-
----
-
-## Security Mistakes
-
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Exporting JSON with API key (from ai_settings) accidentally included | Credential leak if user shares export | Hard-code allowlist of tables to export; NEVER emit `ai_settings` or `analysis_bullet_overrides.raw_llm_response` |
-| Allowing DB relocation without confirming the user owns the target path | Overwrite user's unrelated SQLite DB at `app.db` (very rare but possible) | Default target filename MUST be distinctive (e.g., `resumehelper.db`); warn on name collision |
-| JSON export includes `submissions.notes` free text | May contain HR names, salary details — privacy concern if shared | Document that variant-merged export does NOT include submission data; base export similarly excludes `submissions` table |
-| `.db.bak` orphan files pile up after relocations | Disk fills on user's chosen drive; `.bak` may contain stale credentials | Surface `.bak` cleanup in UI after successful switch; never auto-delete |
+| `buildMergedBuilderData` runs 6+ separate DB queries and will gain more for override lookups | Measurable latency on preview render (today acceptable; grows with new queries) | Bundle new override queries into the existing query block; avoid per-entity-type individual queries | Unlikely to break at Mark's single-user scale; monitor if query count exceeds ~10 |
+| Feeding all excluded bullets to LLM in one prompt | Long analysis calls, rate limit errors | Separate call, cap excluded bullet count | Any variant with 20+ excluded bullets |
+| `overrides` table scan without index on `(variant_id, entity_type)` | Slow merge on large override sets | Add index `CREATE INDEX IF NOT EXISTS idx_overrides_variant ON overrides (variant_id, entity_type)` | Unlikely at single-user scale with <500 override rows, but index is cheap |
 
 ---
 
@@ -353,36 +245,25 @@ BUT: looking at the test file, each `it` calls handlers directly with the per-te
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| "Move DB" button with no confirmation | Accidental click loses data | Two-step: Pick location → Confirm modal with "I understand" checkbox before executing |
-| JSON export with no indication of what's included | User doesn't know if accepted suggestions are baked in | Filename includes analysis ID or "-merged" suffix; download toast summarizes "base" vs "variant-merged" |
-| Silent WAL checkpoint before copy | User sees "copying..." for long time with no progress | Emit progress events: "Preparing database..." → "Copying..." → "Verifying..." → "Switching..." |
-| No undo for DB move | User moves to wrong drive, can't easily revert | Keep `.bak` of source file until user explicitly deletes; add "Revert to previous location" button for 7 days |
-| showSummary fix without migration for existing snapshots | Old DOCX exports rebuilt from snapshots still show summary incorrectly | Snapshot replay (re-export from snapshot) MUST honor `snapshot.templateOptions.showSummary` — add test |
+| User can't tell which tier a reword lives in (variant vs analysis) | User thinks their variant was permanently changed when they accepted an analysis suggestion; or thinks their analysis reword will follow them to other analyses | Show tier badge ("Variant" / "This analysis only") on every overridden field in the builder and analysis screens |
+| No revert path for variant-tier rewords | User rewrites a title, decides it's worse, has no "undo to base" | Provide a "Reset to original" affordance that deletes the override row; if the base text was the default, it reappears immediately |
+| "Permanent vs this-job-only" ambiguity when accepting excluded-bullet suggestion | User accepts a base bullet into an analysis, not realizing it doesn't persist to the variant — next time they run the same variant they don't see it | Confirm dialog on accept: "This will include this bullet for [Company] analysis only. To add it permanently, edit your [variant name] variant." |
+| Inline reword UI appears for all fields simultaneously | Overwhelming; user doesn't know where to start | Scope the reword affordance to the summary, current job's title/company line, and bullets — not all fields at once. Project fields can be a v2.7 addition. |
+| Override text not visible in the builder's main listing | User creates a variant reword but forgets it's there; reads the base text on the list and thinks the override was lost | Show a visual indicator (e.g., subtle pencil icon or "edited" chip) on any field with a variant-tier override |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Base JSON export:** Validates against official resume-schema JSON Schema via ajv — verify a round-trip import-export-import path doesn't crash.
-- [ ] **Base JSON export:** Uses key-omission for missing fields (no `null`s, no `""` for optional strings) — grep export output for `"null"` and empty string values.
-- [ ] **Base JSON export:** Emits `$schema` pointer so downstream tools auto-discover.
-- [ ] **Variant-merged export:** Accepted skill additions from `analysis_skill_additions` present — test with analysis that has accepted skills.
-- [ ] **Variant-merged export:** Job-level exclusions honored — test with a variant where `template_variant_items` has `item_type='job', excluded=1`.
-- [ ] **Variant-merged export:** `showSummary=false` omits `basics.summary` — test.
-- [ ] **Variant-merged export:** Bullet overrides applied — content matches what the PDF shows.
-- [ ] **DB relocation:** `PRAGMA integrity_check` runs on target before switching — proves copy integrity.
-- [ ] **DB relocation:** DB handle closed before copy on Windows — no EBUSY in production.
-- [ ] **DB relocation:** Config persisted to a LOCATION OUTSIDE the DB (userData JSON or similar) — otherwise path is stored in the DB we just moved.
-- [ ] **DB relocation:** Rollback on failure at step 4+ reverts gracefully — test with tempfile simulating `EBUSY`.
-- [ ] **DB relocation:** Network/cloud path detection warning — test with UNC path and a OneDrive-shaped path.
-- [ ] **DOCX showSummary:** Toggle off → export DOCX → open in Word → confirm no summary paragraph.
-- [ ] **DOCX showSummary:** Parameterized test covers HTML, PDF, and DOCX with both toggle states (4 cases per template × 5 templates = 20 assertions).
-- [ ] **TEMPLATE_LIST removal:** Full workspace grep (including `.claude/` `dist/` `scripts/`) produces zero results post-delete.
-- [ ] **TEMPLATE_LIST removal:** Variant builder template dropdown still functions — manual click-through.
-- [ ] **compact removal:** `filterResumeData` does NOT read `props.compact` (verify by reading source, not inference).
-- [ ] **tests/setup.ts removal:** Full suite runs 3 consecutive times, same result (pass count exact).
-- [ ] **jobs.test.ts race:** `.where(undefined as any)` replaced with correct WHERE clause or test intent clarified.
-- [ ] **jobs.test.ts race:** Suite runs with `--pool=threads --poolOptions.threads.singleThread=false` passes 10 consecutive times.
+- [ ] **Migration:** `analysis_bullet_overrides` row count in new `overrides` table equals original row count — verify post-migration assertion runs at startup
+- [ ] **Cascade delete:** Deleting a job also deletes all its override rows from `overrides` — verify via integration test
+- [ ] **Snapshot coverage:** All new entity types (summary, job title, company, project title, project description) appear with override text (not base text) in `resumeSnapshot` JSON after submission
+- [ ] **Merge precedence:** Analysis override wins over variant override for the same entity — verify unit test exists and passes
+- [ ] **Duplicate variant:** Duplicating a variant copies its override rows, not just its `templateVariantItems` rows
+- [ ] **Staleness:** Adding or editing a variant override stamps `template_variants.updated_at` — verify stale banner appears after override is added post-analysis
+- [ ] **Fabrication guard:** Excluded-bullet suggestion accept handler validates that the accepted `bulletId` is in `job_bullets` and is currently excluded in the variant before writing to `overrides`
+- [ ] **NULL scope:** A query for variant-scoped overrides with `WHERE variant_id IS NULL` returns zero rows (no base-scope rows appear as variant overrides)
+- [ ] **Old submission display:** Opening a pre-v2.6 submission snapshot still renders correctly with no new fields expected
 
 ---
 
@@ -390,62 +271,43 @@ BUT: looking at the test file, each `it` calls handlers directly with the per-te
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| DB relocation lost last N writes (WAL not checkpointed) | HIGH | Restore `.bak` of original source; redo any analysis/accept clicks since the move. Prevention is mandatory. |
-| DB corrupted on NAS | HIGH | Last resort: SQLite `.recover` CLI on `.bak`; export to JSON; reimport fresh. Prevent by path heuristic. |
-| JSON export is invalid (null fields) | LOW | Patch serializer to omit, ship fix, re-export — no data loss, just re-run. |
-| Variant-merged export missing accepted skills | LOW | Fix merge helper; re-export. User's PDF was correct, only JSON is wrong — no downstream consumer damaged. |
-| Removed TEMPLATE_LIST broke variant builder | LOW | git revert the deletion commit; no data affected. |
-| DOCX showSummary incorrect in existing snapshots | MEDIUM | Snapshots are immutable by design; re-exports from snapshot will be wrong until fix is deployed. Accept as "historical exports may show summary; new exports respect toggle." |
-| jobs.test.ts flake masking a real bug | MEDIUM | Serialize tests temporarily (`singleThread: true`) while the real race is debugged; do not merge the serialization as the fix. |
+| Migration drops override rows | MEDIUM | Keep `analysis_bullet_overrides` alive; re-run INSERT-SELECT with corrected column mapping; add post-migration assertion to catch on next launch |
+| Wrong merge precedence shipped to user | LOW | Fix `buildMergedBuilderData` Layer 2.5/3 ordering; release patch; no data loss (overrides still in DB) |
+| Snapshot frozen with base text instead of overridden text | HIGH | Cannot retroactively fix frozen snapshots; fix `buildMergedBuilderData` and `buildSnapshotForVariant` going forward; add prominent note in release: "Submissions created before v2.6.x patch may show base text in history" |
+| Orphaned override rows after entity delete | LOW | Run cleanup SQL: `DELETE FROM overrides WHERE bullet_id NOT IN (SELECT id FROM job_bullets)`; idempotent and safe |
+| Hallucinated bullet ID accepted into overrides | LOW | Override silently never matches; user sees no change; cleanup: `DELETE FROM overrides WHERE bullet_id NOT IN (SELECT id FROM job_bullets)` (same as above) |
+| Token cost overrun on excluded-bullet call | LOW | Add cap N in prompt construction; no data loss |
 
 ---
 
 ## Pitfall-to-Phase Mapping
 
-Proposed phase structure (roadmap will finalize):
-- **Phase 30** — Resume.json Base Export
-- **Phase 31** — Resume.json Variant-Merged Export
-- **Phase 32** — Configurable DB Location with Copy/Verify/Switch
-- **Phase 33** — DOCX showSummary Toggle Honor
-- **Phase 34** — Tech Debt Cleanup (TEMPLATE_LIST, compact, setup.ts, jobs.test.ts)
-
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| 1. Base export loses fields silently | Phase 30 | Unit test: import rich resume.json, re-export, diff and document deltas |
-| 2. Null vs omit in JSON | Phase 30 | Grep export output for `:null` and `:""` — should be zero matches on optional fields |
-| 3. Variant merge drops skill additions | Phase 31 | Test: variant + analysis with accepted skill → JSON export contains skill |
-| 4. Toggle sources of truth diverge (summary/job) | Phase 31 | Test: toggle off summary/job → JSON export honors it |
-| 5. WAL not checkpointed before copy | Phase 32 | Test: write, checkpoint, copy, open target, verify last write present |
-| 6. Open handle blocks copy on Windows | Phase 32 | Integration test with explicit close → copy → reopen sequence |
-| 7. Network/cloud path breaks DB | Phase 32 | UI test: simulate UNC/OneDrive path selection → warning appears |
-| 8. DOCX showSummary ignored | Phase 33 | Parameterized test across HTML+PDF+DOCX with toggle on/off |
-| 9. TEMPLATE_LIST deletion cascades | Phase 34-01 | Full workspace grep + manual template dropdown smoke test |
-| 10. compact prop deletion breaks spreads | Phase 34-01 | tsc + vitest full run + render each of 5 templates |
-| 11. tests/setup.ts deletion hides mock dependency | Phase 34-02 | Full suite diff pre/post; 3× consecutive runs same result |
-| 12. jobs.test.ts race / broken where clause | Phase 34-03 | 10× consecutive runs pass with default thread pool; `.where()` replaced with intent-revealing query |
+| Migration drops analysisBulletOverrides rows | Phase 1 — Schema + Migration | Post-migration row count assertion in `ensureSchema()`; manual test on a DB with existing overrides |
+| NULL-column ambiguity breaks merge queries | Phase 1 — Schema + Migration | Unit test: variant-scope override (NULL analysis_id) returns override text without analysisId in call |
+| Merge precedence inversion | Phase 2 — Merge helper extension | Unit test: same-entity variant + analysis override → analysis text wins |
+| Snapshot freezes base text for new override types | Phase 3 — Snapshot integration test | Integration test: submit with variant summary override; assert snapshot JSON contains override text |
+| Staleness misses variant override changes | Phase 2 — Merge helper extension | Staleness unit test: add override after analysis createdAt; assert stale flag is true |
+| Override pointing at excluded/deleted entity | Phase 1 — Schema + Migration | Integration test: delete job; assert override rows cascade-deleted; re-include bullet; assert old override reappears (or not, per policy) |
+| LLM suggests already-variant-excluded bullet as if missing | Phase 4 — Excluded-bullet suggestion prompt | Prompt review + test: assert suggestions only come from excluded set, not included set |
+| LLM hallucinates bullet ID | Phase 4 — Excluded-bullet suggestion prompt | IPC handler test: mock LLM returning non-existent bulletId; assert handler rejects it |
+| Token cost blows up | Phase 4 — Excluded-bullet suggestion prompt | Add cap before first implementation; no separate verification needed |
+| UX tier ambiguity | Phase 3/4 — UI affordance | Design review: every overridden field shows tier badge before marking feature complete |
 
 ---
 
 ## Sources
 
-- `D:\Projects\resumeHelper\.planning\PROJECT.md` — constraints, decisions, current state
-- `D:\Projects\resumeHelper\.planning\RETROSPECTIVE.md` — v2.1-v2.4 lessons (especially v2.4 tests/setup.ts note and v2.1 deletion path lesson)
-- `D:\Projects\resumeHelper\src\main\db\index.ts` — ensureSchema pattern, WAL mode setting
-- `D:\Projects\resumeHelper\src\main\handlers\export.ts` — `getBuilderDataForVariant` merge path (bullet overrides only)
-- `D:\Projects\resumeHelper\src\main\handlers\submissions.ts` — `buildSnapshotForVariant` with skill additions merge + summary sentinel lookup
-- `D:\Projects\resumeHelper\src\main\lib\docxBuilder.ts` — missing `showSummary` destructure (line 59)
-- `D:\Projects\resumeHelper\src\renderer\src\components\templates\resolveTemplate.ts` — `TEMPLATE_LIST` orphan export
-- `D:\Projects\resumeHelper\src\renderer\src\components\templates\types.ts` — vestigial `compact` prop
-- `D:\Projects\resumeHelper\src\main\handlers\import.ts` — partial basics mapping (linkedin-only profile)
-- `D:\Projects\resumeHelper\tests\setup.ts` — the dead file referenced in v2.4 retrospective
-- `D:\Projects\resumeHelper\tests\unit\handlers\jobs.test.ts` — the `.where(undefined as any)` bug
-- [JSON Resume Schema](https://jsonresume.org/schema) — field list and nullability
-- [jsonresume/resume-schema on GitHub](https://github.com/jsonresume/resume-schema) — canonical JSON Schema
-- [SQLite WAL documentation](https://sqlite.org/wal.html) — WAL + network filesystem warnings, backup safety
-- [SQLite Over a Network](https://sqlite.org/useovernet.html) — locking caveats on NFS/CIFS
-- [SQLite wal_checkpoint_v2](https://sqlite.org/c3ref/wal_checkpoint_v2.html) — TRUNCATE mode semantics
-- [better-sqlite3 Issue #376](https://github.com/WiseLibs/better-sqlite3/issues/376) — WAL/SHM cleanup behavior
+- Direct reading of `src/main/db/schema.ts` — existing `analysisBulletOverrides` schema and UNIQUE constraint
+- Direct reading of `src/main/lib/mergeHelper.ts` — three-layer merge implementation, Layer 3 application at lines 278-297
+- Direct reading of `src/main/handlers/ai.ts` — `acceptSuggestion`, `getOverrides` with orphan detection via LEFT JOIN
+- Direct reading of `src/main/handlers/templates.ts` — `duplicateVariant`, `setItemExcluded`, `updatedAt` stamp pattern
+- Direct reading of `src/main/handlers/submissions.ts` — `buildSnapshotForVariant` calling `buildMergedBuilderData`
+- Direct reading of `src/main/db/index.ts` — `ensureSchema`, `alterStatements` try/catch pattern, existing skill-migration idiom
+- `src/shared/overrides.ts` — `applyOverrides()` current signature (non-nullable bulletId)
+- `.planning/PROJECT.md` — Key Decisions for staleness detection, orphaned override handling, fabrication prevention, snapshot immutability
 
 ---
-*Pitfalls research for: v2.5 Portability & Debt Cleanup*
-*Researched: 2026-04-23*
+*Pitfalls research for: ResumeHelper v2.6 — Polymorphic Override Table Migration + Excluded-Bullet LLM Suggestions*
+*Researched: 2026-06-05*

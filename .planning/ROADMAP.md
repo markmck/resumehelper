@@ -11,7 +11,7 @@
 - ✅ **v2.4 Polish & Reliability** - Phases 25-29 (shipped 2026-04-21)
 - ✅ **v2.5 Portability & Debt Cleanup** - Phases 30-34 (shipped 2026-06-05)
 - ✅ **v2.6 Per-Variant Text Overrides** - Phases 35-38 (shipped 2026-06-08)
-- 🚧 **v2.7 Optimization Layout Controls** - Phases 39-41 (in progress)
+- ✅ **v2.7 Optimization Layout Controls** - Phases 39-41 (shipped 2026-06-24)
 
 ## Phases
 
@@ -87,13 +87,15 @@ Phases 30-34 covered: unified `buildMergedBuilderData()` merge path feeding HTML
 
 Full phase details in `.planning/milestones/v2.6-phases/`.
 
-### 🚧 v2.7 Optimization Layout Controls (In Progress)
+### ✅ v2.7 Optimization Layout Controls (Phases 39-41) — SHIPPED 2026-06-24
+
+Full phase details archived in `.planning/milestones/v2.7-ROADMAP.md`.
 
 **Milestone Goal:** Add a presentation-layer override at the analysis tier so users can re-tune resume margins during job optimization — scoped to that analysis, with a live preview and one-click auto-fit — so re-including bullets and accepting rewrites no longer leaves the resume overflowing.
 
 - [x] **Phase 39: Analysis Margin Override Data Layer** - Analysis-scoped margin override storage, merge resolution over variant `templateOptions`, snapshot freezing (completed 2026-06-09)
-- [ ] **Phase 40: Margin Controls + Live Preview in Optimize** - Margin sliders in the Optimize screen, embedded paginated preview pane, revert-to-variant
-- [ ] **Phase 41: Auto-Fit Orphan-Page Removal** - Auto-fit button that tightens margins to drop an orphan trailing page, with a minimum margin floor and unreachable reporting
+- [x] **Phase 40: Margin Controls + Live Preview in Optimize** - Margin sliders in the Optimize screen, embedded paginated preview pane, expand-to-modal readable preview, revert-to-variant (completed 2026-06-23)
+- [x] **Phase 41: Auto-Fit + Optimize Power Features** - Auto-fit orphan-page removal (margin floor + unreachable reporting), save optimized analysis as a new variant, and AI-suggested job-tailored summary (completed 2026-06-24)
 
 ## Phase Details
 
@@ -253,21 +255,37 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 40-03-PLAN.md — Human-verify checkpoint: seed / live preview / persistence / merged content / revert
+- [x] 40-03-PLAN.md — Human-verify checkpoint: seed / live preview / persistence / merged content / revert (+ expand-to-modal gap-closure)
 
 **UI hint**: yes
 
-### Phase 41: Auto-Fit Orphan-Page Removal
+### Phase 41: Auto-Fit + Optimize Power Features
 
-**Goal**: An auto-fit button in the Optimize screen measures the current page count and, when content spills a few lines onto an extra page, tightens the analysis margins just enough to pull that orphan page back — never going below a minimum margin floor, and clearly reporting when the orphan page cannot be removed within the floor
+**Goal**: Extend the Optimize screen beyond margin tuning: (a) an auto-fit button that pulls back an orphan trailing page within a margin floor, (b) saving the current optimized analysis as a new reusable variant, and (c) an AI-suggested job-tailored summary written through the existing override plumbing
 **Depends on**: Phase 40
-**Requirements**: LAYOUT-06, LAYOUT-07
+**Requirements**: LAYOUT-06, LAYOUT-07, SAVE-01, SAVE-02, SUM-01, SUM-02
 **Success Criteria** (what must be TRUE):
 
   1. With content spilling a few lines onto an extra page, clicking auto-fit tightens margins and the preview drops to one fewer page
   2. Auto-fit never sets any margin below the minimum floor (~0.4")
   3. When the orphan page cannot be removed within the floor, auto-fit stops at the floor and shows a clear message rather than silently maxing out or removing content
   4. The margins auto-fit lands on are persisted as the analysis override via the same Phase 39 path as manual adjustment, and freeze into the snapshot on submit
+  5. From the Optimize screen, the user can save the current analysis's optimized result as a new standalone variant — the original variant and analysis are unchanged, and the variant is named after the job (company – role)
+  6. The new variant captures the analysis's accepted rewrites, re-included excluded bullets, added skills, and margin overrides as its own variant-tier state, editable in the Variant Builder (built by duplicating the variant, then baking the analysis overrides onto the duplicate)
+  7. During optimization the AI proposes a job-tailored professional summary, surfaced as an accept/edit/dismiss card targeting the posting's keywords/gaps
+  8. Accepting the suggested summary writes through the existing `summaryOverride` plumbing and appears in the analysis's preview, export, and submission snapshot
+
+**Plans**: 9 plans (4 waves)
+
+- [x] 41-01 — autoFit.ts pure helpers + Wave 0 unit tests (LAYOUT-06/07)
+- [x] 41-02 — PrintApp/VariantPreview pageCount + onContentHeight seam (LAYOUT-06)
+- [x] 41-05 — saveAnalysisAsVariant handler + bake/margin transforms + tests (SAVE-01/02)
+- [x] 41-06 — suggested_summary scorer + acceptAnalysisSummary + getAnalysis surface (SUM-01/02)
+- [x] 41-03 — Auto-Fit button + step-and-remeasure loop + cannot-fit banner + persist (LAYOUT-06/07)
+- [x] 41-07 — preload bridges + types for saveAnalysisAsVariant + acceptAnalysisSummary (SAVE/SUM)
+- [x] 41-04 — Human-verify: auto-fit live behavior, floor banner, persistence (verified 2026-06-24)
+- [x] 41-08 — OptimizeVariant UI: Save-as-variant action + suggested-summary card (SAVE/SUM)
+- [x] 41-09 — Human-verify: Save-as-variant + AI summary end-to-end (verified 2026-06-24)
 
 **UI hint**: yes
 
@@ -284,8 +302,8 @@ Plans:
 | 30-34 | v2.5 | 19/19 | Complete | 2026-06-05 |
 | 35-38 | v2.6 | 13/13 | Complete | 2026-06-08 |
 | 39. Analysis Margin Override Data Layer | v2.7 | 3/3 | Complete    | 2026-06-09 |
-| 40. Margin Controls + Live Preview in Optimize | v2.7 | 2/3 | In Progress|  |
-| 41. Auto-Fit Orphan-Page Removal | v2.7 | 0/? | Pending | - |
+| 40. Margin Controls + Live Preview in Optimize | v2.7 | 3/3 | Complete | 2026-06-23 |
+| 41. Auto-Fit + Optimize Power Features | v2.7 | 9/9 | Complete | 2026-06-24 |
 
 ## Future (v3.0+)
 
@@ -294,3 +312,5 @@ Plans:
 ## Backlog
 
 - **Live re-score-on-accept** — re-run the ATS scorer when an analysis-tier override is accepted/cleared so the displayed score live-updates with accepted rewrites (new LLM call + progress UX). Deferred from Phase 36 (which threads overrides into initial-run scoring only). Its own future phase.
+
+*Promoted into Phase 41 (2026-06-23) and shipped 2026-06-24: "Save optimized variant as a new variant" (SAVE-01/02) and "Suggest summary for job in optimization" (SUM-01/02).*

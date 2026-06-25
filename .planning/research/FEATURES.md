@@ -1,15 +1,16 @@
-# Feature Research — v2.5 Portability & Debt Cleanup
+# Feature Research
 
-**Domain:** Electron resume-management app — portability milestone (JSON export + configurable DB path + small UX/infra debt)
-**Researched:** 2026-04-23
-**Confidence:** HIGH
+**Domain:** Resume builder — per-variant text overrides and excluded-bullet surfacing
+**Researched:** 2026-06-05
+**Confidence:** HIGH (grounded in actual component source + established UX patterns from structured-content editors)
 
-Scope is narrow and additive. Features fall into four categories driven by the milestone:
+---
 
-1. **Export JSON** (base + per-variant merged) — new user-facing feature
-2. **DB Portability** (configurable SQLite location) — new user-facing feature
-3. **DOCX Fix** (honor `showSummary`) — bug fix, no new UX
-4. **Tech Debt** (orphan exports, vestigial props, test plumbing, flaky test) — internal only
+## Scope Boundary
+
+This file covers only the NEW v2.6 features. Everything already shipped (variant builder
+checkbox include/exclude, analysis bullet rewrites, OptimizeVariant suggestion cards,
+three-layer merge, per-click accept/dismiss) is treated as stable infrastructure.
 
 ---
 
@@ -17,103 +18,200 @@ Scope is narrow and additive. Features fall into four categories driven by the m
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist once "Export JSON" is on the roadmap. Missing these = portability feature feels half-built.
+Features without which v2.6 feels incomplete or broken on launch.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **Base "Export JSON" button in Experience tab header** | Symmetry: "Import JSON" and "Import PDF" already live there ([ExperienceTab.tsx:187](../../src/renderer/src/components/ExperienceTab.tsx)). Users expect the inverse button next to its siblings. | LOW | Reuse header button styling. Invokes `dialog.showSaveDialog` → reads all tables → writes resume.json (schema 1.0.0). No confirmation modal needed — safe read-only op. |
-| **Per-variant "Export JSON" button in preview toolbar** | Sits next to `PDF` / `DOCX` buttons in VariantEditor ([line 562-603](../../src/renderer/src/components/VariantEditor.tsx)). Users who can PDF/DOCX a variant expect to JSON it too. | MEDIUM | Must merge three layers (base → variant exclusions → analysis overrides) via `applyOverrides()` — same pipeline as `getBuilderDataForVariant()` in [export.ts:16](../../src/main/handlers/export.ts). Output = resume.json shape, not BuilderData shape. Requires a BuilderData → resume.json transformer. |
-| **Default filename uses profile name + variant name** | Already the pattern for PDF/DOCX (`${sanitize(profile.name)}_Resume_${sanitize(variant.name)}.pdf` — [VariantEditor.tsx:229](../../src/renderer/src/components/VariantEditor.tsx)). Users expect the same filename scheme with `.json`. | LOW | `_Resume_VariantName.json` for variant export; `profile.name.json` for base export. |
-| **Success toast on export** | Existing PDF/DOCX pattern: `showToast('Resume exported as PDF')`. Users expect identical feedback. | LOW | `showToast('Resume exported as JSON')`. |
-| **Silent on user-cancelled save dialog** | Existing pattern: `if (!result.canceled) showToast(...)`. No error when user clicks Cancel. | LOW | Handler returns `{ canceled: true }`; renderer skips toast. |
-| **DB location picker in Settings (folder select, not file select)** | VS Code/Obsidian/Immich all expose data-folder-as-folder, not as a database file. Users think in "where my data lives", not "which .sqlite file". | LOW | `dialog.showOpenDialog({ properties: ['openDirectory'] })`. The file itself stays named `app.db`. |
-| **Confirmation modal before moving DB** | Destructive-feeling operations need a confirm step. Matches existing ImportConfirmModal shape ([ImportConfirmModal.tsx](../../src/renderer/src/components/ImportConfirmModal.tsx)) — modal pattern already in project. | LOW | Modal states: source path, destination path, what will happen (copy → verify → switch → keep old as backup). Primary button "Move database". Cancel closes modal. |
-| **Progress indication during move** | better-sqlite3 copy of a small resume DB is near-instant, but users still expect a spinner/"Moving..." state on the button during the IPC round-trip. | LOW | Same pattern as `{exporting === 'pdf' ? 'Exporting...' : 'PDF'}` — button label swaps to `Moving...` and disables. |
-| **Error state with restore** | If copy or verify fails, revert: keep old DB active, show error toast, surface reason. Matches the rollback convention users expect from any "move my data" operation. | MEDIUM | Verify = open copied DB readonly, run sanity query (e.g. `SELECT COUNT(*) FROM profile` returns 1). If fail → don't update path setting, delete copied file, show error. Old DB untouched throughout. |
-| **Old DB kept as `.bak` after successful switch** | Sane-default safety net. Users know file-copy migrations can fail silently; a `.bak` gives them a rescue point. | LOW | Rename old `app.db` → `app.db.bak` (or move to `old/app.db`) after successful switch. Documented in settings help text. |
-| **Restart prompt after switch** | better-sqlite3 handle is opened once at startup ([db/index.ts:9](../../src/main/db/index.ts)). Swapping files under a live connection is fragile. Users are accustomed to "Restart app to apply" from VS Code settings changes and OS-level data migrations. | LOW–MEDIUM | After successful copy+verify+path-setting update, show "Restart ResumeHelper for the change to take effect" modal with "Restart now" / "Later" buttons. Use `app.relaunch(); app.exit()` on confirm. |
-| **DOCX export respects showSummary toggle** | User already toggles `Summary` in VariantBuilder ([VariantBuilder.tsx:258](../../src/renderer/src/components/VariantBuilder.tsx)). PDF respects it (via print.html). DOCX not respecting it = silent data-correctness bug. | LOW | Pass `showSummary` through to `buildResumeDocx()`; omit summary paragraph when false. No UX change. |
+| Inline reword affordance on bullet text at variant tier | User's mental model is "click bullet to rephrase for this variant" — a separate screen breaks flow; the existing `InlineEdit` component already provides this pattern (used for variant name editing) | MEDIUM | Reuse `InlineEdit` (multiline=true) inline with each bullet row in VariantBuilder; on save write an override row; live preview must refresh via existing `onToggle` callback |
+| Visual distinction: base vs variant-overridden text | Without a clear signal (icon, color, underline) users will not know an override is active and will not trust the output | LOW | A small badge/dot next to the bullet text (accent color) or italic override text suffices; line-through on original is already used for excluded items — do not reuse that convention |
+| Reset to base affordance on overridden fields | Every override tool (Google Docs version history, Notion block menus, VS Code editor settings) provides a clear "reset to original" escape hatch | LOW | A "Reset" link or X icon adjacent to the overridden field; only render when `overrideText != null`; mirrors the existing "Reset to template defaults" link in the Layout section |
+| Inline reword affordance on summary at variant tier | Summary is the only field with an existing toggle-only affordance. Users who write a variant for data-engineering roles want a different summary headline without changing base | MEDIUM | Gated on `showSummary === true` AND `profileSummary !== ''` (same existing gate); clicking the preview text opens an InlineEdit textarea. Reset restores `profileSummary` from profile. |
+| Inline reword for project title and project description at variant tier | Projects section exists in VariantBuilder with bullet checkboxes but no text-edit affordance; titles and descriptions are prime candidates for reword (e.g. "Led API migration" → "Led microservices decomposition") | MEDIUM | Same inline-edit pattern; project title maps to `projects.name`, description is a new `description` field if one is added, or a separate first-bullet convention — needs schema decision |
+| Inline reword for job title/company line at variant tier | "Principal Engineer at Contoso" can be reworded as "Staff Engineer" for target companies if accurate; this is the second most requested reword after bullets | MEDIUM | Maps to `jobs.role` (not `jobs.company` — company is factual; role is fair game for rewording). Override stored per-variant, field='role' |
+| Unified overrides table with precedence analysis → variant → base | Without a single table, existing `analysisBulletOverrides` and new variant-tier overrides diverge — the existing `applyOverrides()` function and `buildMergedBuilderData()` would need two separate lookup paths forever | HIGH | The polymorphic schema from memory (variant_id NULL?, analysis_id NULL?, entity_type, entity_id, field, override_text) cleanly replaces `analysisBulletOverrides`; migration is an INSERT SELECT |
+| Migration of existing `analysisBulletOverrides` into unified table | All existing accepted bullet rewrites must survive the migration — existing submissions snapshots are frozen so they are safe; only live analysis override lookups need to be re-pointed | MEDIUM | INSERT into `overrides` WHERE source from `analysisBulletOverrides`; old table can be dropped after verification; `applyOverrides()` in `src/shared/overrides.ts` adapts to read from unified table |
 
-### Differentiators (Beyond the Minimum)
+### Differentiators (Competitive Advantage)
 
-Features that would *genuinely* differentiate this milestone. Note: with v2.5 scoped to portability + debt, there's little room for differentiation — this is infrastructure work, not a product expansion.
+Features that distinguish this tool beyond what basic resume builders offer.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **Export badge: "Standard resume.json (schema 1.0.0)"** | Signals compliance with the open [JSON Resume](https://jsonresume.org/schema) spec — differentiates from FlowCV (PDF-only) and many builders that use proprietary JSON shapes. Matters for the user persona who wants portability guarantees. | LOW | One-line label next to the button or in tooltip. Zero code impact on the export path itself. |
-| **"Export variant" shows non-roundtrip warning in tooltip** | Variant export embeds analysis overrides and skips excluded items — re-importing would not reproduce the variant structure. Telling users this up front prevents confused bug reports later. | LOW | Tooltip or small help text: "Exports the final rendered resume. Re-importing creates new base entries — it won't recreate this variant." |
-| **Copy-verify-switch migration with explicit step log** | Most desktop apps treat "move data folder" as a black-box restart. Showing the steps (Copying... → Verifying... → Switching...) surfaces the safety guarantees to the user and builds trust. Borrowed from the SQL Server admin pattern. | MEDIUM | Only valuable if user sees a ≥1s duration. For a ~1 MB DB, move is < 100ms and the steps collapse into "Done." Probably not worth the polish. |
-| **"Reveal in Explorer" button next to DB path** | One-click way to see where the file actually lives. Standard pattern in Electron apps (VS Code, Obsidian). Reduces "where's my data?" support confusion. | LOW | `shell.showItemInFolder(dbPath)`. Tiny icon button inline with path label. |
+| Excluded-bullet suggestions during analysis (the "add back" card) | No other tool surfaces "you excluded this bullet from your variant but the JD is specifically asking for it" — this directly converts omissions into inclusions at the right scope | MEDIUM | Analysis prompt must receive the set of base bullets the variant EXCLUDES (not currently sent); LLM scores them against JD gaps; user accepts → re-include at analysis tier only (temporary inclusion, does not modify variant) |
+| Staleness indicator when base text changes after an override | If a user edits the base bullet in ExperienceTab after establishing a variant override, the variant override is now semantically stale — showing a "Base changed" warning prevents silent divergence | MEDIUM | Compare `jobBullets.updatedAt` against `overrides.createdAt`; same on-demand detection pattern already used for analysis staleness (see `stale analysis detection` in v2.2 decisions) |
+| "Override only — doesn't affect base" copy near reword controls | Users are anxious about accidentally destroying their master resume; clear labeling prevents hesitation and support requests | LOW | One line of helper text near the first override a user creates; can be dismissed/suppressed after first use |
+| Accepted-rewrite count badge on VariantEditor builder pane header | The existing builder pane header already shows analysis score badge and "AI suggest" link; adding "3 overrides" badge would communicate variant richness at a glance | LOW | Count of non-null variant-tier override rows for the variant; tap to scroll to first overridden item |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that seem attractive but add risk or scope without payoff for v2.5.
-
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| **Roundtrip guarantee on variant JSON export** | "If I can export, I should be able to import back and get the same variant." | Variant state is *exclusions + overrides relative to base*. Exporting the merged view is export-only by design — round-tripping would require a non-standard schema extension, violating the JSON Resume spec and the "export = portable standard format" promise. | Document explicitly: variant export = final rendered view; base export = full DB. Import path stays INSERT-only into base. |
-| **"Export all variants" bulk button** | Power-user ask. | N variants × one save dialog per file = UX friction, or one zip = new dependency and new error modes. No evidence user has asked for this. | Deferred. Revisit only if multiple users request it. |
-| **Live DB swap without restart** | "Why make me restart?" | better-sqlite3 opens the handle at module load ([db/index.ts](../../src/main/db/index.ts)). Swapping DB files under a live `Database` instance risks WAL-file divergence, stale prepared statements, and open-file locks on Windows. The fix (close/reopen/rewire all singletons) is a full architectural change — out of scope for a debt-cleanup milestone. | Restart prompt. It's the VS Code, Obsidian, and SQL Server convention. Users accept it. |
-| **Export variant as JSON Resume + custom extension field** | Preserve variant semantics ("which items are excluded") in the exported file. | Non-standard extensions break the portability promise and tempt us to build a sibling import path. Explicit base/variant separation (base = roundtrip-safe, variant = export-only) is cleaner. | Document the split. Encourage users who want "another variant" to import base, then build variants in-app. |
-| **In-app DB viewer/browser** | "Let me see my data." | Reimplementing SQLite browsing. Out of scope; users can open `app.db` in DB Browser for SQLite if they need it. | "Reveal in Explorer" is enough. |
-| **Auto-backup DB on schedule** | Safety. | New background subsystem with scheduling, retention, and failure modes. Much bigger than v2.5 debt cleanup. | Old-DB-as-`.bak` during move covers the one dangerous operation. Users can cloud-sync the userData folder themselves. |
-| **Cloud sync / OneDrive integration** | Portability across machines. | Sync engines are a full product. Out of scope. | Configurable DB path in Settings *enables* the user to point at a OneDrive/Dropbox folder manually — that's the portability we're shipping. |
-| **Merge mode for variant JSON import** | Symmetry with export. | Variant export is *not* re-importable by design (see first row). | Explicitly not supported. Spec should say so. |
+| Anti-Feature | Why Requested | Why Problematic | Alternative |
+|--------------|---------------|-----------------|-------------|
+| Variant-tier summary CREATE from scratch (empty base) | User wants per-variant summaries without maintaining a base summary | Breaks the "AI never fabricates" invariant and the "base = master" mental model; an empty base with a variant-only summary means the base export has no summary, which is unexpected | Gate summary override on non-empty base profile.summary (same gate the existing showSummary toggle already uses); user must set a base summary first |
+| Propagate variant override back to base | Seems like a useful shortcut ("promote this reword to base") | Destroys the layering — every other variant and analysis that was using base text silently gets the promoted text; makes the three-layer model unpredictable | Provide copy-to-clipboard of override text; user manually updates base in ExperienceTab if they decide it is canonical |
+| Batch "accept all" for variant overrides | Mirrors the existing "Accept all" in OptimizeVariant | Variant-tier overrides are intentional identity decisions (not AI suggestions to review quickly); bulk-accepting defeats the purpose of the per-field review; also, there is no "suggested" text at variant tier — user types it themselves, so "accept all" has no meaning | Offer "copy base text to edit" pre-population on first open |
+| AI-suggested rewords at variant tier | "Why doesn't the AI suggest how to reword this bullet for data-engineering roles?" | Analysis tier already does this per-JD; variant-tier is the user's own curation layer, not AI-assisted — mixing them collapses the tier distinction and re-introduces fabrication risk at a persistent tier | Keep AI suggestions strictly at analysis tier; variant tier is manual |
+| Free-form company name override per variant | Users may want "Google (contract)" → "Alphabet" | Company names are factual on a resume; rewording them is misrepresentation risk | Allow job role/title reword (fair game — titles vary); keep company as read-only in the override UI |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Base Export JSON]
-    └──requires──> [BuilderData → resume.json transformer]
-                       └──requires──> [All-entity SELECT (already exists in export.ts)]
+[Unified overrides table + migration]
+    └──required by──> [Variant-tier bullet reword affordance]
+    └──required by──> [Variant-tier summary reword affordance]
+    └──required by──> [Variant-tier job title reword affordance]
+    └──required by──> [Variant-tier project title/description reword affordance]
+    └──required by──> [Staleness detection for overrides]
+    └──required by──> [Excluded-bullet suggestion cards]
 
-[Variant Export JSON]
-    └──requires──> [applyOverrides() merge (already exists — shared/overrides.ts)]
-    └──requires──> [getBuilderDataForVariant() (already exists — export.ts:16)]
-    └──requires──> [BuilderData → resume.json transformer] (shared with base export)
+[Excluded-bullet suggestion cards]
+    └──requires──> [Analysis prompt receives excluded-bullet set]
+    └──requires──> [Unified overrides table] (to write analysis-tier re-inclusion)
+    └──enhances──> [OptimizeVariant left pane] (new card type alongside rewrite cards)
 
-[DB Path Picker]
-    └──requires──> [Settings persistence for dbPath (new electron-store or new JSON file alongside DB)]
-    └──requires──> [Startup path resolution (replace hardcoded userData/app.db with settings.dbPath ?? default)]
-    └──requires──> [Copy-verify-switch IPC handler]
+[Visual distinction: base vs overridden]
+    └──required by──> [Reset to base affordance] (need to know override is active to show reset)
 
-[DOCX showSummary fix]
-    └──requires──> [buildResumeDocx() accepts showSummary param (read existing docxBuilder.ts)]
-
-[Tech Debt]
-    └──(no user-facing dependencies)
+[Reset to base affordance]
+    └──enhances──> [Variant-tier reword (all fields)] (each rewordable field needs its own reset)
 ```
 
 ### Dependency Notes
 
-- **Base and Variant JSON export share a transformer.** Write it once: `toResumeJson(builderData, profile) → ResumeJson`. Variant path calls `getBuilderDataForVariant(db, variantId, analysisId)`, base path calls a new `getBaseBuilderData(db)` (no variantId, no exclusion filtering). Both feed the transformer.
-- **DB path setting needs to persist OUTSIDE the SQLite DB itself.** Obvious reason: you can't read "where my DB is" from the DB you're trying to locate. Options: (1) `electron-store` (JSON file in `app.getPath('userData')`) or (2) plain `settings.json` alongside. Either works; the settings file always lives in userData, only the DB is relocatable.
-- **The "restart after DB move" step has a soft dependency on startup path resolution.** If settings.json points to a missing path at startup (e.g. user moved the file externally), app must fall back gracefully — either to the default location or to an error screen with "locate DB" option. Edge case to flag.
-- **DOCX showSummary is strictly additive.** Single code path in `docxBuilder.ts`; threading the flag through is trivial.
+- **Unified overrides table required first:** All five reword affordances write to it. Build the table + migration in Phase 1; UI affordances in Phase 2.
+- **Analysis prompt change required for excluded-bullet suggestions:** The existing `buildResumeTextForLlm` in `analysisPrompts.ts` renders only the included bullets. To surface excluded-bullet suggestions, the LLM prompt must also receive excluded bullets (tagged distinctly). This is a prompt change, not just a UI change.
+- **`applyOverrides()` in `src/shared/overrides.ts` will need updating:** Currently it takes `analysisBulletOverrides`-shaped rows. After unification it reads from the new table — the function signature and call sites in `mergeHelper.ts` need updating together.
+- **`buildMergedBuilderData()` must apply variant-tier overrides before analysis-tier overrides:** Precedence is analysis → variant → base, so variant overrides are Layer 2.5 (after variant exclusions, before analysis overrides). The current Layer 2 only handles exclusion flags; a new override lookup pass is needed between Layer 2 and Layer 3.
+
+---
+
+## UX Recommendations (Answering the Four Specific Questions)
+
+### (a) Inline-edit vs dedicated panel for variant-tier rewording
+
+**Recommendation: Inline-edit within VariantBuilder, triggered by a "Reword" icon/link.**
+
+Rationale grounded in the existing component structure:
+
+- `InlineEdit.tsx` already handles click-to-edit → textarea → blur-to-save with Escape-to-cancel. It supports `multiline=true`. It is already used for variant name editing in `VariantEditor.tsx`.
+- The VariantBuilder left pane is a scrollable checklist — the pattern is already "row per bullet, interact in place." A dedicated side panel would require a new split (making it 3-column) or replacing the live preview pane, both of which break the existing layout.
+- Analysis-tier bullet rewrites already use an in-card textarea (the `isEditing` state in `OptimizeVariant`). Variant-tier rewording should follow the same inline pattern for consistency.
+- Dedicated panels make sense when the override form is complex (multiple fields, structured inputs). Variant overrides are single-field freetext edits — inline is the right level of ceremony.
+
+**Affordance design:**
+- Each bullet row in VariantBuilder gets a small pencil icon or "Reword" micro-link that appears on hover (only visible when job is not excluded).
+- Clicking it expands an `InlineEdit` textarea below the bullet text (not replacing it), pre-populated with the current effective text (override text if one exists, base text otherwise).
+- Save on blur or Enter (multiline: Shift+Enter = newline, Enter = save). Escape cancels.
+- The same pattern applies to summary, job title (role field), project title, and project description.
+
+### (b) Visual distinction: base text vs variant-overridden text vs reset-to-base
+
+Three states need distinct visual treatment, using tokens from the existing design system:
+
+| State | Treatment | Rationale |
+|-------|-----------|-----------|
+| **Base (no override)** | Normal text — `var(--color-text-secondary)` as today | No change to existing look |
+| **Variant-overridden** | Override text displayed with a small `var(--color-accent)` dot or left-border accent (`borderLeft: '2px solid var(--color-accent)'`) + italic style | Mirrors the accent left-border the suggestion card uses for its suggested text block in OptimizeVariant (line 841-846) — immediately recognizable |
+| **Reset-to-base** | A small "Reset" text link (`var(--color-text-muted)`, underline) appears inline after the overridden text when override is active | Mirrors existing "Reset to template defaults" in the Layout section footer (line 529-536 of VariantBuilder) — consistent pattern within the same screen |
+
+Do NOT use strikethrough for "base text replaced by override" — strikethrough already means "excluded" (line 56-59 of VariantBuilder). Reuse would create confusion.
+
+Do NOT use a green accepted-state style for overrides — that color belongs to analysis-tier accepted suggestions (OptimizeVariant). Variant-tier overrides are permanent edits, not pending suggestions.
+
+### (c) Excluded-bullet "add back" suggestion card: copy and behavior
+
+**Card placement:** In the OptimizeVariant left pane, after the existing "Bullet Rewrites" section and before (or within) the "Missing skills for this job" section. A new section header "Bullets you excluded that match this job" separates them from rewrites.
+
+**Why not mixed with rewrites:** Rewrites operate on *included* bullets; add-back cards operate on *excluded* bullets. They are different actions. Mixing them would be confusing when a bullet both has a rewrite suggestion and is also marked excluded.
+
+**Card structure (mirroring existing skill suggestion card shape):**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  [Company — Role] · Excluded from variant   [Moderate]  │
+│                                                         │
+│  "Architected event-driven pipeline reducing latency    │
+│   by 40% using Kafka and Flink..."                      │
+│                                                         │
+│  Relevant because: JD requires stream processing        │
+│  experience (Kafka listed as required).                 │
+│                                                         │
+│  [Include for this job]    [Skip]                       │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Copy rules:**
+- Header label: `"Excluded from variant"` — factual, not alarming; distinguishes from orphaned-bullet danger badge.
+- Body: Show the full base bullet text (not overridden — the variant excluded it so there is no override).
+- Reason line: AI-generated rationale tied to the specific JD gap (same `reason` field structure as `StagedSkill.reason` in OptimizeVariant).
+- Action — primary: `"Include for this job"` (not "Accept" or "Add" — matches the actual outcome: temporary re-inclusion at analysis tier only).
+- Action — secondary: `"Skip"` (mirrors existing skill card "Skip" label).
+
+**Behavior on accept:**
+- Writes an analysis-tier inclusion flag (or clears the analysis-tier exclusion) — does NOT modify the variant's exclusion setting.
+- The bullet appears in the merged output for this analysis only — same scoping as existing bullet rewrites.
+- `previewRefreshKey` increments so the live preview pane reflects the re-inclusion immediately (same pattern as `accept()` in OptimizeVariant line 352).
+- The card transitions to an "Included for this job" accepted state with green border (same visual as accepted rewrite cards).
+
+**Behavior on skip:** Card fades to 50% opacity, skip state persisted, no preview change. Same as `dismissSkill()`.
+
+**Prompt change required:** The analysis prompt (`buildResumeTextForLlm` + `buildScorerPrompt`) must receive excluded bullets in a clearly marked section so the LLM can evaluate relevance. Suggested format: a `## Excluded Bullets (not on this variant)` section in the resume text sent for scoring, with a scorer instruction to flag any that are relevant to gap skills.
+
+### (d) Edge Cases
+
+**Empty base field (summary gate):**
+- The existing gate in VariantBuilder: summary section only renders if `profileSummary` is non-empty (line 253 in VariantBuilder). The override UI must respect the same gate.
+- If the base summary is empty, the "Reword" affordance must not appear — you cannot override a field that does not exist.
+- If a user deletes their base summary after establishing a variant override, the override becomes orphaned. At render time: `buildMergedBuilderData` should treat a null/empty base summary as "no summary" regardless of override — the override has nothing to override. Log a warning, do not crash.
+
+**Reset/revert affordances:**
+- Variant-tier overrides have no "pending → accepted" state machine — they are immediately applied on save. Reset is the only revert path.
+- Reset deletes the override row (or sets it null). The field snaps back to base text instantly. The live preview refreshes.
+- Reset for summary reword: clears override text; the profile.summary remains unchanged.
+- Reset must NOT be confused with "exclude item" — they are separate controls. Reset is adjacent to the override text; the checkbox toggle remains at the left edge of the row.
+
+**Staleness when base text changes after a variant override is established:**
+- Scenario: User rewrites bullet A in VariantBuilder at variant tier ("Led cloud migration" → "Led Azure migration"). Two weeks later, user edits bullet A in ExperienceTab to fix a typo in the base text. The variant override is now semantically stale (it no longer reflects the corrected base).
+- Detection: Compare `jobBullets.updatedAt` (already tracked, see schema line 23) against `overrides.updatedAt` (new table must track this). If `updatedAt(base) > createdAt(override)`, show a staleness indicator.
+- Indicator: A small amber "Base updated" pill next to the overridden bullet in VariantBuilder — same amber color token (`var(--color-warning)`) used for stale-analysis warning banners.
+- Action: User can dismiss the staleness warning (mark as acknowledged) or click "Review" to see the base text and decide whether to update their override. Do NOT auto-update the override (that would silently discard intentional rewording).
+- Analysis-tier staleness (existing behavior): The existing on-demand staleness detection (v2.2) already flags stale analyses. Override staleness is a separate concern — variant-tier overrides are persistent whereas analysis overrides are job-specific.
+
+**Excluded-bullet re-inclusion + variant override interaction:**
+- Edge case: A bullet has both a variant-tier text override AND is excluded at variant tier. This should not be possible by construction — you cannot override text for an excluded item (the "Reword" control is disabled when the bullet checkbox is unchecked). But if the user re-includes via the excluded-bullet suggestion card at analysis tier, the analysis re-inclusion should use the BASE text (not the variant override that was set before exclusion) since the exclusion postdates the override. This needs explicit handling in the merge precedence logic.
+
+**Project description field not in current schema:**
+- `projects` table (schema line 50-54) has only `name`, `sortOrder`. There is no `description` or `url` field. If project description override is in scope, the schema must first add a `description` field to the `projects` table, or treat the first project bullet as the description. The first-bullet-as-description convention avoids schema migration but is semantically fragile. Recommendation: Add `description TEXT NOT NULL DEFAULT ''` to `projects` table as part of v2.6 schema work, then support variant-level override on that field.
 
 ---
 
 ## MVP Definition
 
-v2.5 **is** the MVP for this portability surface — there's no "v2.5.1" planned. The list below is what ships in the milestone.
+### Launch With (v2.6 core)
 
-### Launch With (v2.5)
+These are all required — they form the coherent "git-branch" mental model:
 
-- [ ] **Base resume.json export** — button in Experience tab header next to `Import JSON` / `Import PDF`. Filename = `${profileName}_Resume.json`. Toast on success.
-- [ ] **Variant resume.json export** — button next to `PDF` / `DOCX` in VariantEditor preview toolbar. Filename = `${profileName}_Resume_${variantName}.json`. Three-layer merge. Toast on success.
-- [ ] **Configurable DB location** — Settings card with: (a) current path label + "Reveal in Explorer", (b) `Change location...` button → folder picker → confirmation modal → copy-verify-switch → old file renamed to `.bak` → restart prompt.
-- [ ] **DOCX honors showSummary** — threaded through `buildResumeDocx()`; no UI change.
-- [ ] **Tech debt** — TEMPLATE_LIST export removed, `compact` prop removed from `ResumeTemplateProps`, `tests/setup.ts` deleted, `jobs.test.ts` race fixed.
+- [ ] Unified overrides table with polymorphic shape (entity_type, entity_id, field, override_text, variant_id, analysis_id) — required foundation
+- [ ] Migration: INSERT existing `analysisBulletOverrides` rows into new table with analysis_id scoping preserved
+- [ ] Update `applyOverrides()` and `buildMergedBuilderData()` to read from unified table with precedence analysis → variant → base
+- [ ] Inline reword affordance for bullet text at variant tier (InlineEdit pattern, pencil icon on hover)
+- [ ] Inline reword affordance for summary at variant tier (gated on non-empty base summary + showSummary)
+- [ ] Visual distinction: accent dot/left-border for overridden fields in VariantBuilder
+- [ ] Reset-to-base for all overridable fields
+- [ ] Excluded-bullet suggestion cards in OptimizeVariant (requires prompt change to send excluded bullets)
 
-### Explicitly NOT in v2.5
+### Add After Validation (v2.6.x)
 
-- "Export all variants" bulk/zip
-- In-app DB browser
-- Scheduled auto-backups
-- Cloud sync integration
-- Variant JSON roundtrip / import
+- [ ] Inline reword for job title (role field) at variant tier — high value but lower urgency since summary + bullets cover most tailoring cases
+- [ ] Inline reword for project title + description at variant tier — requires projects.description schema addition
+- [ ] Staleness indicator when base text updated after variant override — nice-to-have safety signal; don't block launch on it
+- [ ] Override count badge in VariantEditor builder pane header — cosmetic quality-of-life
+
+### Future Consideration (v2.7+)
+
+- [ ] Bulk override management UI (see all overrides across a variant, clear all) — only relevant once users have many overrides
+- [ ] Override history / audit trail — only relevant if users report confusion about what changed
 
 ---
 
@@ -121,182 +219,45 @@ v2.5 **is** the MVP for this portability surface — there's no "v2.5.1" planned
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Base resume.json export | HIGH — headline feature | LOW | P1 |
-| Variant resume.json export | HIGH — headline feature | MEDIUM — needs transformer + merge reuse | P1 |
-| DB location picker + migration | HIGH — blocks multi-machine use | MEDIUM — copy/verify/switch + restart flow | P1 |
-| DOCX showSummary fix | MEDIUM — correctness bug | LOW | P1 |
-| Tech debt cleanup | LOW (user) / HIGH (dev) | LOW | P1 |
-| "Reveal in Explorer" next to DB path | LOW–MEDIUM polish | LOW | P2 |
-| Schema/version badge on export | LOW polish | LOW | P2 |
-| Migration step log (Copying... Verifying...) | LOW polish | MEDIUM | P3 — skip |
+| Unified overrides table + migration | HIGH (enables everything else) | MEDIUM (schema + migration + applyOverrides refactor) | P1 |
+| Bullet text reword at variant tier | HIGH (core v2.6 requirement) | MEDIUM (InlineEdit reuse + new IPC handler) | P1 |
+| Summary reword at variant tier | HIGH (existing gate already exists) | LOW (one InlineEdit addition to VariantBuilder) | P1 |
+| Visual distinction (overridden vs base) | HIGH (trust signal) | LOW (CSS addition to bullet row) | P1 |
+| Reset-to-base affordance | HIGH (required for any override feature) | LOW (delete override row + preview refresh) | P1 |
+| Excluded-bullet suggestion cards | HIGH (unique differentiator) | MEDIUM-HIGH (prompt change + new card type + IPC) | P1 |
+| Job title (role) reword at variant tier | MEDIUM (nice for role-family variants) | LOW (same pattern as bullet reword) | P2 |
+| Project title + description reword | MEDIUM (relevant for portfolio roles) | MEDIUM (schema change to projects table) | P2 |
+| Staleness detection | MEDIUM (prevents silent divergence) | MEDIUM (updatedAt comparison + UI indicator) | P2 |
+| Override count badge | LOW (cosmetic) | LOW | P3 |
 
-Everything in the Active list of PROJECT.md is P1 — there's no "should we do this?" question, only "how do we present it?"
-
----
-
-## Detailed UX Behaviors (for Requirements author)
-
-### Base Export JSON
-
-- **Trigger:** `Export JSON` button in Experience tab header, right of `Import PDF`.
-- **Dialog:** `dialog.showSaveDialog({ title: 'Export Resume as JSON', defaultPath: '${profileName}_Resume.json', filters: [{ name: 'JSON Files', extensions: ['json'] }] })`.
-- **Behavior:**
-  - Read all DB tables (profile, jobs+bullets, skills+categories, projects+bullets, education, volunteer, awards, publications, languages, interests, references).
-  - Transform to JSON Resume schema 1.0.0 shape (see [jsonresume.org/schema](https://jsonresume.org/schema)).
-  - Write via `fs.writeFile(filePath, JSON.stringify(data, null, 2))`.
-- **Success state:** `showToast('Resume exported as JSON')`.
-- **Cancel state:** no toast, no state change (mirrors PDF/DOCX pattern).
-- **Error state:** `showToast('Export failed: ${err.message}')`.
-- **Loading state:** button shows `Exporting...` during operation; disabled; other export buttons in same toolbar untouched.
-
-### Variant Export JSON
-
-- **Trigger:** `JSON` button in VariantEditor preview toolbar, right of `DOCX`. Treated as peer of PDF/DOCX.
-- **Dialog:** `defaultPath: '${profileName}_Resume_${variantName}.json'`.
-- **Behavior:**
-  - Call `getBuilderDataForVariant(db, variantId, analysisId)` — already produces merged three-layer view.
-  - Transform to resume.json; write as above.
-  - Variant name included in filename only (not embedded in JSON content — export matches spec).
-- **Feedback:** Same toast/cancel/error pattern as base.
-- **Edge case:** If `variantName` is empty, fall back to `Untitled`.
-
-### DB Location Settings Card
-
-Place in `SettingsTab.tsx` as **second card**, below AI Configuration. Heading: `Database Location`.
-
-**Field layout:**
-
-```
-┌─ Database Location ────────────────────────────────────┐
-│                                                        │
-│  CURRENT LOCATION                                      │
-│  C:\Users\Mark\AppData\Roaming\resume-helper\app.db    │
-│  [Reveal in Explorer]                                  │
-│                                                        │
-│  [Change location...]                                  │
-│                                                        │
-│  Your resume data lives in a single SQLite file.       │
-│  Move it to a synced folder (OneDrive, Dropbox) to     │
-│  access from multiple machines.                        │
-└────────────────────────────────────────────────────────┘
-```
-
-**`Change location...` flow:**
-
-1. Click → folder picker opens (`properties: ['openDirectory']`).
-2. User selects folder → confirmation modal appears:
-
-   ```
-   ┌─ Move database ──────────────────────────────────┐
-   │                                                  │
-   │  From: C:\Users\Mark\AppData\...\app.db          │
-   │  To:   D:\OneDrive\ResumeHelper\app.db           │
-   │                                                  │
-   │  What will happen:                               │
-   │  1. Copy database file to new location           │
-   │  2. Verify the copy opens and reads correctly    │
-   │  3. Switch to the new location                   │
-   │  4. Rename old file to app.db.bak (kept as       │
-   │     backup — delete manually when ready)         │
-   │  5. Restart ResumeHelper                         │
-   │                                                  │
-   │  If anything fails, nothing changes.             │
-   │                                                  │
-   │  [Cancel]                        [Move database] │
-   └──────────────────────────────────────────────────┘
-   ```
-
-3. Confirm → button becomes `Moving...`, disabled.
-4. IPC handler:
-   - `fs.copyFile(oldPath, newPath)` — if fails, show error toast, no changes.
-   - Open copied DB read-only, `SELECT COUNT(*) FROM profile` (expect 1), close — if fails, delete `newPath`, show error toast, no changes.
-   - Update settings file: `{ dbPath: newPath }`.
-   - Rename `oldPath` → `oldPath + '.bak'`.
-   - Return success.
-5. Restart modal appears:
-
-   ```
-   ┌─ Restart required ───────────────────────────────┐
-   │                                                  │
-   │  Database moved successfully. Restart            │
-   │  ResumeHelper to use the new location.           │
-   │                                                  │
-   │  [Restart later]                  [Restart now]  │
-   └──────────────────────────────────────────────────┘
-   ```
-
-6. `Restart now` → `app.relaunch(); app.exit(0)`.
-7. `Restart later` → modal closes; Settings card shows new path but a banner: `Restart required for changes to take effect`.
-
-**Edge cases requirements should cover:**
-
-- Destination path already contains `app.db` → warn, require explicit "Replace" button in confirm modal.
-- Destination path = source path → picker should prevent OR confirm modal should skip (no-op).
-- Destination folder not writable → catch at copy step, show error.
-- Settings file points to missing path on next startup → fall back to default location, show one-time notice on first render ("Previous database location not found. Using default.").
-- User manually moves `app.db` externally → same fallback behavior.
-- WAL files (`app.db-wal`, `app.db-shm`) must be copied alongside the main file OR we force a checkpoint before copying (per [SQLite backup best practice](https://sqlite.org/backup.html) — writer must be quiesced for file-level copy to be consistent). Easiest: `sqlite.pragma('wal_checkpoint(TRUNCATE)')` before copy, then copy only `app.db`. Flag this in requirements so the author surfaces it.
-
-### DOCX showSummary
-
-- **Trigger:** User toggles Summary checkbox in VariantBuilder ([line 256-260](../../src/renderer/src/components/VariantBuilder.tsx)).
-- **Current behavior (bug):** PDF respects toggle (print.html reads `showSummary`), DOCX always includes summary regardless.
-- **Expected behavior:** DOCX omits the Summary paragraph when `showSummary === false`.
-- **Implementation:** `buildResumeDocx(builderData, profile, layoutTemplate, templateOptions)` already reads `templateOptions.showSummary`; check whether it's being *used* in the DOCX builder. If not wired, wire it. If partially wired, complete it. (Requires reading docxBuilder.ts — not in this research scope.)
-- **No UI change.**
-
-### Tech Debt
-
-All four items are internal. No user-visible behavior. Requirements should just list:
-
-- Remove orphan `TEMPLATE_LIST` export from `resolveTemplate.ts`.
-- Remove vestigial `compact` prop from `ResumeTemplateProps`.
-- Delete dead `tests/setup.ts` (or wire into vitest config if it's meant to run).
-- Fix race in `jobs.test.ts` — likely shared in-memory SQLite across threads; use per-test isolation or pool=forks.
+**Priority key:** P1 = required for v2.6 launch, P2 = add after core validated, P3 = nice to have
 
 ---
 
-## Competitor Feature Analysis
+## Component Integration Map
 
-| Feature | JSON Resume registry | Reactive Resume | FlowCV | Our Approach |
-|---------|----------------------|-----------------|--------|--------------|
-| JSON export of full resume | Raw JSON/YAML/TEXT via registry URL | `Export → JSON` button in right sidebar (top-level menu) | Not available (PDF-only, per search results) | **Button in Experience tab header + button in variant toolbar. Two distinct scopes.** |
-| Schema compliance | JSON Resume 1.0.0 (they *are* the spec) | JSON Resume 1.0.0 with known roundtrip bugs ([Issue #2364](https://github.com/AmruthPillai/Reactive-Resume/issues/2364)) | N/A | JSON Resume 1.0.0. Base export is roundtrip-safe (uses existing INSERT-only append import). Variant export is explicitly export-only. |
-| Variant/tailored export | N/A (single resume) | N/A (single active resume) | N/A | **Differentiator: per-variant merged export — no other tool has this because no other tool has the three-layer model.** |
-| Configurable storage location | N/A (web-hosted gist) | N/A (web app or self-hosted container) | N/A (web) | Electron-native. **Differentiator vs. web tools: works offline, user owns the file, swappable folder.** |
-| Data folder restart prompt | N/A | N/A | N/A | Standard Electron/VS Code/Obsidian convention. Low-risk, high-familiarity. |
-
-**Takeaway:** The JSON export feature itself is commoditized (every serious builder has it). What matters is the *variant-merged* export, which is uniquely enabled by our three-layer data model. The DB-location feature has no web-app equivalent and is straightforward desktop-app table stakes.
+| Feature | Primary Component | Secondary Components | New IPC Handler Needed |
+|---------|------------------|---------------------|------------------------|
+| Bullet reword affordance | `VariantBuilder.tsx` | `InlineEdit.tsx` (reuse), `VariantPreview` (refresh) | `templates.setVariantOverride(variantId, entityType, entityId, field, text)` |
+| Summary reword affordance | `VariantBuilder.tsx` | `InlineEdit.tsx` (reuse) | Same handler |
+| Job title reword | `VariantBuilder.tsx` | `InlineEdit.tsx` (reuse) | Same handler |
+| Project title/description reword | `VariantBuilder.tsx` | `InlineEdit.tsx` (reuse) | Same handler |
+| Visual distinction | `VariantBuilder.tsx` | None | None (pure styling) |
+| Reset-to-base | `VariantBuilder.tsx` | `VariantPreview` (refresh) | `templates.clearVariantOverride(variantId, entityType, entityId, field)` |
+| Excluded-bullet suggestion cards | `OptimizeVariant.tsx` | `VariantPreview` (refresh via `previewRefreshKey`) | `ai.getExcludedBulletSuggestions(analysisId)` + `ai.acceptExcludedBullet(analysisId, bulletId)` |
+| Unified table merge | `src/main/lib/mergeHelper.ts` | `src/shared/overrides.ts` | None (pure function change) |
+| Migration | `src/main/db/bootstrap.ts` | `src/main/db/schema.ts` | None (schema + migration script) |
 
 ---
 
 ## Sources
 
-- [Reactive Resume — Exporting your resume](https://docs.rxresu.me/guides/exporting-your-resume) — confirms right-sidebar JSON button pattern.
-- [Reactive Resume — JSON Resume Schema](https://docs.rxresu.me/guides/json-resume-schema) — schema compliance.
-- [Reactive Resume Issue #2364 — export/import roundtrip failures](https://github.com/AmruthPillai/Reactive-Resume/issues/2364) — cautionary tale on schema mismatch; reinforces our "base export = roundtrip, variant export = export-only" split.
-- [JSON Resume — Schema 1.0.0](https://jsonresume.org/schema) — authoritative schema spec.
-- [JSON Resume Docs](https://docs.jsonresume.org/schema) — canonical field list.
-- [Obsidian Forum — How do I move the vault to another location?](https://forum.obsidian.md/t/how-do-i-move-the-vault-to-another-location/637) — confirms "vault switcher + move dialog" is accepted pattern for desktop data-folder moves.
-- [Obsidian — Manage vaults](https://help.obsidian.md/Files+and+folders/Manage+vaults) — vault location UX.
-- [VS Code — Settings Sync](https://code.visualstudio.com/docs/configure/settings-sync) — symbolic link / portable mode as the usual answer for "change settings location"; reinforces that explicit "pick a folder" is the simpler UX for our case.
-- [Electron Issue #24536 — userData folder still created after setPath](https://github.com/electron/electron/issues/24536) — flags that `app.setPath()` must run before `app.whenReady()` and still leaves default folder artifacts. Informs the "restart to apply" decision.
-- [How to store user data in Electron (Cameron Nokes)](https://cameronnokes.com/blog/how-to-store-user-data-in-electron/) — confirms userData default locations per OS.
-- [electron-store](https://github.com/sindresorhus/electron-store) — standard pattern for the meta-settings file (where we record `dbPath`).
-- [SQLite Backup API](https://sqlite.org/backup.html) — authoritative: "close writing connections or use backup API + ensure checkpoint before filesystem copy." Informs the WAL-checkpoint step before `fs.copyFile`.
-- [SQLite Forum — Backup via file system backup software](https://sqlite.org/forum/info/796a192a95ac35b9) — reinforces WAL quiescence requirement.
-- [better-sqlite3 npm](https://www.npmjs.com/package/better-sqlite3) — WAL mode and connection lifecycle.
-- [Move system databases — SQL Server docs](https://learn.microsoft.com/en-us/sql/relational-databases/databases/move-system-databases) — copy → verify → switch → delete-original pattern is standard.
-- Existing codebase:
-  - [ExperienceTab.tsx](../../src/renderer/src/components/ExperienceTab.tsx) (Import button placement — line 187)
-  - [VariantEditor.tsx](../../src/renderer/src/components/VariantEditor.tsx) (PDF/DOCX toolbar — lines 562-603)
-  - [SettingsTab.tsx](../../src/renderer/src/components/SettingsTab.tsx) (Settings card pattern)
-  - [ImportConfirmModal.tsx](../../src/renderer/src/components/ImportConfirmModal.tsx) (modal shape to mirror for DB-move confirm)
-  - [export.ts](../../src/main/handlers/export.ts) (getBuilderDataForVariant — line 16; uses applyOverrides at line 10/192)
-  - [import.ts](../../src/main/handlers/import.ts) (resume.json parse/append structure to mirror for export)
-  - [db/index.ts](../../src/main/db/index.ts) (hardcoded `userData/app.db` — line 8; the string to replace)
+- Codebase inspection: `VariantBuilder.tsx`, `OptimizeVariant.tsx`, `VariantEditor.tsx`, `InlineEdit.tsx`, `mergeHelper.ts`, `overrides.ts`, `schema.ts`
+- Project context: `.planning/PROJECT.md` (v2.6 milestone definition, Key Decisions table)
+- Memory: `project_v26_overrides.md` (polymorphic overrides table design, git-branch mental model)
+- UX patterns: standard inline-edit conventions from structured-content editors (Notion block editing, VS Code settings reset, GitHub PR review comment editing) — MEDIUM confidence (common patterns, not citation-verified)
 
 ---
 
-*Feature research for: v2.5 Portability & Debt Cleanup — ResumeHelper*
-*Researched: 2026-04-23*
+*Feature research for: ResumeHelper v2.6 Per-Variant Text Overrides + Excluded-Bullet Suggestions*
+*Researched: 2026-06-05*
