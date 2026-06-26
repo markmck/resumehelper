@@ -29,6 +29,7 @@ const api = {
     update: (id: number, data: { name?: string; tags?: string[]; categoryId?: number | null }) =>
       ipcRenderer.invoke('skills:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('skills:delete', id),
+    reorder: (orderedIds: number[]) => ipcRenderer.invoke('skills:reorder', orderedIds),
     categories: {
       list: () => ipcRenderer.invoke('skills:categories:list'),
       create: (data: { name: string }) => ipcRenderer.invoke('skills:categories:create', data),

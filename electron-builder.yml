@@ -50,4 +50,7 @@ linux:
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
-npmRebuild: false
+# Rebuild native modules (better-sqlite3) against Electron's ABI at package time.
+# Must stay true: with false, the Node-ABI binary ships and fails to dlopen in the
+# packaged app (NODE_MODULE_VERSION mismatch -> ERR_DLOPEN_FAILED -> dead DB layer).
+npmRebuild: true

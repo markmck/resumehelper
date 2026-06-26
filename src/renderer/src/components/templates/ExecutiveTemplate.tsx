@@ -448,18 +448,8 @@ export default function ExecutiveTemplate({
       {includedInterests.length > 0 && (
         <section>
           <h2 style={sectionHeadingStyle}>Interests</h2>
-          <div>
-            {includedInterests.map((interest) => (
-              <div
-                key={interest.id}
-                style={{ fontSize: '10.5px', color: '#1a1a1a', marginBottom: '4px' }}
-              >
-                <span style={{ fontWeight: 'bold' }}>{interest.name}</span>
-                {interest.keywords.length > 0 && (
-                  <span>: {interest.keywords.join(', ')}</span>
-                )}
-              </div>
-            ))}
+          <div style={{ fontSize: '10.5px', color: '#1a1a1a' }}>
+            {includedInterests.map((interest) => interest.name).join(', ')}
           </div>
         </section>
       )}

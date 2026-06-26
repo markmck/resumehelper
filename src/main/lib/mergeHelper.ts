@@ -113,6 +113,7 @@ export async function buildMergedBuilderData(
     })
     .from(skills)
     .leftJoin(skillCategories, eq(skills.categoryId, skillCategories.id))
+    .orderBy(asc(skills.sortOrder))
 
   const allProjects = await db.select().from(projects).orderBy(asc(projects.sortOrder))
 

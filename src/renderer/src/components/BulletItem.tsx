@@ -96,8 +96,10 @@ function BulletItem({ id, text, onUpdate, onDelete, onEnterKey, autoFocus, onFoc
           }}
           onEnter={onEnterKey}
           placeholder="Add bullet text..."
-          multiline={false}
-          style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', width: '100%' }}
+          multiline
+          submitOnEnter
+          rows={2}
+          style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', width: '100%', resize: 'vertical' }}
           autoFocus={autoFocus}
           onFocused={onFocused}
           alwaysFireSave

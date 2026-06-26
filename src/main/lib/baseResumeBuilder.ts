@@ -279,7 +279,7 @@ export function buildBaseResumeJson(db: Db): ResumeJson {
   const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
   const jobRows = db.select().from(jobs).orderBy(asc(jobs.sortOrder)).all()
   const jobBulletRows = db.select().from(jobBullets).orderBy(asc(jobBullets.sortOrder)).all()
-  const skillRows = db.select().from(skills).all()
+  const skillRows = db.select().from(skills).orderBy(asc(skills.sortOrder)).all()
   const skillCategoryRows = db.select().from(skillCategories).orderBy(asc(skillCategories.sortOrder)).all()
   const projectRows = db.select().from(projects).orderBy(asc(projects.sortOrder)).all()
   const projectBulletRows = db.select().from(projectBullets).orderBy(asc(projectBullets.sortOrder)).all()

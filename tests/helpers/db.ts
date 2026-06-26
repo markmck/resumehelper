@@ -41,7 +41,8 @@ export function createTestDb() {
     CREATE TABLE IF NOT EXISTS \`skills\` (
       \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
       \`name\` text NOT NULL,
-      \`tags\` text DEFAULT '[]' NOT NULL
+      \`tags\` text DEFAULT '[]' NOT NULL,
+      \`sort_order\` integer NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS \`template_variants\` (

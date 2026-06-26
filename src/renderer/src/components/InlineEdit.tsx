@@ -11,6 +11,10 @@ interface InlineEditProps {
   autoFocus?: boolean
   onFocused?: () => void
   alwaysFireSave?: boolean
+  /** When true, a plain Enter saves + fires onEnter even in multiline mode (Shift+Enter inserts a newline). */
+  submitOnEnter?: boolean
+  /** Row count for the multiline textarea. */
+  rows?: number
 }
 
 function InlineEdit({
@@ -23,6 +27,8 @@ function InlineEdit({
   autoFocus = false,
   onFocused,
   alwaysFireSave = false,
+  submitOnEnter = false,
+  rows = 3,
 }: InlineEditProps): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -60,7 +66,7 @@ function InlineEdit({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
-    if (e.key === 'Enter' && !multiline) {
+    if (e.key === 'Enter' && (!multiline || submitOnEnter) && !e.shiftKey) {
       e.preventDefault()
       handleSave()
       onEnter?.()
@@ -101,7 +107,7 @@ function InlineEdit({
       <textarea
         {...sharedProps}
         ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-        rows={3}
+        rows={rows}
       />
     ) : (
       <input {...sharedProps} ref={inputRef as React.RefObject<HTMLInputElement>} type="text" />

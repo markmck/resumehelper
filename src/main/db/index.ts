@@ -360,10 +360,20 @@ function ensureSchema(sqlite: Database.Database): void {
     'ALTER TABLE `template_variants` ADD COLUMN `updated_at` integer',
     'ALTER TABLE `skills` ADD COLUMN `category_id` integer REFERENCES `skill_categories`(`id`) ON DELETE set null',
     'ALTER TABLE `template_variants` ADD COLUMN `score_threshold` integer NOT NULL DEFAULT 80',
+    'ALTER TABLE `skills` ADD COLUMN `sort_order` integer NOT NULL DEFAULT 0',
   ]
   for (const sql of alterStatements) {
     try { sqlite.exec(sql) } catch { /* column already exists */ }
   }
+
+  // Seed skills.sort_order by id when ordering has never been customized (all rows share one value).
+  // Idempotent: once a user reorders (distinct values exist) this no-ops and won't clobber their order.
+  try {
+    const s = sqlite.prepare('SELECT COUNT(*) as cnt, COUNT(DISTINCT sort_order) as distinctOrders FROM skills').get() as { cnt: number; distinctOrders: number }
+    if (s.cnt > 1 && s.distinctOrders <= 1) {
+      sqlite.exec('UPDATE skills SET sort_order = (SELECT COUNT(*) FROM skills s2 WHERE s2.id < skills.id)')
+    }
+  } catch { /* skills table not ready yet */ }
 
   // Migrate skill tags to skill_categories (idempotent — only processes skills with NULL category_id)
   try {

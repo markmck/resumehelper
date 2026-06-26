@@ -447,18 +447,8 @@ export default function JakeTemplate({
       {includedInterests.length > 0 && (
         <section>
           <h2 style={sectionHeadingStyle}>Interests</h2>
-          <div>
-            {includedInterests.map((interest) => (
-              <div
-                key={interest.id}
-                style={{ fontSize: '10px', color: '#1a1a1a', marginBottom: '2px' }}
-              >
-                <span style={{ fontWeight: 'bold' }}>{interest.name}</span>
-                {interest.keywords.length > 0 && (
-                  <span>: {interest.keywords.join(', ')}</span>
-                )}
-              </div>
-            ))}
+          <div style={{ fontSize: '10px', color: '#1a1a1a' }}>
+            {includedInterests.map((interest) => interest.name).join(', ')}
           </div>
         </section>
       )}

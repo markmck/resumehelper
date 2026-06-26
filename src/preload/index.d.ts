@@ -30,6 +30,7 @@ export interface Skill {
   tags: string[]
   categoryId: number | null
   categoryName: string | null
+  sortOrder: number
 }
 
 export interface SkillCategory {
@@ -354,6 +355,7 @@ export interface Api {
     create: (data: { name: string; tags: string[]; categoryId?: number | null }) => Promise<Skill>
     update: (id: number, data: { name?: string; tags?: string[]; categoryId?: number | null }) => Promise<Skill>
     delete: (id: number) => Promise<void>
+    reorder: (orderedIds: number[]) => Promise<void>
     categories: {
       list: () => Promise<SkillCategory[]>
       create: (data: { name: string }) => Promise<SkillCategory>

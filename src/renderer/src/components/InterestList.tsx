@@ -38,14 +38,6 @@ function InterestList(): React.JSX.Element {
     setItems((prev) => prev.filter((item) => item.id !== id))
   }
 
-  const handleKeywordsUpdate = async (id: number, keywordsText: string): Promise<void> => {
-    const keywords = keywordsText
-      .split(',')
-      .map((k) => k.trim())
-      .filter((k) => k.length > 0)
-    await handleUpdate(id, { keywords })
-  }
-
   if (loading) {
     return <div className="text-zinc-500 text-sm">Loading interests...</div>
   }
@@ -124,26 +116,6 @@ function InterestList(): React.JSX.Element {
                   onSave={(val) => handleUpdate(item.id, { name: val })}
                   className="text-zinc-100 font-medium text-sm"
                 />
-                {item.keywords.length > 0 && (
-                  <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {item.keywords.map((kw, i) => (
-                      <span
-                        key={i}
-                        className="bg-zinc-700 text-zinc-300 text-xs rounded px-2 py-0.5"
-                      >
-                        {kw}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div style={{ marginTop: '4px' }}>
-                  <InlineEdit
-                    value={item.keywords.join(', ')}
-                    placeholder="Keywords (comma-separated)"
-                    onSave={(val) => handleKeywordsUpdate(item.id, val)}
-                    className="text-zinc-500 text-xs"
-                  />
-                </div>
               </div>
               <button
                 onClick={() => handleDelete(item.id)}

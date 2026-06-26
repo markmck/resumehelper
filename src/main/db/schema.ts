@@ -33,6 +33,7 @@ export const skills = sqliteTable('skills', {
   name: text('name').notNull(),
   tags: text('tags').notNull().default('[]'),
   categoryId: integer('category_id').references(() => skillCategories.id, { onDelete: 'set null' }),
+  sortOrder: integer('sort_order').notNull().default(0),
 })
 
 export const templateVariants = sqliteTable('template_variants', {

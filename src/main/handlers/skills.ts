@@ -1,22 +1,26 @@
 import { ipcMain } from 'electron'
 import { db } from '../db'
 import { skills, skillCategories } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, asc } from 'drizzle-orm'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type * as schema from '../db/schema'
 type Db = BetterSQLite3Database<typeof schema>
 
+const skillSelect = {
+  id: skills.id,
+  name: skills.name,
+  tags: skills.tags,
+  categoryId: skills.categoryId,
+  categoryName: skillCategories.name,
+  sortOrder: skills.sortOrder,
+}
+
 export async function listSkills(db: Db) {
   const rows = await db
-    .select({
-      id: skills.id,
-      name: skills.name,
-      tags: skills.tags,
-      categoryId: skills.categoryId,
-      categoryName: skillCategories.name,
-    })
+    .select(skillSelect)
     .from(skills)
     .leftJoin(skillCategories, eq(skills.categoryId, skillCategories.id))
+    .orderBy(asc(skills.sortOrder))
 
   return rows.map(row => ({
     ...row,
@@ -27,13 +31,16 @@ export async function listSkills(db: Db) {
 }
 
 export async function createSkill(db: Db, data: { name: string; tags: string[]; categoryId?: number | null }) {
+  const maxRows = await db.select({ sortOrder: skills.sortOrder }).from(skills).orderBy(asc(skills.sortOrder))
+  const nextOrder = maxRows.length > 0 ? Math.max(...maxRows.map(r => r.sortOrder)) + 1 : 0
   const rows = await db.insert(skills).values({
     name: data.name,
     tags: JSON.stringify(data.tags),
     categoryId: data.categoryId ?? null,
+    sortOrder: nextOrder,
   }).returning()
   const result = await db
-    .select({ id: skills.id, name: skills.name, tags: skills.tags, categoryId: skills.categoryId, categoryName: skillCategories.name })
+    .select(skillSelect)
     .from(skills)
     .leftJoin(skillCategories, eq(skills.categoryId, skillCategories.id))
     .where(eq(skills.id, rows[0].id))
@@ -47,7 +54,7 @@ export async function updateSkill(db: Db, id: number, data: { name?: string; tag
   if (data.categoryId !== undefined) updateData.categoryId = data.categoryId
   await db.update(skills).set(updateData).where(eq(skills.id, id))
   const result = await db
-    .select({ id: skills.id, name: skills.name, tags: skills.tags, categoryId: skills.categoryId, categoryName: skillCategories.name })
+    .select(skillSelect)
     .from(skills)
     .leftJoin(skillCategories, eq(skills.categoryId, skillCategories.id))
     .where(eq(skills.id, id))
@@ -56,6 +63,12 @@ export async function updateSkill(db: Db, id: number, data: { name?: string; tag
 
 export async function deleteSkill(db: Db, id: number) {
   await db.delete(skills).where(eq(skills.id, id))
+}
+
+export async function reorderSkills(db: Db, orderedIds: number[]) {
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db.update(skills).set({ sortOrder: i }).where(eq(skills.id, orderedIds[i]))
+  }
 }
 
 export function registerSkillHandlers(): void {
@@ -70,4 +83,6 @@ export function registerSkillHandlers(): void {
   )
 
   ipcMain.handle('skills:delete', (_, id: number) => deleteSkill(db, id))
+
+  ipcMain.handle('skills:reorder', (_, orderedIds: number[]) => reorderSkills(db, orderedIds))
 }

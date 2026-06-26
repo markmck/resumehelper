@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  CollisionDetection,
   DndContext,
   DragEndEvent,
   DragStartEvent,
@@ -10,9 +11,14 @@ import {
   useSensor,
   useSensors,
   useDroppable,
-  useDraggable,
 } from '@dnd-kit/core'
-import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import {
+  SortableContext,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
 interface Skill {
@@ -29,6 +35,20 @@ interface SkillCategory {
   sortOrder: number
 }
 
+// Skills (numeric ids) and category bodies (`category-*`) are valid drop targets for a skill drag;
+// category headers (`category-sort-*`) are valid only for a category drag. Restricting collisions
+// this way keeps within-category reordering working and prevents a skill being dropped on a header
+// (which previously produced a NaN categoryId and made the skill vanish).
+const skillGridCollisionDetection: CollisionDetection = (args) => {
+  const activeId = String(args.active.id)
+  const isCategoryDrag = activeId.startsWith('category-sort-')
+  const droppableContainers = args.droppableContainers.filter((c) => {
+    const id = String(c.id)
+    return isCategoryDrag ? id.startsWith('category-sort-') : !id.startsWith('category-sort-')
+  })
+  return closestCenter({ ...args, droppableContainers })
+}
+
 // ─── SkillChip ───────────────────────────────────────────────────────────────
 
 interface SkillChipProps {
@@ -38,7 +58,7 @@ interface SkillChipProps {
 }
 
 function SkillChip({ skill, onDelete, isOverlay = false }: SkillChipProps): React.JSX.Element {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: skill.id,
     data: { categoryId: skill.categoryId },
   })
@@ -67,6 +87,9 @@ function SkillChip({ skill, onDelete, isOverlay = false }: SkillChipProps): Reac
     boxShadow: isOverlay ? '0 4px 12px rgba(0,0,0,0.4)' : undefined,
     fontFamily: 'var(--font-sans)',
     userSelect: 'none',
+    touchAction: 'none',
+    transform: isOverlay ? undefined : CSS.Transform.toString(transform),
+    transition: isOverlay ? undefined : transition,
   }
 
   return (
@@ -491,9 +514,11 @@ function CategoryBlock({
           transition: 'background 0.15s, border-color 0.15s',
         }}
       >
-        {skills.map((skill) => (
-          <SkillChip key={skill.id} skill={skill} onDelete={onDeleteSkill} />
-        ))}
+        <SortableContext items={skills.map((s) => s.id)} strategy={rectSortingStrategy}>
+          {skills.map((skill) => (
+            <SkillChip key={skill.id} skill={skill} onDelete={onDeleteSkill} />
+          ))}
+        </SortableContext>
         <AddChip
           categoryId={isUncategorized ? null : category.id}
           isAdding={isAdding}
@@ -672,56 +697,81 @@ function SkillChipGrid(): React.JSX.Element {
     }
 
     const skillId = active.id as number
-    const skill = skills.find((s) => s.id === skillId)
-    if (!skill) return
+    const dragged = skills.find((s) => s.id === skillId)
+    if (!dragged) return
 
-    const overId = String(over.id)
-
-    let targetCategoryId: number | null
-
-    if (overId === 'drop-zone-new-category') {
-      // Create a new category and move skill into it
+    // Drop on the "new category" zone → create a category and move the skill into it.
+    if (overStr === 'drop-zone-new-category') {
       try {
-        const newCategory = await window.api.skills.categories.create({ name: 'New Category' })
-        setCategories((prev) => [...prev, newCategory as SkillCategory])
-        const newCat = newCategory as SkillCategory
-        // Move skill optimistically
+        const newCategory = (await window.api.skills.categories.create({ name: 'New Category' })) as SkillCategory
+        setCategories((prev) => [...prev, newCategory])
         setSkills((prev) =>
-          prev.map((s) => (s.id === skillId ? { ...s, categoryId: newCat.id, categoryName: newCat.name } : s)),
+          prev.map((s) =>
+            s.id === skillId ? { ...s, categoryId: newCategory.id, categoryName: newCategory.name } : s,
+          ),
         )
-        await window.api.skills.update(skillId, { categoryId: newCat.id })
-        // Enter edit mode on new category
-        setEditingCategoryId(newCat.id)
+        await window.api.skills.update(skillId, { categoryId: newCategory.id })
+        setEditingCategoryId(newCategory.id)
       } catch (err) {
         console.error('Failed to create new category on drop:', err)
       }
       return
     }
 
-    if (overId === 'category-uncategorized') {
+    // Resolve the target category, and (if dropped on a chip) the chip to insert before.
+    let targetCategoryId: number | null
+    let overSkillId: number | null = null
+    if (typeof over.id === 'number') {
+      overSkillId = over.id
+      const overSkill = skills.find((s) => s.id === overSkillId)
+      if (!overSkill) return
+      targetCategoryId = overSkill.categoryId
+    } else if (overStr === 'category-uncategorized') {
       targetCategoryId = null
-    } else if (overId.startsWith('category-')) {
-      targetCategoryId = parseInt(overId.replace('category-', ''), 10)
+    } else if (overStr.startsWith('category-sort-')) {
+      // Dropped on a category header — treat it as that category (prevents the NaN/lost-skill bug).
+      targetCategoryId = parseInt(overStr.replace('category-sort-', ''), 10)
+    } else if (overStr.startsWith('category-')) {
+      targetCategoryId = parseInt(overStr.replace('category-', ''), 10)
     } else {
       return
     }
+    if (targetCategoryId !== null && Number.isNaN(targetCategoryId)) return
 
-    if (skill.categoryId === targetCategoryId) return
+    // Rebuild the global skill order: pull the dragged skill out, then re-insert it either
+    // before the hovered chip (reorder / move-to-position) or at the end of the target category.
+    const moved: Skill = {
+      ...dragged,
+      categoryId: targetCategoryId,
+      categoryName:
+        targetCategoryId !== null ? categories.find((c) => c.id === targetCategoryId)?.name ?? null : null,
+    }
+    const without = skills.filter((s) => s.id !== skillId)
+    let insertIndex: number
+    if (overSkillId !== null) {
+      insertIndex = without.findIndex((s) => s.id === overSkillId)
+      if (insertIndex === -1) insertIndex = without.length
+    } else {
+      // Dropped on a category container → after the last skill already in that category.
+      let lastIdx = -1
+      without.forEach((s, i) => {
+        if (s.categoryId === targetCategoryId) lastIdx = i
+      })
+      insertIndex = lastIdx === -1 ? without.length : lastIdx + 1
+    }
+    const reordered = [...without.slice(0, insertIndex), moved, ...without.slice(insertIndex)]
 
-    // Optimistic update
-    const targetCategory = targetCategoryId !== null ? categories.find((c) => c.id === targetCategoryId) : null
-    setSkills((prev) =>
-      prev.map((s) =>
-        s.id === skillId
-          ? { ...s, categoryId: targetCategoryId, categoryName: targetCategory?.name ?? null }
-          : s,
-      ),
-    )
+    const categoryChanged = dragged.categoryId !== targetCategoryId
+    const orderUnchanged =
+      reordered.length === skills.length && reordered.every((s, i) => s.id === skills[i].id)
+    if (!categoryChanged && orderUnchanged) return
 
+    setSkills(reordered)
     try {
-      await window.api.skills.update(skillId, { categoryId: targetCategoryId })
+      if (categoryChanged) await window.api.skills.update(skillId, { categoryId: targetCategoryId })
+      await window.api.skills.reorder(reordered.map((s) => s.id))
     } catch (err) {
-      console.error('Failed to update skill category:', err)
+      console.error('Failed to persist skill move/reorder:', err)
     }
   }
 
@@ -813,7 +863,7 @@ function SkillChipGrid(): React.JSX.Element {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={skillGridCollisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
