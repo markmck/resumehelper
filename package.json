@@ -1,6 +1,6 @@
 {
   "name": "resumehelper",
-  "version": "2.7.1",
+  "version": "2.7.2",
   "description": "Desktop app for managing tailored resumes and tracking job applications",
   "main": "./out/main/index.js",
   "author": "Mark M",
