@@ -188,6 +188,15 @@ function VariantBuilder({
     onToggle?.()
   }
 
+  const handleProjectToggle = async (projectId: number, currentExcluded: boolean): Promise<void> => {
+    const newExcluded = !currentExcluded
+    await window.api.templates.setItemExcluded(variantId, 'project', projectId, newExcluded)
+    // Re-fetch so the project's bullet exclusions reflect the backend cascade.
+    const fresh = await window.api.templates.getBuilderData(variantId)
+    setBuilderData(fresh)
+    onToggle?.()
+  }
+
   const handleProjectBulletToggle = async (projectId: number, bulletId: number, currentExcluded: boolean): Promise<void> => {
     const newExcluded = !currentExcluded
     setBuilderData((prev) => {
@@ -541,8 +550,15 @@ function VariantBuilder({
                   padding: '8px 0',
                   marginBottom: 'var(--space-2)',
                   ...overrideBorderStyle(projectOverridden),
+                  opacity: project.excluded ? 0.5 : 1,
                 }}
               >
+                <input
+                  type="checkbox"
+                  checked={!project.excluded}
+                  onChange={() => handleProjectToggle(project.id, project.excluded)}
+                  style={{ ...cbSmallStyle, cursor: 'pointer' }}
+                />
                 {isProjectEditing ? (
                   <div style={{ flex: 1 }}>
                     <InlineEdit
@@ -557,7 +573,6 @@ function VariantBuilder({
                 ) : (
                   <>
                     <span style={{ ...toggleHeaderStyle(project.excluded), flex: 1 }}>{project.name}</span>
-                    {/* Project headers have no exclusion checkbox — pencil always available. */}
                     {isProjectHovered && (
                       <button
                         type="button"
@@ -592,7 +607,7 @@ function VariantBuilder({
                     onChange={() => !project.excluded && handleProjectBulletToggle(project.id, bullet.id, bullet.excluded)}
                     style={{ ...cbSmallStyle, cursor: project.excluded ? 'not-allowed' : 'pointer', opacity: project.excluded ? 0.4 : 1 }}
                   />
-                  <span style={{ ...toggleTextStyle(project.excluded || bullet.excluded), fontSize: 'var(--font-size-sm)' }}>
+                  <span style={{ ...toggleTextStyle(project.excluded || bullet.excluded), fontSize: 'var(--font-size-sm)', flex: 1 }}>
                     {bullet.text}
                   </span>
                 </div>

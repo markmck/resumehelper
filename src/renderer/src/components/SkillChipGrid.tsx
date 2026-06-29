@@ -505,11 +505,14 @@ function CategoryBlock({
         style={{
           display: 'flex',
           flexWrap: 'wrap',
+          alignContent: 'flex-start',
           gap: '8px',
-          minHeight: '32px',
-          padding: '4px',
+          width: '100%',
+          boxSizing: 'border-box',
+          minHeight: '48px',
+          padding: '8px',
           borderRadius: 'var(--radius-md)',
-          border: isOver ? '1px dashed rgba(139,92,246,0.3)' : '1px solid transparent',
+          border: isOver ? '1px dashed rgba(139,92,246,0.45)' : '1px dashed var(--color-border-subtle)',
           background: isOver ? 'rgba(139,92,246,0.06)' : 'transparent',
           transition: 'background 0.15s, border-color 0.15s',
         }}
