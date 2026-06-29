@@ -1,0 +1,46 @@
+name: Release
+
+# Build and publish the Windows installer whenever a version tag is pushed.
+# electron-builder uploads all three files the auto-updater needs
+# (resumehelper-<version>-setup.exe, latest.yml, and the .blockmap) to a
+# GitHub Release for the tag. By default it creates a DRAFT release — review
+# it and click "Publish release" to make it live (which also activates
+# auto-update for installed clients).
+#
+# Usage: bump "version" in package.json, commit, then:
+#   git tag v2.7.4 && git push origin v2.7.4
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # allow creating/uploading the GitHub Release
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        # postinstall runs `electron-builder install-app-deps`, which rebuilds
+        # better-sqlite3 against Electron's ABI on the clean CI runner.
+        run: npm ci
+
+      - name: Build renderer + main
+        run: npm run build
+
+      - name: Package and publish installer to GitHub Releases
+        env:
+          # Provided automatically by Actions; electron-builder reads GH_TOKEN.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --publish always
