@@ -41,8 +41,19 @@ const STATUS_OPTIONS = [
 ]
 
 function todayString(): string {
+  // Local calendar date (not UTC) so it matches the <input type="date"> value and
+  // the today-detection in submittedAtFromDate.
   const d = new Date()
-  return d.toISOString().slice(0, 10)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Resolve the timestamp to store for a submission. The date picker only captures a
+// calendar date, so a bare `new Date(dateStr)` lands at midnight and every submission
+// renders the same clock time. When the chosen date is today, stamp the real current
+// time so the log reflects when it was actually entered; a deliberately chosen past/
+// future date has no meaningful time, so use local midnight of that date.
+function submittedAtFromDate(dateStr: string): Date {
+  return dateStr === todayString() ? new Date() : new Date(`${dateStr}T00:00:00`)
 }
 
 const inputStyle: React.CSSProperties = {
@@ -116,7 +127,7 @@ function SubmissionLogForm({ linkedAnalysisId, onSaved, onBack }: Props): React.
       await window.api.submissions.create({
         company: company.trim(),
         role: role.trim(),
-        submittedAt: new Date(submittedAt),
+        submittedAt: submittedAtFromDate(submittedAt),
         variantId: variantId !== '' ? Number(variantId) : null,
         url: url.trim() || undefined,
         notes: notes.trim() || undefined,

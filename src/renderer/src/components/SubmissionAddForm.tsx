@@ -30,7 +30,8 @@ const labelStyle: React.CSSProperties = {
 }
 
 function SubmissionAddForm({ onSaved, onCancel }: SubmissionAddFormProps): React.JSX.Element {
-  const today = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const [company, setCompany] = useState('')
   const [role, setRole] = useState('')
   const [submittedAt, setSubmittedAt] = useState(today)
@@ -60,7 +61,9 @@ function SubmissionAddForm({ onSaved, onCancel }: SubmissionAddFormProps): React
     await window.api.submissions.create({
       company: company.trim(),
       role: role.trim(),
-      submittedAt: new Date(submittedAt + 'T00:00:00'),
+      // Stamp the real time when logging for today so the list shows when it was
+      // actually entered; a chosen past/future date has no time (local midnight).
+      submittedAt: submittedAt === today ? new Date() : new Date(submittedAt + 'T00:00:00'),
       variantId,
       url: url || undefined,
       notes: notes || undefined,
