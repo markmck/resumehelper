@@ -368,7 +368,7 @@ export interface Api {
     create: (data: { name: string; layoutTemplate?: string }) => Promise<TemplateVariant>
     rename: (id: number, name: string) => Promise<TemplateVariant>
     duplicate: (id: number) => Promise<TemplateVariant>
-    delete: (id: number) => Promise<void>
+    delete: (id: number) => Promise<{ success: boolean } | { error: string }>
     setLayoutTemplate: (id: number, layoutTemplate: string) => Promise<TemplateVariant>
     getBuilderData: (variantId: number, analysisId?: number) => Promise<BuilderData>
     setItemExcluded: (
@@ -615,12 +615,16 @@ export interface Api {
     acceptExcludedBulletSuggestion: (analysisId: number, bulletId: number) => Promise<{ success: boolean } | { error: string }>
     dismissExcludedBulletSuggestion: (analysisId: number, bulletId: number) => Promise<{ success: boolean } | { error: string }>
     acceptAnalysisSummary: (analysisId: number, text: string) => Promise<{ success: boolean } | { error: string }>
+    clearAnalysisSummary: (analysisId: number) => Promise<{ success: boolean } | { error: string }>
+    getAnalysisSummary: (analysisId: number) => Promise<string | null>
+    setSkillAdditionCategory: (analysisId: number, skillName: string, category: string) => Promise<{ success: boolean } | { error: string }>
+    getSkillAdditions: (analysisId: number) => Promise<Array<{ skillName: string; category: string; status: string }>>
   }
   jobPostings: {
     list: () => Promise<unknown[]>
     create: (data: { company: string; role: string; rawText: string }) => Promise<unknown>
     update: (id: number, data: { company?: string; role?: string }) => Promise<unknown>
-    delete: (id: number) => Promise<void>
+    delete: (id: number) => Promise<{ success: boolean } | { error: string }>
     getAnalysis: (id: number) => Promise<Record<string, unknown> | null>
     updateAnalysisStatus: (analysisId: number, status: string) => Promise<void>
     fetchUrl: (url: string) => Promise<{

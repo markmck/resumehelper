@@ -253,6 +253,48 @@ export function acceptAnalysisSummary(db: Db, analysisId: number, text: string) 
   }
 }
 
+// SUM-03: Remove a previously accepted analysis-tier summary override (reject).
+// Idempotent — deleting a non-existent override is a no-op.
+export function clearAnalysisSummary(db: Db, analysisId: number) {
+  try {
+    db.delete(entityOverrides)
+      .where(
+        and(
+          eq(entityOverrides.analysisId, analysisId),
+          eq(entityOverrides.entityType, 'summary'),
+          eq(entityOverrides.field, 'text'),
+        )
+      )
+      .run()
+    return { success: true }
+  } catch (err) {
+    console.error('ai:clearAnalysisSummary error', err)
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+// Return the accepted analysis-tier summary override text, or null if none.
+// Used to hydrate the summary card's "accepted" state when re-opening Optimize.
+export function getAnalysisSummary(db: Db, analysisId: number): string | null {
+  try {
+    const row = db
+      .select({ text: entityOverrides.overrideText })
+      .from(entityOverrides)
+      .where(
+        and(
+          eq(entityOverrides.analysisId, analysisId),
+          eq(entityOverrides.entityType, 'summary'),
+          eq(entityOverrides.field, 'text'),
+        )
+      )
+      .get()
+    return row?.text ?? null
+  } catch (err) {
+    console.error('ai:getAnalysisSummary error', err)
+    return null
+  }
+}
+
 export function dismissSuggestion(db: Db, analysisId: number, bulletId: number) {
   try {
     db.delete(entityOverrides)
@@ -335,6 +377,44 @@ export function dismissSkillAddition(db: Db, analysisId: number, skillName: stri
   } catch (err) {
     console.error('ai:dismissSkillAddition error', err)
     return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+// Set the category for a staged skill addition. Controls which skills section the
+// added skill lands in on the optimized resume (mergeHelper uses sk.category as the
+// categoryName). Persists the user's choice across reloads.
+export function setSkillAdditionCategory(db: Db, analysisId: number, skillName: string, category: string) {
+  try {
+    db.update(analysisSkillAdditions)
+      .set({ category })
+      .where(and(
+        eq(analysisSkillAdditions.analysisId, analysisId),
+        eq(analysisSkillAdditions.skillName, skillName),
+      ))
+      .run()
+    return { success: true }
+  } catch (err) {
+    console.error('ai:setSkillAdditionCategory error', err)
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+// Return staged skill additions (name, category, status) so the Optimize screen can
+// hydrate user-set categories and accept/dismiss state across reloads.
+export function getSkillAdditions(db: Db, analysisId: number) {
+  try {
+    return db
+      .select({
+        skillName: analysisSkillAdditions.skillName,
+        category: analysisSkillAdditions.category,
+        status: analysisSkillAdditions.status,
+      })
+      .from(analysisSkillAdditions)
+      .where(eq(analysisSkillAdditions.analysisId, analysisId))
+      .all()
+  } catch (err) {
+    console.error('ai:getSkillAdditions error', err)
+    return []
   }
 }
 
@@ -597,5 +677,21 @@ export function registerAiHandlers(): void {
 
   ipcMain.handle('ai:acceptAnalysisSummary', (_event, analysisId: number, text: string) =>
     acceptAnalysisSummary(db, analysisId, text),
+  )
+
+  ipcMain.handle('ai:clearAnalysisSummary', (_event, analysisId: number) =>
+    clearAnalysisSummary(db, analysisId),
+  )
+
+  ipcMain.handle('ai:getAnalysisSummary', (_event, analysisId: number) =>
+    getAnalysisSummary(db, analysisId),
+  )
+
+  ipcMain.handle('ai:setSkillAdditionCategory', (_event, analysisId: number, skillName: string, category: string) =>
+    setSkillAdditionCategory(db, analysisId, skillName, category),
+  )
+
+  ipcMain.handle('ai:getSkillAdditions', (_event, analysisId: number) =>
+    getSkillAdditions(db, analysisId),
   )
 }

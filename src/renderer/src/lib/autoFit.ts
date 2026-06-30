@@ -81,15 +81,25 @@ export function allAtFloor(top: number, bottom: number, sides: number, floor: nu
 }
 
 /**
- * Estimate whether auto-fit is feasible before the iteration loop begins.
+ * Decide whether auto-fit is worth attempting before the iteration loop begins.
  *
- * Uses a pessimistic upper-bound: assumes all current pages are fully packed
- * (contentHeightEst = pageCount × currentUsable). If that estimate already fits
- * within the floor usable height, returns true (worth trying). If it cannot
- * possibly fit even at the floor, returns false immediately.
+ * Auto-fit only collapses a single orphan page — the iteration loop in
+ * OptimizeVariant bails when there are more than 2 pages — so feasibility breaks
+ * down by page count:
+ *   - ≤ 1 page  → already fits, trivially true.
+ *   - > 2 pages → cannot be margin-fit; false.
+ *   - = 2 pages → worth trying *iff* there is vertical headroom left to shrink,
+ *     i.e. the current top/bottom margins are still above the floor. (The exact
+ *     content height isn't directly measurable from the stacked iframe — each
+ *     page box is a fixed PAGE_HEIGHT_PX regardless of fill — so this is an
+ *     optimistic gate. The step-and-remeasure loop re-measures after every step
+ *     and remains the source of truth, reporting "cannot fit" if it reaches the
+ *     floor still on two pages.)
  *
- * This is a fast pre-flight check — the actual loop still re-measures after
- * every step and may stop earlier.
+ * NB: the previous implementation used `pageCount × currentUsable` as a content
+ * estimate and required it to fit within a single floor page, which is
+ * impossible for any real two-page document — so it always returned false and
+ * auto-fit never ran.
  *
  * @param iframeHeight - total stacked iframe height from the print-height postMessage
  * @param marginTop - current top margin in inches
@@ -102,10 +112,9 @@ export function canAutoFitSucceed(
   marginBottom: number,
   floor: number
 ): boolean {
-  const currentUsable = usableHeightPx(marginTop, marginBottom)
-  const floorUsable = usableHeightPx(floor, floor)
   const pageCount = pageCountFromIframeHeight(iframeHeight)
-  // Pessimistic content height upper bound
-  const contentHeightEst = pageCount * currentUsable
-  return contentHeightEst <= floorUsable
+  if (pageCount <= 1) return true
+  if (pageCount > 2) return false
+  // Two pages: feasible only while there's still room to tighten the margins.
+  return usableHeightPx(marginTop, marginBottom) < usableHeightPx(floor, floor)
 }

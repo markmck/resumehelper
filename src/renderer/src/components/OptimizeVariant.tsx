@@ -3,7 +3,8 @@ import { useToast } from './Toast'
 import VariantPreview from './VariantPreview'
 import { getScoreColor } from '../lib/scoreColor'
 import { MARGIN_FLOOR } from '../lib/marginConstants'
-import { pageCountFromIframeHeight, canAutoFitSucceed, nextMarginStep, allAtFloor } from '../lib/autoFit'
+import { pageCountFromIframeHeight, nextMarginStep, allAtFloor } from '../lib/autoFit'
+import { sanitizeFilename as sanitize } from '../../../shared/sanitizeFilename'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ interface StagedSkill {
   reason: string
   severity: 'critical' | 'moderate'
   state: StagedSkillState
+  category: string
 }
 
 type StagedExcludedBulletStatus = 'pending' | 'accepted' | 'dismissed'
@@ -155,6 +157,8 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   // ── Suggestion state machine
   const [suggStates, setSuggStates] = useState<SuggestionEdit[]>([])
   const [stagedSkills, setStagedSkills] = useState<StagedSkill[]>([])
+  // Existing skill category names, for the per-suggested-skill category picker
+  const [skillCategories, setSkillCategories] = useState<string[]>([])
   const [stagedBullets, setStagedBullets] = useState<StagedExcludedBullet[]>([])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
@@ -182,6 +186,9 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
 
   // ── Save-as-variant state
   const [savingVariant, setSavingVariant] = useState(false)
+
+  // ── PDF export state
+  const [exportingPdf, setExportingPdf] = useState(false)
 
   // ── Auto-fit state (Phase 41)
   const [autoFitStatus, setAutoFitStatus] = useState<'idle' | 'running' | 'success' | 'cannot-fit'>('idle')
@@ -274,12 +281,12 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
     const iframeH = currentContentHeightRef.current
     if (iframeH === null) return
 
-    // Feasibility pre-check
     const startTop = latestMarginTop.current
     const startBottom = latestMarginBottom.current
     const startSides = latestMarginSides.current
 
-    if (!canAutoFitSucceed(iframeH, startTop, startBottom, MARGIN_FLOOR)) {
+    // Nothing left to shrink — every margin is already at the floor.
+    if (allAtFloor(startTop, startBottom, startSides, MARGIN_FLOOR)) {
       setAutoFitStatus('cannot-fit')
       return
     }
@@ -322,24 +329,20 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
         latestMarginBottom.current = bottom
         latestMarginSides.current = sides
 
-        // Wait for the iframe to report a new height
-        let newH: number
+        // Wait for the iframe to report a page drop. The preview height is quantized
+        // to whole pages, so a single 0.05" step usually produces NO height change —
+        // waitForNextHeight then times out. That is expected: it means the page count
+        // didn't change on this step, so we keep shrinking rather than giving up. Only
+        // reaching the floor (here or via nextMarginStep === null above) ends the loop.
+        let dropped = false
         try {
-          newH = await waitForNextHeight(currentContentHeightRef)
+          const newH = await waitForNextHeight(currentContentHeightRef, 450)
+          dropped = pageCountFromIframeHeight(newH) < startPageCount
         } catch {
-          // Timeout — treat as cannot-fit at current margins
-          window.api.analysisLayout.setMargins(analysis.id, {
-            marginTop: top,
-            marginBottom: bottom,
-            marginSides: sides,
-          })
-          setHasOverride(true)
-          setAutoFitStatus('cannot-fit')
-          break
+          dropped = false
         }
 
-        const newPageCount = pageCountFromIframeHeight(newH)
-        if (newPageCount < startPageCount) {
+        if (dropped) {
           // Success — page dropped
           window.api.analysisLayout.setMargins(analysis.id, {
             marginTop: top,
@@ -352,7 +355,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
         }
 
         if (allAtFloor(top, bottom, sides, MARGIN_FLOOR)) {
-          // Reached floor, still > 1 page
+          // Reached the floor and still > 1 page — genuinely cannot fit on one page
           window.api.analysisLayout.setMargins(analysis.id, {
             marginTop: top,
             marginBottom: bottom,
@@ -457,6 +460,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                   reason: 'Already in your skills but excluded from this variant. Re-include it.',
                   severity: g.severity,
                   state: 'pending',
+                  category: g.category ?? '',
                 })
               } else {
                 // Skill doesn't exist at all — suggest adding
@@ -465,7 +469,23 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                   reason: g.reason ?? 'Required by posting. Not currently in variant.',
                   severity: g.severity,
                   state: 'pending',
+                  category: g.category ?? '',
                 })
+              }
+            }
+
+            // Reconcile with persisted staged rows so user-set categories and
+            // accept/dismiss state survive reloads (the suggestions above are
+            // re-derived from the AI gap data each load).
+            const persisted = await window.api.ai.getSkillAdditions(analysisId)
+            if (Array.isArray(persisted) && persisted.length > 0) {
+              const byName = new Map(persisted.map((p) => [p.skillName, p]))
+              for (const s of suggestions) {
+                const p = byName.get(s.name)
+                if (!p) continue
+                if (p.category && p.category !== '') s.category = p.category
+                if (p.status === 'accepted') s.state = 'added'
+                else if (p.status === 'dismissed') s.state = 'skipped'
               }
             }
             setStagedSkills(suggestions)
@@ -498,6 +518,18 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
     )
   }, [analysis?.id])
 
+  // ── Load existing skill category names for the suggested-skill category picker
+  useEffect(() => {
+    window.api.skills.categories
+      .list()
+      .then((cats) => {
+        if (Array.isArray(cats)) {
+          setSkillCategories(cats.map((c) => c.name).filter((n): n is string => !!n))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   // ── Load excluded-bullet suggestions on mount
   useEffect(() => {
     if (!analysis?.id) return
@@ -516,11 +548,25 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
     loadExcludedBullets()
   }, [analysis?.id])
 
-  // ── Seed summary edit text when analysis loads (session-only; non-empty guard prevents card render)
+  // ── Seed summary edit text when analysis loads, and hydrate the "accepted" state
+  // from any persisted analysis-tier summary override so it survives reopening.
   useEffect(() => {
     if (!analysis?.id) return
-    const text = analysis.suggestedSummary ?? ''
-    if (text) setSummaryEditText(text)
+    let cancelled = false
+    const seedSummary = async (): Promise<void> => {
+      const accepted = await window.api.ai.getAnalysisSummary(analysis.id)
+      if (cancelled) return
+      if (accepted) {
+        setSummaryEditText(accepted)
+        setSummaryCardState('accepted')
+      } else if (analysis.suggestedSummary) {
+        setSummaryEditText(analysis.suggestedSummary)
+      }
+    }
+    seedSummary()
+    return () => {
+      cancelled = true
+    }
   }, [analysis?.id])
 
   // ── Seed margin sliders on mount (or when analysis.id changes)
@@ -736,6 +782,25 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
     showToast('Skill dismissed')
   }
 
+  // Update a suggested skill's category locally as the user types/picks (no persist yet)
+  const updateSkillCategory = (skillName: string, category: string): void => {
+    setStagedSkills((prev) =>
+      prev.map((s) => (s.name === skillName ? { ...s, category } : s))
+    )
+  }
+
+  // Persist the chosen category and refresh the preview so the skill lands in the
+  // right section. Also remembers a freshly-typed category for the other pickers.
+  const commitSkillCategory = async (skillName: string, category: string): Promise<void> => {
+    if (!analysis) return
+    const trimmed = category.trim()
+    await window.api.ai.setSkillAdditionCategory(analysis.id, skillName, trimmed)
+    if (trimmed && !skillCategories.includes(trimmed)) {
+      setSkillCategories((prev) => [...prev, trimmed])
+    }
+    setPreviewRefreshKey((k) => k + 1)
+  }
+
   const acceptBullet = async (bulletId: number): Promise<void> => {
     if (!analysis) return
     const result = await window.api.ai.acceptExcludedBulletSuggestion(analysis.id, bulletId)
@@ -782,6 +847,25 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
     setSummaryCardState('dismissed')
   }
 
+  // Re-open an accepted summary for editing (the override stays applied until re-accepted)
+  const editSummary = (): void => {
+    setSummaryCardState('editing')
+  }
+
+  // Reject an accepted summary — remove the override and return the card to a pending edit
+  const removeSummary = async (): Promise<void> => {
+    if (!analysis) return
+    const result = await window.api.ai.clearAnalysisSummary(analysis.id)
+    if ('error' in result) {
+      showToast('Failed to remove summary')
+      return
+    }
+    setSummaryEditText(analysis.suggestedSummary ?? '')
+    setSummaryCardState('pending')
+    setPreviewRefreshKey((k) => k + 1)
+    showToast('Summary removed')
+  }
+
   // ── Save-as-variant handler (SAVE-01)
   const handleSaveAsVariant = async (): Promise<void> => {
     if (!analysis?.id) return
@@ -795,6 +879,24 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
       }
     } finally {
       setSavingVariant(false)
+    }
+  }
+
+  // ── Export the optimized (analysis-tier) resume as PDF. Routes through the same
+  // export:pdf path as the Variant Builder but passes analysisId so the merge layer
+  // applies the analysis-tier bullet rewrites, summary, and margin overrides.
+  const handleExportPdf = async (): Promise<void> => {
+    if (exportingPdf || !analysis?.variantId) return
+    setExportingPdf(true)
+    try {
+      const profile = await window.api.profile.get()
+      const filename = `${sanitize(profile.name || 'Resume')}_Resume_${sanitize(analysis.variantName || 'Optimized')}.pdf`
+      const result = await window.api.exportFile.pdf(analysis.variantId, filename, analysis.id)
+      if (result && !result.canceled) {
+        showToast('Resume exported as PDF')
+      }
+    } finally {
+      setExportingPdf(false)
     }
   }
 
@@ -1043,6 +1145,26 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
           Optimize Variant
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <button
+            onClick={handleExportPdf}
+            disabled={exportingPdf || analysis.variantId == null}
+            title={analysis.variantId == null
+              ? 'This analysis has no linked variant to export'
+              : 'Export the optimized resume as a PDF'}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: 'var(--color-accent)',
+              color: 'var(--color-text-on-accent, #fff)',
+              border: '1px solid var(--color-accent)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--font-size-sm)',
+              fontFamily: 'var(--font-sans)',
+              cursor: exportingPdf || analysis.variantId == null ? 'not-allowed' : 'pointer',
+              opacity: exportingPdf || analysis.variantId == null ? 0.6 : 1,
+            }}
+          >
+            {exportingPdf ? 'Exporting...' : 'Export PDF'}
+          </button>
           <button
             onClick={handleSaveAsVariant}
             disabled={savingVariant}
@@ -1602,6 +1724,44 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                     </button>
                   </div>
                 )}
+
+                {/* Accepted-state controls (SUM-03): edit re-opens, remove rejects */}
+                {summaryCardState === 'accepted' && (
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={editSummary}
+                      style={{
+                        padding: '5px 12px',
+                        backgroundColor: 'var(--color-bg-input)',
+                        color: 'var(--color-text-secondary)',
+                        border: '1px solid var(--color-border-default)',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: 'var(--font-size-xs)',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: 'var(--font-sans)',
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={removeSummary}
+                      style={{
+                        padding: '5px 12px',
+                        backgroundColor: 'transparent',
+                        color: 'var(--color-danger)',
+                        border: '1px solid var(--color-border-default)',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: 'var(--font-size-xs)',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: 'var(--font-sans)',
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1965,6 +2125,40 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                           >
                             {sk.reason}
                           </p>
+                          {sk.state !== 'skipped' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
+                                Category
+                              </span>
+                              <input
+                                list={`skill-cats-${i}`}
+                                value={sk.category}
+                                onChange={(e) => updateSkillCategory(sk.name, e.target.value)}
+                                onBlur={(e) => commitSkillCategory(sk.name, e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                                }}
+                                placeholder="Uncategorized"
+                                style={{
+                                  flex: 1,
+                                  maxWidth: 220,
+                                  padding: '3px 8px',
+                                  backgroundColor: 'var(--color-bg-input)',
+                                  border: '1px solid var(--color-border-default)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  color: 'var(--color-text-primary)',
+                                  fontSize: 'var(--font-size-xs)',
+                                  fontFamily: 'var(--font-sans)',
+                                  outline: 'none',
+                                }}
+                              />
+                              <datalist id={`skill-cats-${i}`}>
+                                {skillCategories.map((c) => (
+                                  <option key={c} value={c} />
+                                ))}
+                              </datalist>
+                            </div>
+                          )}
                         </div>
                         <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0 }}>
                           {sk.state === 'pending' && (

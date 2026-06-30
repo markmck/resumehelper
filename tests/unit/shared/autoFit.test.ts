@@ -231,4 +231,17 @@ describe('canAutoFitSucceed', () => {
     const singlePageHeight = PAGE_HEIGHT_PX // 1056
     expect(canAutoFitSucceed(singlePageHeight, 1.0, 1.0, 0.4)).toBe(true)
   })
+
+  it('case 4: returns true for a 2-page (orphan) overflow when margins are above the floor', () => {
+    // 2-page stacked height = 2*1056 + 16 = 2128 → pageCount = 2
+    // margins 1.0 are above the 0.4 floor → headroom to shrink → worth trying
+    const twoPageHeight = PAGE_HEIGHT_PX * 2 + PAGE_GAP_PX // 2128
+    expect(canAutoFitSucceed(twoPageHeight, 1.0, 1.0, 0.4)).toBe(true)
+  })
+
+  it('case 5: returns false for a 2-page overflow when margins are already at the floor', () => {
+    // No vertical headroom left to tighten → auto-fit cannot help
+    const twoPageHeight = PAGE_HEIGHT_PX * 2 + PAGE_GAP_PX // 2128
+    expect(canAutoFitSucceed(twoPageHeight, 0.4, 0.4, 0.4)).toBe(false)
+  })
 })

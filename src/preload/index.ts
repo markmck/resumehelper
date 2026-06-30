@@ -296,6 +296,14 @@ const api = {
       ipcRenderer.invoke('ai:dismissExcludedBulletSuggestion', analysisId, bulletId),
     acceptAnalysisSummary: (analysisId: number, text: string) =>
       ipcRenderer.invoke('ai:acceptAnalysisSummary', analysisId, text),
+    clearAnalysisSummary: (analysisId: number) =>
+      ipcRenderer.invoke('ai:clearAnalysisSummary', analysisId),
+    getAnalysisSummary: (analysisId: number) =>
+      ipcRenderer.invoke('ai:getAnalysisSummary', analysisId),
+    setSkillAdditionCategory: (analysisId: number, skillName: string, category: string) =>
+      ipcRenderer.invoke('ai:setSkillAdditionCategory', analysisId, skillName, category),
+    getSkillAdditions: (analysisId: number) =>
+      ipcRenderer.invoke('ai:getSkillAdditions', analysisId),
   },
   jobPostings: {
     list: () => ipcRenderer.invoke('jobPostings:list'),
