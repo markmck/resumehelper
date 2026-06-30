@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { db, sqlite } from '../db'
-import { templateVariants, templateVariantItems, jobBullets, projectBullets, entityOverrides, analysisLayoutOverrides, analysisResults, analysisSkillAdditions, skills, skillCategories, jobPostings } from '../db/schema'
+import { templateVariants, templateVariantItems, jobBullets, projectBullets, entityOverrides, analysisLayoutOverrides, analysisResults, analysisSkillAdditions, skills, skillCategories, jobPostings, submissions } from '../db/schema'
 import { eq, and, desc, inArray, isNull } from 'drizzle-orm'
 import { buildMergedBuilderData } from '../lib/mergeHelper'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
@@ -101,8 +101,21 @@ export async function renameVariant(db: Db, id: number, name: string) {
   return rows[0]
 }
 
-export async function deleteVariant(db: Db, id: number) {
-  await db.delete(templateVariants).where(eq(templateVariants.id, id))
+export function deleteVariant(db: Db, id: number) {
+  try {
+    // `submissions.variant_id` references this variant via ON DELETE NO ACTION, so
+    // the FK would block deletion once a submission has been logged against it.
+    // Submissions retain their own `resume_snapshot`, so null the back-reference
+    // first (preserving submission history), then delete — atomically.
+    db.transaction((tx) => {
+      tx.update(submissions).set({ variantId: null }).where(eq(submissions.variantId, id)).run()
+      tx.delete(templateVariants).where(eq(templateVariants.id, id)).run()
+    })
+    return { success: true }
+  } catch (err) {
+    console.error('templates:delete error', err)
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 export function duplicateVariant(db: Db, id: number) {

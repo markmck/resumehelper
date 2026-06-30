@@ -1,7 +1,7 @@
 import { ipcMain, net, safeStorage } from 'electron'
 import { db, sqlite } from '../db'
-import { jobPostings, analysisResults, templateVariants, aiSettings } from '../db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { jobPostings, analysisResults, templateVariants, aiSettings, submissions } from '../db/schema'
+import { eq, desc, inArray } from 'drizzle-orm'
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import { getModel, JobUrlExtractionSchema } from '../lib/aiProvider'
@@ -117,7 +117,23 @@ export async function updateJobPosting(db: Db, id: number, data: { company?: str
 // Deletes a job posting by id (cascade removes analysis_results)
 export async function deleteJobPosting(db: Db, id: number) {
   try {
-    await db.delete(jobPostings).where(eq(jobPostings.id, id))
+    // `submissions` reference this posting and its analyses via ON DELETE NO ACTION
+    // (they keep their own `resume_snapshot`), so those FKs would block the delete
+    // once a submission has been logged. Null the back-references first — for both
+    // the posting and the analyses about to be cascade-removed — then delete.
+    db.transaction((tx) => {
+      const analysisIds = tx
+        .select({ id: analysisResults.id })
+        .from(analysisResults)
+        .where(eq(analysisResults.jobPostingId, id))
+        .all()
+        .map((r) => r.id)
+      if (analysisIds.length > 0) {
+        tx.update(submissions).set({ analysisId: null }).where(inArray(submissions.analysisId, analysisIds)).run()
+      }
+      tx.update(submissions).set({ jobPostingId: null }).where(eq(submissions.jobPostingId, id)).run()
+      tx.delete(jobPostings).where(eq(jobPostings.id, id)).run()
+    })
     return { success: true }
   } catch (err) {
     console.error('jobPostings:delete error', err)

@@ -33,7 +33,11 @@ function TemplatesTab({ selectedVariantId, onVariantsLoaded, onSelectedChange, o
   }
 
   const handleDelete = async (id: number): Promise<void> => {
-    await window.api.templates.delete(id)
+    const result = await window.api.templates.delete(id)
+    if (result && 'error' in result) {
+      console.error('Failed to delete variant:', result.error)
+      return
+    }
     setVariants((prev) => {
       const updated = prev.filter((v) => v.id !== id)
       onVariantsLoaded(updated.map((v) => ({ id: v.id, name: v.name })))

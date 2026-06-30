@@ -81,6 +81,25 @@ describe('variant CRUD', () => {
     expect(items).toHaveLength(0)
   })
 
+  it('deleteVariant succeeds even when a logged submission references it, nulling the back-ref', async () => {
+    const db = createTestDb()
+    const variant = seedVariant(db)
+    // A logged submission references the variant via an ON DELETE NO ACTION FK.
+    // Without nulling it first, the delete would fail with a FK constraint error.
+    db.insert(schema.submissions)
+      .values({ company: 'Acme', role: 'SWE', variantId: variant.id, resumeSnapshot: '{}' })
+      .run()
+
+    const result = deleteVariant(db, variant.id)
+    expect(result).toEqual({ success: true })
+    expect(await listVariants(db)).toHaveLength(0)
+
+    // Submission row is preserved (it keeps its own snapshot) with a nulled variant ref.
+    const subs = db.select().from(schema.submissions).all()
+    expect(subs).toHaveLength(1)
+    expect(subs[0].variantId).toBeNull()
+  })
+
   it('duplicateVariant copies variant and all exclusion items', async () => {
     const db = createTestDb()
     const { job, bullets } = seedJobWithBullets(db, ['Bullet A'])
