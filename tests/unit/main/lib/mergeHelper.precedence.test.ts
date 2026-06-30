@@ -88,6 +88,42 @@ describe('buildMergedBuilderData — override precedence (OVR-02) + inclusion (D
     expect(mergedJob!.bullets[0].text).not.toBe('Variant override text')
   })
 
+  it('case 2b: an accepted analysis summary forces showSummary=true even when the variant hides the summary', async () => {
+    const db = createTestDb()
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+    // Non-executive variants hide the summary by default (excluded sentinel row).
+    db.insert(templateVariantItems).values({
+      variantId: variant.id,
+      itemType: 'summary',
+      excluded: true,
+    }).run()
+    const posting = seedJobPosting(db, { company: 'TestCo', role: 'Dev' })
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+
+    // Before accepting a summary, the section stays hidden for the analysis render.
+    const before = await buildMergedBuilderData(db, variant.id, analysis.id)
+    expect(before.showSummary).toBe(false)
+
+    // Accept an AI-suggested summary at the analysis tier.
+    db.insert(entityOverrides).values({
+      variantId: variant.id,
+      analysisId: analysis.id,
+      entityType: 'summary',
+      field: 'text',
+      overrideText: 'Tailored summary for this job',
+      source: 'ai_suggestion',
+    }).run()
+
+    // Now the optimized resume must show the summary (this is the submission-snapshot bug fix).
+    const after = await buildMergedBuilderData(db, variant.id, analysis.id)
+    expect(after.showSummary).toBe(true)
+    expect(after.summaryOverride).toBe('Tailored summary for this job')
+
+    // The variant-only preview (no analysisId) still respects the hidden default.
+    const variantOnly = await buildMergedBuilderData(db, variant.id)
+    expect(variantOnly.showSummary).toBe(false)
+  })
+
   it('case 3: project title override (project_name/name) applies in merged output', async () => {
     const db = createTestDb()
 

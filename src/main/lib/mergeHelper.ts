@@ -420,9 +420,23 @@ export async function buildMergedBuilderData(
   // ----------------------------------------------------------------
   // showSummary derivation (D-05) — positive-semantic
   // Default true: no sentinel row means "not excluded" = show summary
+  //
+  // Analysis-tier override: when the user accepts an AI-suggested summary for this
+  // analysis they explicitly want a summary on the optimized resume, so it must be
+  // shown even if the base variant hides the summary section (non-executive variants
+  // exclude it by default — createVariant auto-inserts an excluded summary sentinel).
+  // Without this, an accepted summary is written and frozen into the submission
+  // snapshot's profile.summary but never rendered (showSummary stays false).
   // ----------------------------------------------------------------
+  const hasAnalysisSummaryOverride = overrideRows.some(
+    (r) => r.analysisId != null && r.entityType === 'summary' && r.field === 'text',
+  )
   const summarySentinel = exclusionItems.find((item) => item.itemType === 'summary')
-  const showSummary = summarySentinel ? !summarySentinel.excluded : true
+  const showSummary = hasAnalysisSummaryOverride
+    ? true
+    : summarySentinel
+      ? !summarySentinel.excluded
+      : true
 
   // ----------------------------------------------------------------
   // effectiveMargins derivation (D-06/D-07) — three-tier precedence
