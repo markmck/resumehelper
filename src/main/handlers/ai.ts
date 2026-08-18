@@ -1,12 +1,13 @@
 import { ipcMain, safeStorage } from 'electron'
 import { eq, and } from 'drizzle-orm'
 import { db, sqlite } from '../db'
-import { aiSettings, jobPostings, analysisResults, profile, analysisSkillAdditions, entityOverrides, analysisExcludedBulletSuggestions, analysisExcludedProjectSuggestions, jobBullets, projects, templateVariantItems } from '../db/schema'
-import { callJobParser, callResumeScorer, deriveOverallScore, getModel } from '../lib/aiProvider'
-import { buildResumeTextForLlm } from '../lib/analysisPrompts'
+import { aiSettings, jobPostings, analysisResults, profile, analysisSkillAdditions, entityOverrides, analysisExcludedBulletSuggestions, analysisExcludedProjectSuggestions, jobBullets, projects, templateVariantItems, coverLetters, templateVariants } from '../db/schema'
+import { callJobParser, callResumeScorer, callCoverLetterGenerator, deriveOverallScore, getModel } from '../lib/aiProvider'
+import { buildResumeTextForLlm, resolveLetterTone } from '../lib/analysisPrompts'
 import { buildMergedBuilderData } from '../lib/mergeHelper'
 import { buildResumeJson } from '../lib/themeRegistry'
 import type { ParsedJob } from '../lib/aiProvider'
+import type { LanguageModel } from 'ai'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type * as schema from '../db/schema'
 type Db = BetterSQLite3Database<typeof schema>
@@ -313,6 +314,129 @@ export function getAnalysisSummary(db: Db, analysisId: number): string | null {
   } catch (err) {
     console.error('ai:getAnalysisSummary error', err)
     return null
+  }
+}
+
+// ─── Cover letter generation + persistence (Phase 42) ──────────────────────
+
+// D-10: blind overwrite, no versioning — a regenerate-guard warning was explicitly
+// declined (T-02). Do NOT read the existing row first, do NOT warn.
+export function saveCoverLetterDraft(db: Db, analysisId: number, text: string) {
+  try {
+    sqlite.transaction(() => {
+      db.delete(coverLetters).where(eq(coverLetters.analysisId, analysisId)).run()
+      db.insert(coverLetters)
+        .values({ analysisId, letterText: text, updatedAt: new Date() })
+        .run()
+    })()
+    return { success: true }
+  } catch (err) {
+    console.error('ai:saveCoverLetterDraft error', err)
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export function getCoverLetter(db: Db, analysisId: number): string | null {
+  try {
+    const row = db
+      .select({ letterText: coverLetters.letterText })
+      .from(coverLetters)
+      .where(eq(coverLetters.analysisId, analysisId))
+      .get()
+    return row?.letterText ?? null
+  } catch (err) {
+    console.error('ai:getCoverLetter error', err)
+    return null
+  }
+}
+
+// D-12: generation requires an analysis — there is no variant+raw-JD fallback and
+// no inline offer to run analysis. D-07: tone is derived from the analysis's
+// variant layoutTemplate. D-04: the letter saves as a draft immediately on
+// generation, with no accept/edit/dismiss gate.
+export async function generateCoverLetter(db: Db, analysisId: number, injectedModel?: LanguageModel) {
+  try {
+    // 1. Load the analysis row (D-12 — generation requires an analysis)
+    const analysis = db
+      .select({ id: analysisResults.id, jobPostingId: analysisResults.jobPostingId, variantId: analysisResults.variantId })
+      .from(analysisResults)
+      .where(eq(analysisResults.id, analysisId))
+      .get()
+    if (!analysis) {
+      return { error: 'Analysis not found', code: 'NOT_FOUND' }
+    }
+    if (analysis.variantId == null) {
+      return { error: 'Analysis has no variant', code: 'NOT_FOUND' }
+    }
+    const variantId = analysis.variantId
+
+    // 2. Resolve the model — replicate runAnalysis's key-decryption path exactly.
+    // No new secret surface (ASVS V6).
+    let llm: LanguageModel
+    if (injectedModel) {
+      llm = injectedModel
+    } else {
+      const row = db.select().from(aiSettings).where(eq(aiSettings.id, 1)).get()
+      if (!row || row.apiKey.length === 0) {
+        return { error: 'AI provider not configured', code: 'NOT_CONFIGURED' }
+      }
+      if (!safeStorage.isEncryptionAvailable()) {
+        return { error: 'Encryption not available on this system', code: 'NOT_CONFIGURED' }
+      }
+      const apiKey = safeStorage.decryptString(Buffer.from(row.apiKey, 'base64'))
+      llm = getModel(row.provider, row.model, apiKey) as LanguageModel
+    }
+
+    // 3. Load the job posting and reconstruct ParsedJob from cached columns —
+    // D-12 guarantees an analysis (and therefore cached parsed data) exists, so
+    // no second callJobParser LLM call is made here.
+    const posting = db.select().from(jobPostings).where(eq(jobPostings.id, analysis.jobPostingId)).get()
+    if (!posting) {
+      return { error: 'Job posting not found', code: 'NOT_FOUND' }
+    }
+    const parsedJob: ParsedJob = {
+      title: posting.role,
+      company: posting.company,
+      required_skills: JSON.parse(posting.parsedSkills) as string[],
+      preferred_skills: JSON.parse(posting.parsedPreferred) as string[],
+      experience_years: null,
+      education_requirement: null,
+      key_responsibilities: JSON.parse(posting.parsedRequirements) as string[],
+      keywords: JSON.parse(posting.parsedKeywords) as string[],
+    }
+
+    // 4. Resolve tone from the analysis's variant layoutTemplate (D-07)
+    const variant = db
+      .select({ layoutTemplate: templateVariants.layoutTemplate })
+      .from(templateVariants)
+      .where(eq(templateVariants.id, variantId))
+      .get()
+    const tone = resolveLetterTone(variant?.layoutTemplate)
+
+    // 5. Build resume text exactly as runAnalysis does
+    const merged = await buildMergedBuilderData(db, variantId)
+    const { showSummary: _showSummary, summaryOverride, ...builderData } = merged
+    const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()
+    const effectiveProfile = profileRow && summaryOverride ? { ...profileRow, summary: summaryOverride } : profileRow
+    const resumeJson = buildResumeJson(effectiveProfile, builderData)
+    const resumeText = buildResumeTextForLlm(resumeJson)
+    const candidateName = profileRow?.name ?? ''
+
+    // 6. Call the LLM — MUST stay outside any sqlite.transaction() callback (RESEARCH.md
+    // Pitfall 4 — better-sqlite3 transactions are synchronous).
+    const letter = await callCoverLetterGenerator(resumeText, parsedJob, tone, candidateName, llm)
+
+    // 7. Persist immediately as a draft — D-04, no accept step.
+    saveCoverLetterDraft(db, analysisId, letter)
+
+    // 8. Return the letter
+    return { letter }
+  } catch (err) {
+    console.error('ai:generateCoverLetter error', err)
+    return {
+      error: err instanceof Error ? err.message : String(err),
+      code: 'GENERATION_FAILED',
+    }
   }
 }
 
@@ -914,5 +1038,17 @@ export function registerAiHandlers(): void {
 
   ipcMain.handle('ai:getSkillAdditions', (_event, analysisId: number) =>
     getSkillAdditions(db, analysisId),
+  )
+
+  ipcMain.handle('ai:generateCoverLetter', (_event, analysisId: number) =>
+    generateCoverLetter(db, analysisId),
+  )
+
+  ipcMain.handle('ai:saveCoverLetterDraft', (_event, analysisId: number, text: string) =>
+    saveCoverLetterDraft(db, analysisId, text),
+  )
+
+  ipcMain.handle('ai:getCoverLetter', (_event, analysisId: number) =>
+    getCoverLetter(db, analysisId),
   )
 }
