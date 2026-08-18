@@ -89,6 +89,64 @@ Score this resume against the job data above. Be rigorous and accurate.`
   return { system, prompt }
 }
 
+// ─── Cover Letter Prompt ──────────────────────────────────────────────────────
+
+export type LetterTone = 'formal' | 'direct' | 'plain' | 'neutral'
+
+/**
+ * Derives the cover letter's tone from the resume variant's layoutTemplate (D-07).
+ * No new tone setting is introduced — the variant is already chosen for the submission.
+ */
+export function resolveLetterTone(layoutTemplate: string | null | undefined): LetterTone {
+  switch (layoutTemplate) {
+    case 'executive':
+      return 'formal'
+    case 'modern':
+      return 'direct'
+    case 'jake':
+      return 'plain'
+    default:
+      return 'neutral'
+  }
+}
+
+export function buildCoverLetterPrompt(
+  resumeText: string,
+  parsedJob: ParsedJob,
+  tone: LetterTone,
+  candidateName: string,
+): { system: string; prompt: string } {
+  const system = `You are an expert career writer composing a job-tailored cover letter.
+
+Structure (CRITICAL):
+- Write EXACTLY 3 paragraphs:
+  1. A hook naming the specific role being applied for
+  2. Evidence matched to the posting's top requirements, drawn only from the candidate's resume
+  3. A close
+- Target length: approximately 250 words total. Be concise — select only the strongest evidence.
+- Tone: ${tone}. Write the entire letter in a ${tone} tone.
+
+Grounding rules (CRITICAL):
+- Base the letter ONLY on skills and experience present in the resume — do NOT fabricate experience, titles, or credentials.
+- For job requirements the resume does not support, say nothing about them. Do not raise gaps, and do not attempt to bridge unrelated or transferable experience to imply a match that isn't there.
+- The candidate's motivation for this specific company does not exist anywhere in the resume data. Include exactly one placeholder for it, written literally as: [why this company — your words]. Invent nothing about the company.
+
+Format:
+- Open the letter with the greeting: Dear Hiring Manager,
+- Close the letter with the candidate's name as the signature: ${candidateName}
+- Return only the letter text — no commentary, no markdown, no headings.`
+
+  const prompt = `## Candidate Resume
+${resumeText}
+
+## Job Posting
+${JSON.stringify(parsedJob, null, 2)}
+
+Write the cover letter for ${candidateName} following the system instructions above.`
+
+  return { system, prompt }
+}
+
 // ─── Resume Text Renderer ─────────────────────────────────────────────────────
 
 export function buildResumeTextForLlm(resumeJson: Record<string, unknown>): string {
