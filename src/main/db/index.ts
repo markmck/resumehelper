@@ -344,6 +344,14 @@ function ensureSchema(sqlite: Database.Database): void {
       \`margin_sides\` real NOT NULL,
       FOREIGN KEY (\`analysis_id\`) REFERENCES \`analysis_results\`(\`id\`) ON DELETE cascade
     );
+
+    CREATE TABLE IF NOT EXISTS \`cover_letters\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`analysis_id\` integer NOT NULL UNIQUE,
+      \`letter_text\` text NOT NULL DEFAULT '',
+      \`updated_at\` integer,
+      FOREIGN KEY (\`analysis_id\`) REFERENCES \`analysis_results\`(\`id\`) ON DELETE cascade
+    );
   `)
 
   // Add columns that may be missing on existing databases

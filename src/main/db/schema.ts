@@ -313,3 +313,13 @@ export const analysisLayoutOverrides = sqliteTable('analysis_layout_overrides', 
   marginBottom: real('margin_bottom').notNull(),
   marginSides: real('margin_sides').notNull(),
 })
+
+export const coverLetters = sqliteTable('cover_letters', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  analysisId: integer('analysis_id')
+    .notNull()
+    .unique()
+    .references(() => analysisResults.id, { onDelete: 'cascade' }),
+  letterText: text('letter_text').notNull().default(''),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }),
+})
