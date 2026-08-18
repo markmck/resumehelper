@@ -614,6 +614,15 @@ export interface Api {
     }>>
     acceptExcludedBulletSuggestion: (analysisId: number, bulletId: number) => Promise<{ success: boolean } | { error: string }>
     dismissExcludedBulletSuggestion: (analysisId: number, bulletId: number) => Promise<{ success: boolean } | { error: string }>
+    getExcludedProjectSuggestions: (analysisId: number) => Promise<Array<{
+      projectId: number
+      projectName: string
+      reason: string
+      matchedKeywords: string[]
+      status: string
+    }>>
+    acceptExcludedProjectSuggestion: (analysisId: number, projectId: number) => Promise<{ success: boolean } | { error: string }>
+    dismissExcludedProjectSuggestion: (analysisId: number, projectId: number) => Promise<{ success: boolean } | { error: string }>
     acceptAnalysisSummary: (analysisId: number, text: string) => Promise<{ success: boolean } | { error: string }>
     clearAnalysisSummary: (analysisId: number) => Promise<{ success: boolean } | { error: string }>
     getAnalysisSummary: (analysisId: number) => Promise<string | null>

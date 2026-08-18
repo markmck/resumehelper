@@ -265,6 +265,22 @@ export const analysisExcludedBulletSuggestions = sqliteTable('analysis_excluded_
     .$defaultFn(() => new Date()),
 })
 
+export const analysisExcludedProjectSuggestions = sqliteTable('analysis_excluded_project_suggestions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  analysisId: integer('analysis_id')
+    .notNull()
+    .references(() => analysisResults.id, { onDelete: 'cascade' }),
+  projectId: integer('project_id')
+    .notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  reason: text('reason').notNull().default(''),
+  matchedKeywords: text('matched_keywords').notNull().default('[]'),  // JSON string[]
+  status: text('status').notNull().default('pending'),  // 'pending' | 'accepted' | 'dismissed'
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
 export const entityOverrides = sqliteTable('entity_overrides', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   variantId: integer('variant_id').references(() => templateVariants.id, { onDelete: 'cascade' }),

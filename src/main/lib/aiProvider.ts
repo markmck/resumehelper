@@ -56,6 +56,19 @@ export const ResumeScorerSchema = z.object({
       matched_keywords: z.array(z.string()),
     })
   ).default([]),
+  // PROJ-01: whole-project inclusion suggestions. Same shape/guards as excluded_bullet_suggestions
+  // but keyed by projectId (from the [P{id}] tags in the excluded-projects context block).
+  project_suggestions: z.array(
+    z.object({
+      // See excluded_bullet_suggestions note above: .refine (not .int()/.positive()) so the
+      // JSON schema stays a plain { type: number } that the Anthropic structured-output API accepts.
+      projectId: z
+        .number()
+        .refine((n) => Number.isInteger(n) && n > 0, { message: 'projectId must be a positive integer' }),
+      reason: z.string(),
+      matched_keywords: z.array(z.string()),
+    })
+  ).default([]),
   // SUM-01: AI-suggested job-tailored summary. Rides the existing scorer call.
   // .default('') ensures backward compat — all existing MockLanguageModelV3 fixtures
   // that omit this field continue to parse successfully (same pattern as excluded_bullet_suggestions).
@@ -189,8 +202,9 @@ export async function callResumeScorer(
   parsedJob: ParsedJob,
   model: LanguageModel,
   excludedBulletsText?: string,
+  excludedProjectsText?: string,
 ): Promise<ResumeScore> {
-  const { system, prompt } = buildScorerPrompt(resumeText, parsedJob, excludedBulletsText)
+  const { system, prompt } = buildScorerPrompt(resumeText, parsedJob, excludedBulletsText, excludedProjectsText)
   const result = await generateObject({
     model: model as Parameters<typeof generateObject>[0]['model'],
     schema: ResumeScorerSchema,

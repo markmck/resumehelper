@@ -17,6 +17,7 @@ import {
   seedBullet,
   seedVariant,
   seedProject,
+  seedProjectBullet,
   seedJobPosting,
   seedAnalysis,
 } from '../../../helpers/factories'
@@ -211,6 +212,48 @@ describe('buildMergedBuilderData — override precedence (OVR-02) + inclusion (D
     const excludedBullet = jobBaseView!.bullets.find((b) => b.id === bullet.id)
     expect(excludedBullet).toBeDefined()
     expect(excludedBullet!.excluded).toBe(true)
+  })
+
+  it('case 5b: PROJ-01 project inclusion is analysis-scoped — re-includes only with analysisId', async () => {
+    const db = createTestDb()
+
+    const project = seedProject(db, { name: 'Benched Project' })
+    seedProjectBullet(db, project.id, { text: 'Project bullet' })
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+
+    const posting = seedJobPosting(db, { company: 'TestCo', role: 'Dev' })
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+
+    // Variant excludes the whole project
+    db.insert(templateVariantItems).values({
+      variantId: variant.id,
+      itemType: 'project',
+      projectId: project.id,
+      excluded: true,
+    }).run()
+
+    // Analysis-tier inclusion row re-includes the project for THIS analysis only
+    db.insert(entityOverrides).values({
+      variantId: variant.id,
+      analysisId: analysis.id,
+      entityType: 'project',
+      field: 'inclusion',
+      projectId: project.id,
+      overrideText: '',
+      source: 'inclusion',
+    }).run()
+
+    // With analysisId: re-included → excluded === false
+    const mergedWithAnalysis = await buildMergedBuilderData(db, variant.id, analysis.id)
+    const includedProject = mergedWithAnalysis.projects.find((p) => p.id === project.id)
+    expect(includedProject).toBeDefined()
+    expect(includedProject!.excluded).toBe(false)
+
+    // Without analysisId (base variant view): re-inclusion does NOT apply → excluded === true
+    const mergedBaseView = await buildMergedBuilderData(db, variant.id)
+    const excludedProject = mergedBaseView.projects.find((p) => p.id === project.id)
+    expect(excludedProject).toBeDefined()
+    expect(excludedProject!.excluded).toBe(true)
   })
 
   it('case 6: rejects a (variantId, analysisId) pair that belong to different variants (WR-01 fail-closed)', async () => {

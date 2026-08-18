@@ -246,6 +246,18 @@ export function createTestDb() {
       FOREIGN KEY (\`bullet_id\`) REFERENCES \`job_bullets\`(\`id\`) ON DELETE cascade
     );
 
+    CREATE TABLE IF NOT EXISTS \`analysis_excluded_project_suggestions\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`analysis_id\` integer NOT NULL,
+      \`project_id\` integer NOT NULL,
+      \`reason\` text NOT NULL DEFAULT '',
+      \`matched_keywords\` text NOT NULL DEFAULT '[]',
+      \`status\` text NOT NULL DEFAULT 'pending',
+      \`created_at\` integer NOT NULL DEFAULT (unixepoch()),
+      FOREIGN KEY (\`analysis_id\`) REFERENCES \`analysis_results\`(\`id\`) ON DELETE cascade,
+      FOREIGN KEY (\`project_id\`) REFERENCES \`projects\`(\`id\`) ON DELETE cascade
+    );
+
     CREATE TABLE IF NOT EXISTS \`entity_overrides\` (
       \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
       \`variant_id\` integer,

@@ -294,6 +294,12 @@ const api = {
       ipcRenderer.invoke('ai:acceptExcludedBulletSuggestion', analysisId, bulletId),
     dismissExcludedBulletSuggestion: (analysisId: number, bulletId: number) =>
       ipcRenderer.invoke('ai:dismissExcludedBulletSuggestion', analysisId, bulletId),
+    getExcludedProjectSuggestions: (analysisId: number) =>
+      ipcRenderer.invoke('ai:getExcludedProjectSuggestions', analysisId),
+    acceptExcludedProjectSuggestion: (analysisId: number, projectId: number) =>
+      ipcRenderer.invoke('ai:acceptExcludedProjectSuggestion', analysisId, projectId),
+    dismissExcludedProjectSuggestion: (analysisId: number, projectId: number) =>
+      ipcRenderer.invoke('ai:dismissExcludedProjectSuggestion', analysisId, projectId),
     acceptAnalysisSummary: (analysisId: number, text: string) =>
       ipcRenderer.invoke('ai:acceptAnalysisSummary', analysisId, text),
     clearAnalysisSummary: (analysisId: number) =>

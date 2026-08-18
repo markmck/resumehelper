@@ -1,7 +1,7 @@
 import { ipcMain, safeStorage } from 'electron'
 import { eq, and } from 'drizzle-orm'
 import { db, sqlite } from '../db'
-import { aiSettings, jobPostings, analysisResults, profile, analysisSkillAdditions, entityOverrides, analysisExcludedBulletSuggestions, jobBullets, templateVariantItems } from '../db/schema'
+import { aiSettings, jobPostings, analysisResults, profile, analysisSkillAdditions, entityOverrides, analysisExcludedBulletSuggestions, analysisExcludedProjectSuggestions, jobBullets, projects, templateVariantItems } from '../db/schema'
 import { callJobParser, callResumeScorer, deriveOverallScore, getModel } from '../lib/aiProvider'
 import { buildResumeTextForLlm } from '../lib/analysisPrompts'
 import { buildMergedBuilderData } from '../lib/mergeHelper'
@@ -108,10 +108,27 @@ export async function runAnalysis(db: Db, event: Electron.IpcMainInvokeEvent, jo
       ? excludedBulletLines.join('\n')
       : ''
 
+    // Build excluded projects context for the scorer prompt (PROJ-01).
+    // Collect whole projects excluded in this variant so the scorer can suggest re-inclusions.
+    // Skip projects with no showable bullets — a bare name is not worth suggesting.
+    const excludedProjectIds = new Set<number>()
+    const excludedProjectLines: string[] = []
+    for (const project of builderData.projects) {
+      if (!project.excluded) continue
+      const projectBullets = project.bullets.filter((b) => !b.excluded)
+      if (projectBullets.length === 0) continue
+      excludedProjectIds.add(project.id)
+      excludedProjectLines.push(`[P${project.id}] ${project.name}`)
+      for (const b of projectBullets) excludedProjectLines.push(`• ${b.text}`)
+    }
+    const excludedProjectsText = excludedProjectLines.length > 0
+      ? excludedProjectLines.join('\n')
+      : ''
+
     // 5. Call 2 — score resume
     event.sender.send('ai:progress', 'scoring', 50)
 
-    const scoreResult = await callResumeScorer(resumeText, parsedJob, llm, excludedBulletsText)
+    const scoreResult = await callResumeScorer(resumeText, parsedJob, llm, excludedBulletsText, excludedProjectsText)
     const overallScore = deriveOverallScore(scoreResult)
 
     // 6. Store results in analysis_results table
@@ -143,6 +160,10 @@ export async function runAnalysis(db: Db, event: Electron.IpcMainInvokeEvent, jo
     // 7. Seed excluded-bullet suggestions from scorer output (SUG-01).
     // Only validated suggestions (bulletId in job_bullets AND in excludedBulletIds) are persisted.
     ensureExcludedBulletSuggestions(db, inserted.id, scoreResult.excluded_bullet_suggestions, excludedBulletIds)
+
+    // 7b. Seed excluded-project suggestions from scorer output (PROJ-01).
+    // Only validated suggestions (projectId in projects AND in excludedProjectIds) are persisted.
+    ensureExcludedProjectSuggestions(db, inserted.id, scoreResult.project_suggestions, excludedProjectIds)
 
     // 8. Signal completion
     event.sender.send('ai:progress', 'done', 100)
@@ -634,6 +655,194 @@ export function getExcludedBulletSuggestions(db: Db, analysisId: number): Array<
   }
 }
 
+// ─── Excluded-project suggestions (PROJ-01) — mirrors the excluded-bullet flow ──
+
+export function ensureExcludedProjectSuggestions(
+  db: Db,
+  analysisId: number,
+  suggestions: Array<{ projectId: number; reason: string; matched_keywords: string[] }>,
+  excludedProjectIds: Set<number>,
+) {
+  try {
+    for (const sg of suggestions) {
+      // Guard 1: projectId must exist in projects (reject hallucinated IDs)
+      const projectRow = db.select({ id: projects.id })
+        .from(projects)
+        .where(eq(projects.id, sg.projectId))
+        .get()
+      if (!projectRow) {
+        console.error(`ensureExcludedProjectSuggestions: projectId ${sg.projectId} not found in projects — skipping`)
+        continue
+      }
+      // Guard 2: projectId must be in the excluded set built at analysis time
+      if (!excludedProjectIds.has(sg.projectId)) {
+        console.error(`ensureExcludedProjectSuggestions: projectId ${sg.projectId} not in excludedProjectIds set — skipping`)
+        continue
+      }
+      // Insert only if not already present for this (analysisId, projectId)
+      const existing = db.select({ id: analysisExcludedProjectSuggestions.id })
+        .from(analysisExcludedProjectSuggestions)
+        .where(and(
+          eq(analysisExcludedProjectSuggestions.analysisId, analysisId),
+          eq(analysisExcludedProjectSuggestions.projectId, sg.projectId),
+        ))
+        .get()
+      if (!existing) {
+        db.insert(analysisExcludedProjectSuggestions)
+          .values({
+            analysisId,
+            projectId: sg.projectId,
+            reason: sg.reason,
+            matchedKeywords: JSON.stringify(sg.matched_keywords),
+            status: 'pending',
+          })
+          .run()
+      }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error('ai:ensureExcludedProjectSuggestions error', err)
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export function acceptExcludedProjectSuggestion(db: Db, analysisId: number, projectId: number) {
+  try {
+    // Resolve variantId from the analysis row
+    const analysisRow = db
+      .select({ variantId: analysisResults.variantId })
+      .from(analysisResults)
+      .where(eq(analysisResults.id, analysisId))
+      .get()
+    const variantId = analysisRow?.variantId ?? null
+
+    // Re-validation at accept time (variant may have changed since seeding).
+    // Guard 1: projectId must exist in projects
+    const projectRow = db.select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .get()
+    if (!projectRow) {
+      console.error(`acceptExcludedProjectSuggestion: projectId ${projectId} not found in projects`)
+      return { error: `projectId ${projectId} not found in projects` }
+    }
+
+    // Guard 2: projectId must be excluded in template_variant_items for this variant
+    if (variantId !== null) {
+      const exclusionRow = db.select({ id: templateVariantItems.id })
+        .from(templateVariantItems)
+        .where(and(
+          eq(templateVariantItems.variantId, variantId),
+          eq(templateVariantItems.projectId, projectId),
+          eq(templateVariantItems.excluded, true),
+        ))
+        .get()
+      if (!exclusionRow) {
+        console.error(`acceptExcludedProjectSuggestion: projectId ${projectId} is not excluded in variant ${variantId}`)
+        return { error: `projectId ${projectId} is not excluded in variant ${variantId}` }
+      }
+    }
+
+    // Write inclusion entityOverrides row (delete+insert upsert). field='inclusion' and
+    // source='inclusion' — NOT field='text'. The mergeHelper reads source === 'inclusion'
+    // with projectId set to build the project inclusion set (PROJ-01).
+    sqlite.transaction(() => {
+      db.delete(entityOverrides)
+        .where(
+          and(
+            eq(entityOverrides.analysisId, analysisId),
+            eq(entityOverrides.entityType, 'project'),
+            eq(entityOverrides.projectId, projectId),
+          )
+        )
+        .run()
+
+      db.insert(entityOverrides)
+        .values({
+          variantId,
+          analysisId,
+          entityType: 'project',
+          field: 'inclusion',
+          projectId,
+          overrideText: '',
+          source: 'inclusion',
+        })
+        .run()
+    })()
+
+    // Flip suggestion status to accepted
+    db.update(analysisExcludedProjectSuggestions)
+      .set({ status: 'accepted' })
+      .where(and(
+        eq(analysisExcludedProjectSuggestions.analysisId, analysisId),
+        eq(analysisExcludedProjectSuggestions.projectId, projectId),
+      ))
+      .run()
+
+    return { success: true }
+  } catch (err) {
+    console.error('ai:acceptExcludedProjectSuggestion error', err)
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export function dismissExcludedProjectSuggestion(db: Db, analysisId: number, projectId: number) {
+  try {
+    db.update(analysisExcludedProjectSuggestions)
+      .set({ status: 'dismissed' })
+      .where(and(
+        eq(analysisExcludedProjectSuggestions.analysisId, analysisId),
+        eq(analysisExcludedProjectSuggestions.projectId, projectId),
+      ))
+      .run()
+    return { success: true }
+  } catch (err) {
+    console.error('ai:dismissExcludedProjectSuggestion error', err)
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export function getExcludedProjectSuggestions(db: Db, analysisId: number): Array<{
+  projectId: number
+  projectName: string
+  reason: string
+  matchedKeywords: string[]
+  status: string
+}> {
+  try {
+    // Use raw sqlite session shim for testability (createTestDb uses better-sqlite3 directly).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const session = (db as any).session
+    const prepare = session
+      ? (sql: string) => session.client.prepare(sql)
+      : (sql: string) => sqlite.prepare(sql)
+    const rows = prepare(`
+      SELECT aeps.project_id AS projectId,
+             p.name AS projectName,
+             aeps.reason,
+             aeps.matched_keywords AS matchedKeywords,
+             aeps.status
+      FROM analysis_excluded_project_suggestions aeps
+      JOIN projects p ON p.id = aeps.project_id
+      WHERE aeps.analysis_id = ?
+      ORDER BY aeps.id
+    `).all(analysisId) as Array<{
+      projectId: number
+      projectName: string
+      reason: string
+      matchedKeywords: string
+      status: string
+    }>
+    return rows.map(r => ({
+      ...r,
+      matchedKeywords: JSON.parse(r.matchedKeywords) as string[],
+    }))
+  } catch (err) {
+    console.error('ai:getExcludedProjectSuggestions error', err)
+    return []
+  }
+}
+
 export function registerAiHandlers(): void {
   ipcMain.handle('ai:analyze', (event, jobPostingId: number, variantId: number) =>
     runAnalysis(db, event, jobPostingId, variantId),
@@ -673,6 +882,18 @@ export function registerAiHandlers(): void {
 
   ipcMain.handle('ai:dismissExcludedBulletSuggestion', (_event, analysisId: number, bulletId: number) =>
     dismissExcludedBulletSuggestion(db, analysisId, bulletId),
+  )
+
+  ipcMain.handle('ai:getExcludedProjectSuggestions', (_event, analysisId: number) =>
+    getExcludedProjectSuggestions(db, analysisId),
+  )
+
+  ipcMain.handle('ai:acceptExcludedProjectSuggestion', (_event, analysisId: number, projectId: number) =>
+    acceptExcludedProjectSuggestion(db, analysisId, projectId),
+  )
+
+  ipcMain.handle('ai:dismissExcludedProjectSuggestion', (_event, analysisId: number, projectId: number) =>
+    dismissExcludedProjectSuggestion(db, analysisId, projectId),
   )
 
   ipcMain.handle('ai:acceptAnalysisSummary', (_event, analysisId: number, text: string) =>

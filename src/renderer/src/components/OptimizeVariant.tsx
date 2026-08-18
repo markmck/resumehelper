@@ -75,6 +75,16 @@ interface StagedExcludedBullet {
   status: StagedExcludedBulletStatus
 }
 
+type StagedExcludedProjectStatus = 'pending' | 'accepted' | 'dismissed'
+
+interface StagedExcludedProject {
+  projectId: number
+  projectName: string
+  reason: string
+  matchedKeywords: string[]
+  status: StagedExcludedProjectStatus
+}
+
 interface BuilderBullet {
   id: number
   text: string
@@ -160,6 +170,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
   // Existing skill category names, for the per-suggested-skill category picker
   const [skillCategories, setSkillCategories] = useState<string[]>([])
   const [stagedBullets, setStagedBullets] = useState<StagedExcludedBullet[]>([])
+  const [stagedProjects, setStagedProjects] = useState<StagedExcludedProject[]>([])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
   // ── Summary card state
@@ -548,6 +559,24 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
     loadExcludedBullets()
   }, [analysis?.id])
 
+  // ── Load excluded-project suggestions on mount (PROJ-01)
+  useEffect(() => {
+    if (!analysis?.id) return
+    const loadExcludedProjects = async (): Promise<void> => {
+      const results = await window.api.ai.getExcludedProjectSuggestions(analysis.id)
+      setStagedProjects(
+        results.map((r) => ({
+          projectId: r.projectId,
+          projectName: r.projectName,
+          reason: r.reason,
+          matchedKeywords: r.matchedKeywords,
+          status: r.status as StagedExcludedProjectStatus,
+        }))
+      )
+    }
+    loadExcludedProjects()
+  }, [analysis?.id])
+
   // ── Seed summary edit text when analysis loads, and hydrate the "accepted" state
   // from any persisted analysis-tier summary override so it survives reopening.
   useEffect(() => {
@@ -636,6 +665,16 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
         }
       }
     }
+    // Resolved keywords from accepted excluded-project re-inclusions (PROJ-01)
+    for (const sp of stagedProjects) {
+      if (sp.status === 'accepted') {
+        for (const kw of sp.matchedKeywords) {
+          if (missingKeywords.some((mk) => mk.toLowerCase() === kw.toLowerCase())) {
+            resolvedCount++
+          }
+        }
+      }
+    }
 
     const totalKeywords = keywordHits.length + semanticMatches.length + missingKeywords.length
     const newExact = keywordHits.length + resolvedCount
@@ -654,7 +693,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
       experience_score: analysis.scoreBreakdown.experience_score,
       ats_score: analysis.scoreBreakdown.ats_score,
     })
-  }, [analysis, suggStates, stagedSkills, stagedBullets])
+  }, [analysis, suggStates, stagedSkills, stagedBullets, stagedProjects])
 
   // ── Derived display values
   const originalScore = analysis?.matchScore ?? 0
@@ -830,6 +869,36 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
     setPreviewRefreshKey((k) => k + 1)
   }
 
+  // ── Excluded-project handlers (PROJ-01)
+  const acceptProject = async (projectId: number): Promise<void> => {
+    if (!analysis) return
+    const result = await window.api.ai.acceptExcludedProjectSuggestion(analysis.id, projectId)
+    if ('error' in result) return
+    setStagedProjects((prev) =>
+      prev.map((p) => (p.projectId === projectId ? { ...p, status: 'accepted' } : p))
+    )
+    setPreviewRefreshKey((k) => k + 1)
+  }
+
+  const dismissProject = async (projectId: number): Promise<void> => {
+    if (!analysis) return
+    const result = await window.api.ai.dismissExcludedProjectSuggestion(analysis.id, projectId)
+    if ('error' in result) return
+    setStagedProjects((prev) =>
+      prev.map((p) => (p.projectId === projectId ? { ...p, status: 'dismissed' } : p))
+    )
+  }
+
+  const revertProject = async (projectId: number): Promise<void> => {
+    if (!analysis) return
+    const result = await window.api.ai.dismissExcludedProjectSuggestion(analysis.id, projectId)
+    if ('error' in result) return
+    setStagedProjects((prev) =>
+      prev.map((p) => (p.projectId === projectId ? { ...p, status: 'pending' } : p))
+    )
+    setPreviewRefreshKey((k) => k + 1)
+  }
+
   // ── Summary card handlers (SUM-01 / SUM-02)
   const acceptSummary = async (): Promise<void> => {
     if (!analysis) return
@@ -889,8 +958,7 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
     if (exportingPdf || !analysis?.variantId) return
     setExportingPdf(true)
     try {
-      const profile = await window.api.profile.get()
-      const filename = `${sanitize(profile.name || 'Resume')}_Resume_${sanitize(analysis.variantName || 'Optimized')}.pdf`
+      const filename = `${sanitize(analysis.variantName || 'Resume')}_${sanitize(analysis.company || 'Company')}.pdf`
       const result = await window.api.exportFile.pdf(analysis.variantId, filename, analysis.id)
       if (result && !result.canceled) {
         showToast('Resume exported as PDF')
@@ -1983,6 +2051,224 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
             </div>
           )}
 
+          {/* Excluded-project suggestions section (PROJ-01) */}
+          {stagedProjects.filter((p) => p.status !== 'dismissed').length > 0 && (
+            <div style={{ marginTop: 'var(--space-8)' }}>
+              {/* Heading row */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-3)',
+                  marginBottom: 'var(--space-4)',
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: 'var(--font-size-base)',
+                    fontWeight: 700,
+                    color: 'var(--color-text-primary)',
+                    margin: 0,
+                  }}
+                >
+                  Projects that match this job
+                </h2>
+                {stagedProjects.filter((p) => p.status === 'pending').length > 0 && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '1px 8px',
+                      backgroundColor: 'rgba(139,92,246,0.12)',
+                      color: 'var(--color-accent)',
+                      borderRadius: '999px',
+                      fontSize: 'var(--font-size-xs)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {stagedProjects.filter((p) => p.status === 'pending').length} pending
+                  </span>
+                )}
+              </div>
+
+              {/* Card list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                {stagedProjects
+                  .filter((p) => p.status !== 'dismissed')
+                  .map((p) => {
+                    const isAccepted = p.status === 'accepted'
+                    return (
+                      <div
+                        key={p.projectId}
+                        style={{
+                          backgroundColor: isAccepted
+                            ? 'rgba(34,197,94,0.04)'
+                            : 'var(--color-bg-surface)',
+                          border: isAccepted
+                            ? '1px solid rgba(34,197,94,0.25)'
+                            : '1px solid var(--color-border-subtle)',
+                          borderRadius: 'var(--radius-lg)',
+                          padding: 'var(--space-3) var(--space-4)',
+                          opacity: 1,
+                          transition: 'opacity 0.2s',
+                        }}
+                      >
+                        {/* Card header row */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 'var(--space-2)',
+                            marginBottom: 'var(--space-3)',
+                          }}
+                        >
+                          {isAccepted && (
+                            <span
+                              style={{
+                                marginLeft: 'auto',
+                                padding: '1px 8px',
+                                backgroundColor: 'rgba(34,197,94,0.12)',
+                                color: 'var(--color-success)',
+                                borderRadius: 'var(--radius-sm)',
+                                fontSize: 'var(--font-size-xs)',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Re-included
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Project name block (left-border accent) */}
+                        <div
+                          style={{
+                            borderLeft: '2px solid var(--color-accent)',
+                            paddingLeft: 'var(--space-2)',
+                            marginBottom: 'var(--space-2)',
+                            ...(isAccepted
+                              ? {
+                                  backgroundColor: 'rgba(34,197,94,0.08)',
+                                  borderRadius: `0 var(--radius-sm) var(--radius-sm) 0`,
+                                }
+                              : {}),
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 'var(--font-size-sm)',
+                              fontWeight: 600,
+                              color: 'var(--color-text-primary)',
+                              margin: 0,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {p.projectName}
+                          </p>
+                        </div>
+
+                        {/* AI reason line (omit if empty) */}
+                        {p.reason && (
+                          <p
+                            style={{
+                              fontSize: 'var(--font-size-xs)',
+                              color: 'var(--color-text-secondary)',
+                              margin: '0 0 var(--space-2) 0',
+                            }}
+                          >
+                            {p.reason}
+                          </p>
+                        )}
+
+                        {/* Matched keyword chips */}
+                        {p.matchedKeywords.length > 0 && (
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: 'var(--space-1)',
+                              marginBottom: 'var(--space-3)',
+                            }}
+                          >
+                            {p.matchedKeywords.map((kw, ki) => (
+                              <span
+                                key={ki}
+                                style={{
+                                  padding: '1px 6px',
+                                  backgroundColor: 'rgba(139,92,246,0.12)',
+                                  color: 'var(--color-accent-light)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  fontSize: 'var(--font-size-xs)',
+                                }}
+                              >
+                                {kw}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                          {isAccepted ? (
+                            <button
+                              onClick={() => revertProject(p.projectId)}
+                              style={{
+                                padding: '4px 12px',
+                                backgroundColor: 'transparent',
+                                color: 'var(--color-text-secondary)',
+                                border: '1px solid var(--color-border-default)',
+                                borderRadius: 'var(--radius-md)',
+                                fontSize: 'var(--font-size-xs)',
+                                fontWeight: 400,
+                                cursor: 'pointer',
+                                fontFamily: 'var(--font-sans)',
+                              }}
+                            >
+                              Revert
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => acceptProject(p.projectId)}
+                                style={{
+                                  padding: '5px 12px',
+                                  backgroundColor: 'rgba(34,197,94,0.12)',
+                                  color: 'var(--color-success)',
+                                  border: '1px solid rgba(34,197,94,0.3)',
+                                  borderRadius: 'var(--radius-md)',
+                                  fontSize: 'var(--font-size-xs)',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  fontFamily: 'var(--font-sans)',
+                                }}
+                              >
+                                Re-include project
+                              </button>
+                              <button
+                                onClick={() => dismissProject(p.projectId)}
+                                style={{
+                                  padding: '5px 12px',
+                                  backgroundColor: 'transparent',
+                                  color: 'var(--color-text-tertiary)',
+                                  border: 'none',
+                                  borderRadius: 'var(--radius-md)',
+                                  fontSize: 'var(--font-size-xs)',
+                                  cursor: 'pointer',
+                                  fontFamily: 'var(--font-sans)',
+                                }}
+                              >
+                                Dismiss
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
+          )}
+
           {/* Skill Suggestions section */}
           {stagedSkills.length > 0 && (
             <div style={{ marginTop: 'var(--space-8)' }}>
@@ -2347,7 +2633,8 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
               : 0
             const pendingSkills = stagedSkills.filter(s => s.state === 'pending').length
             const pendingExcludedBulletCount = stagedBullets.filter(b => b.status === 'pending').length
-            const hasItems = pendingRewrites > 0 || remainingKeywords > 0 || pendingSkills > 0 || pendingExcludedBulletCount > 0
+            const pendingExcludedProjectCount = stagedProjects.filter(p => p.status === 'pending').length
+            const hasItems = pendingRewrites > 0 || remainingKeywords > 0 || pendingSkills > 0 || pendingExcludedBulletCount > 0 || pendingExcludedProjectCount > 0
             if (!hasItems) return null
             return (
               <div style={{
@@ -2385,6 +2672,9 @@ function OptimizeVariant({ analysisId, onBack, onLogSubmission }: OptimizeVarian
                   )}
                   {pendingExcludedBulletCount > 0 && (
                     <li>{pendingExcludedBulletCount} excluded bullet suggestion{pendingExcludedBulletCount !== 1 ? 's' : ''}</li>
+                  )}
+                  {pendingExcludedProjectCount > 0 && (
+                    <li>{pendingExcludedProjectCount} excluded project suggestion{pendingExcludedProjectCount !== 1 ? 's' : ''}</li>
                   )}
                 </ul>
               </div>

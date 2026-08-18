@@ -267,6 +267,21 @@ export async function buildMergedBuilderData(
     }
   }
 
+  // PROJ-01 inclusion set: analysis-tier source='inclusion' rows re-include whole projects.
+  // Keyed by projectId (entityType 'project') so it does not cross-wire with the bullet
+  // inclusion set above (bullet rows carry bulletId, project rows carry projectId).
+  const analysisInclusionProjectIds = new Set<number>()
+  for (const row of overrideRows) {
+    if (
+      row.analysisId != null &&
+      row.source === 'inclusion' &&
+      row.entityType === 'project' &&
+      row.projectId != null
+    ) {
+      analysisInclusionProjectIds.add(row.projectId)
+    }
+  }
+
   const summaryOverride = getOverrideText('summary', null, 'text')
 
   // ----------------------------------------------------------------
@@ -318,7 +333,7 @@ export async function buildMergedBuilderData(
   const projectsWithBullets: BuilderProject[] = allProjects.map((project) => ({
     id: project.id,
     name: getOverrideText('project_name', project.id, 'name') ?? project.name,
-    excluded: excludedProjectIds.has(project.id),
+    excluded: excludedProjectIds.has(project.id) && !analysisInclusionProjectIds.has(project.id),
     bullets: (projectBulletsByProjectId.get(project.id) ?? []).map((b) => ({
       id: b.id,
       text: b.text,

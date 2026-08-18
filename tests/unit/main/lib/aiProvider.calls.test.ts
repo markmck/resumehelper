@@ -105,9 +105,9 @@ describe('callResumeScorer', () => {
   it('returns the parsed score when mock yields valid ResumeScorerSchema data', async () => {
     const model = mockReturning(validScore)
     const result = await callResumeScorer('resume text', validParsedJob, model as any)
-    // ResumeScorerSchema applies .default('') so the parsed result includes suggested_summary
-    // even when the fixture does not supply it — match the full parsed shape.
-    expect(result).toEqual({ ...validScore, suggested_summary: '' })
+    // ResumeScorerSchema applies .default() so the parsed result includes suggested_summary
+    // and project_suggestions even when the fixture does not supply them — match the full parsed shape.
+    expect(result).toEqual({ ...validScore, suggested_summary: '', project_suggestions: [] })
   })
 
   it('rejects when mock returns a score missing gaps', async () => {

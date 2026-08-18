@@ -26,6 +26,7 @@ export function buildScorerPrompt(
   resumeText: string,
   parsedJob: ParsedJob,
   excludedBulletsText?: string,
+  excludedProjectsText?: string,
 ): { system: string; prompt: string } {
   const system = `You are an expert resume analyst and ATS (Applicant Tracking System) specialist. Your task is to score a resume against a parsed job description.
 
@@ -56,6 +57,16 @@ Excluded-bullet suggestion guidelines:
 - DO NOT suggest a bullet if you cannot reliably read its [B{id}] integer — leave excluded_bullet_suggestions empty rather than guess an ID.
 - If no excluded bullets are relevant, return an empty excluded_bullet_suggestions array.
 
+Excluded-project suggestion guidelines (project_suggestions field):
+- You will receive a list of whole PROJECTS the candidate excluded from their active resume variant (tagged [P{id}] for reference), each with its bullet highlights.
+- Review this list against the job's required and preferred skills, key responsibilities, and missing keywords.
+- Suggest at most 3 excluded projects that are GENUINELY relevant to this specific job's gaps — not just generally impressive projects.
+- Rank suggestions by relevance: the most gap-closing project first.
+- For each suggestion, provide: the projectId (integer, from the [P{id}] tag), a brief reason (1 sentence why this project helps), and the matched_keywords (JD keywords this project addresses, subset of the job's keywords list).
+- DO NOT suggest a project that is already covered by the included resume text or is not relevant to the job gaps.
+- DO NOT suggest a project if you cannot reliably read its [P{id}] integer — leave project_suggestions empty rather than guess an ID.
+- If no excluded projects are relevant, return an empty project_suggestions array.
+
 Summary suggestion guidelines (suggested_summary field):
 - Write a 2–4 sentence professional summary tailored to THIS specific job posting.
 - The summary should highlight the candidate's most relevant experience and incorporate the job's key keywords naturally.
@@ -71,6 +82,7 @@ ${JSON.stringify(parsedJob, null, 2)}
 ## Resume Text
 ${resumeText}
 ${excludedBulletsText ? `\n## Excluded Bullets (base experience not on your variant)\n${excludedBulletsText}` : ''}
+${excludedProjectsText ? `\n## Excluded Projects (projects not on your variant)\n${excludedProjectsText}` : ''}
 
 Score this resume against the job data above. Be rigorous and accurate.`
 
