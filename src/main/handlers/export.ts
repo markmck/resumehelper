@@ -222,6 +222,101 @@ export function registerExportHandlers(): void {
     return { canceled: false, filePath }
   })
 
+  // export:coverLetterPdf — deliberately NOT template-aware (D-15/T-05): this handler must
+  // never resolve a layoutTemplate, never read DOCX_MARGIN_DEFAULTS, and never touch
+  // V2_TEMPLATES/templateVariants. The letter text always arrives as a caller-supplied payload;
+  // the ONLY correct post-submit source is JSON.parse(submissions.resumeSnapshot).coverLetter —
+  // this handler must never re-query the mutable cover_letters table live (D-11 / Pitfall 2).
+  ipcMain.handle(
+    'export:coverLetterPdf',
+    async (
+      _,
+      payload: {
+        coverLetter: string
+        profile?: { name: string; email: string; phone: string; location: string; linkedin: string }
+        company?: string
+        role?: string
+      },
+      defaultFilename: string
+    ) => {
+      // 1. Nothing to print — bail before any dialog
+      if (!payload?.coverLetter || !payload.coverLetter.trim()) return { canceled: true }
+
+      // 2. Save dialog
+      const lastDir = getSetting(db, 'lastExportDir')
+      const fallbackName = defaultFilename ?? 'cover-letter.pdf'
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: 'Export Cover Letter as PDF',
+        defaultPath: lastDir ? join(lastDir, fallbackName) : fallbackName,
+        filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+      })
+      if (canceled || !filePath) return { canceled: true }
+
+      // 3. Profile resolution — frozen snapshot profile wins; fall back to live DB for old
+      // submissions that predate the frozen profile. No templateVariants read (D-15).
+      const profileRow = payload.profile ?? db.select().from(profile).where(eq(profile.id, 1)).get()
+
+      // 4. Build the print payload consumed by CoverLetterPrintApp.tsx
+      const printPayload = {
+        coverLetter: payload.coverLetter,
+        profile: profileRow
+          ? {
+              name: profileRow.name,
+              email: profileRow.email,
+              phone: profileRow.phone,
+              location: profileRow.location,
+              linkedin: profileRow.linkedin,
+            }
+          : undefined,
+        company: payload.company,
+        role: payload.role,
+        dateString: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+      }
+
+      // 5. Hidden window
+      const win = new BrowserWindow({
+        show: false,
+        width: 816,
+        height: 1056,
+        webPreferences: {
+          preload: join(__dirname, '../preload/index.js'),
+          sandbox: false,
+        },
+      })
+
+      // 6. Load the app's own bundled print target only — never a caller-constructed URL
+      if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+        await win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/print-letter.html`)
+      } else {
+        await win.loadFile(join(__dirname, '../renderer/print-letter.html'))
+      }
+
+      // 7. Wait for CoverLetterPrintApp to signal readiness
+      await new Promise<void>((resolve) => {
+        ipcMain.once('print:ready', () => resolve())
+        setTimeout(() => resolve(), 3000)
+      })
+
+      // 8. Push the letter as data via postMessage — never injected as markup
+      await win.webContents.executeJavaScript(
+        `window.postMessage(${JSON.stringify({ type: 'print-data', payload: printPayload })}, '*')`
+      )
+
+      // 9. Settle delay, then print with fixed 1in margins (top/bottom); sides come from
+      // CoverLetterPrintApp.tsx's inline padding: '0 1in'. FIXED literals — no template lookup.
+      await new Promise((r) => setTimeout(r, 500))
+      const pdfBuffer = await win.webContents.printToPDF({
+        printBackground: true,
+        pageSize: 'Letter',
+        margins: { top: 1, bottom: 1, left: 0, right: 0 },
+      })
+      win.destroy()
+      await fs.writeFile(filePath, pdfBuffer)
+      setSetting(db, 'lastExportDir', dirname(filePath))
+      return { canceled: false, filePath }
+    }
+  )
+
   ipcMain.handle('export:json', async (_, defaultFilename: string) => {
     let resumeJson
     try {
