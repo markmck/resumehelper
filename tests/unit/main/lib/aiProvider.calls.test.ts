@@ -4,6 +4,7 @@ import {
   callJobParser,
   callResumeScorer,
   callResumeExtractor,
+  callCoverLetterGenerator,
   type ParsedJob,
 } from '../../../../src/main/lib/aiProvider'
 
@@ -162,5 +163,52 @@ describe('callResumeExtractor', () => {
     const model = mockReturningText(JSON.stringify(validResumeJson))
     const result = await callResumeExtractor('pdf text', model as any)
     expect(result.work.length).toBe(1)
+  })
+})
+
+describe('callCoverLetterGenerator', () => {
+  // callCoverLetterGenerator uses generateText and returns free-text prose, not JSON.
+  function mockReturningText(text: string): MockLanguageModelV3 {
+    return new MockLanguageModelV3({
+      doGenerate: async () => ({
+        finishReason: 'stop' as const,
+        usage: { inputTokens: 10, outputTokens: 20 },
+        content: [{ type: 'text' as const, text }],
+        warnings: [],
+      }),
+    })
+  }
+
+  it('returns the mock text trimmed of surrounding whitespace', async () => {
+    const model = mockReturningText('\n\n  Dear Hiring Manager, ... Mark M  \n\n')
+    const result = await callCoverLetterGenerator('resume text', validParsedJob, 'neutral', 'Mark M', model as any)
+    expect(result).toBe('Dear Hiring Manager, ... Mark M')
+  })
+
+  it('passes resumeText through to the prompt', async () => {
+    const marker = 'UNIQUE_RESUME_TEXT_MARKER_55555'
+    const { model, getPrompt } = mockCapturingPrompt('generated letter text')
+    await callCoverLetterGenerator(marker, validParsedJob, 'neutral', 'Mark M', model as any)
+    expect(getPrompt()).toContain(marker)
+  })
+
+  it('passes parsedJob title and company through to the prompt', async () => {
+    const { model, getPrompt } = mockCapturingPrompt('generated letter text')
+    await callCoverLetterGenerator('resume text', validParsedJob, 'neutral', 'Mark M', model as any)
+    const prompt = getPrompt()
+    expect(prompt).toContain(validParsedJob.title)
+    expect(prompt).toContain(validParsedJob.company)
+  })
+
+  it('includes the D-01 no-fabrication fence in the captured system/prompt content', async () => {
+    const { model, getPrompt } = mockCapturingPrompt('generated letter text')
+    await callCoverLetterGenerator('resume text', validParsedJob, 'neutral', 'Mark M', model as any)
+    expect(getPrompt()).toContain('do NOT fabricate experience, titles, or credentials')
+  })
+
+  it('includes the D-03 company-motivation placeholder in the captured content', async () => {
+    const { model, getPrompt } = mockCapturingPrompt('generated letter text')
+    await callCoverLetterGenerator('resume text', validParsedJob, 'neutral', 'Mark M', model as any)
+    expect(getPrompt()).toContain('[why this company — your words]')
   })
 })

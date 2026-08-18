@@ -3,7 +3,7 @@ import type { LanguageModel } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { z } from 'zod'
-import { buildJobParserPrompt, buildScorerPrompt } from './analysisPrompts'
+import { buildJobParserPrompt, buildScorerPrompt, buildCoverLetterPrompt, type LetterTone } from './analysisPrompts'
 import { buildPdfResumeParserPrompt } from './pdfResumePrompt'
 
 // ─── Zod Schemas ────────────────────────────────────────────────────────────
@@ -228,6 +228,23 @@ export async function callResumeExtractor(
   })
   const parsed = ResumeJsonSchema.parse(extractJsonFromText(result.text))
   return parsed
+}
+
+export async function callCoverLetterGenerator(
+  resumeText: string,
+  parsedJob: ParsedJob,
+  tone: LetterTone,
+  candidateName: string,
+  model: LanguageModel,
+): Promise<string> {
+  const { system, prompt } = buildCoverLetterPrompt(resumeText, parsedJob, tone, candidateName)
+  const result = await generateText({
+    model: model as Parameters<typeof generateText>[0]['model'],
+    system,
+    prompt,
+    temperature: 0.3,
+  })
+  return result.text.trim()
 }
 
 /**
