@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { TemplateVariant } from '../../../preload/index.d'
 import { getScoreColor } from '../lib/scoreColor'
+import { sanitizeFilename } from '../../../shared/sanitizeFilename'
 
 interface LinkedAnalysis {
   id: number
@@ -90,6 +91,11 @@ function SubmissionLogForm({ linkedAnalysisId, onSaved, onBack }: Props): React.
   const [variants, setVariants] = useState<TemplateVariant[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [coverLetter, setCoverLetter] = useState('')
+  const [generatingLetter, setGeneratingLetter] = useState(false)
+  const [letterError, setLetterError] = useState<string | null>(null)
+  const [hasExistingLetter, setHasExistingLetter] = useState(false)
+  const [exportingLetter, setExportingLetter] = useState(false)
 
   useEffect(() => {
     // Load variants
@@ -106,6 +112,12 @@ function SubmissionLogForm({ linkedAnalysisId, onSaved, onBack }: Props): React.
           if (data.variantId != null) {
             window.api.templates.getThreshold(data.variantId).then((t) => setThreshold(t))
           }
+          window.api.ai.getCoverLetter(linkedAnalysisId).then((letter) => {
+            if (letter != null && letter !== '') {
+              setCoverLetter(letter)
+              setHasExistingLetter(true)
+            }
+          }).catch(() => {})
         }
       }).catch((e: unknown) => {
         setLoadError(e instanceof Error ? e.message : 'Failed to load analysis')
@@ -118,6 +130,50 @@ function SubmissionLogForm({ linkedAnalysisId, onSaved, onBack }: Props): React.
     setCompany('')
     setRole('')
     setVariantId('')
+    setCoverLetter('')
+    setHasExistingLetter(false)
+    setLetterError(null)
+  }
+
+  const handleGenerateLetter = async (): Promise<void> => {
+    if (linkedAnalysis == null || generatingLetter) return
+    setGeneratingLetter(true)
+    setLetterError(null)
+    try {
+      const result = await window.api.ai.generateCoverLetter(linkedAnalysis.id)
+      if ('error' in result) {
+        setLetterError(result.error)
+      } else {
+        setCoverLetter(result.letter)
+        setHasExistingLetter(true)
+      }
+    } finally {
+      setGeneratingLetter(false)
+    }
+  }
+
+  const handleLetterBlur = async (): Promise<void> => {
+    if (linkedAnalysis != null) {
+      await window.api.ai.saveCoverLetterDraft(linkedAnalysis.id, coverLetter)
+    }
+  }
+
+  const handleExportLetterPdf = async (): Promise<void> => {
+    if (coverLetter.trim() === '' || exportingLetter) return
+    setExportingLetter(true)
+    try {
+      const base = [company, role]
+        .map((p) => sanitizeFilename(p ?? ''))
+        .filter(Boolean)
+        .join('_')
+      const filename = base ? `${base}_cover-letter.pdf` : 'cover-letter.pdf'
+      await window.api.exportFile.coverLetterPdf(
+        { coverLetter, company: company.trim() || undefined, role: role.trim() || undefined },
+        filename,
+      )
+    } finally {
+      setExportingLetter(false)
+    }
   }
 
   const handleSubmit = async (): Promise<void> => {
@@ -134,6 +190,7 @@ function SubmissionLogForm({ linkedAnalysisId, onSaved, onBack }: Props): React.
         status,
         scoreAtSubmit: linkedAnalysis?.score ?? null,
         analysisId: linkedAnalysis?.id ?? null,
+        coverLetter: coverLetter.trim() || undefined,
       })
       onSaved()
     } catch (e) {
@@ -344,6 +401,69 @@ function SubmissionLogForm({ linkedAnalysisId, onSaved, onBack }: Props): React.
                 placeholder="Any context about this application -- referral, cover letter notes, specific team, etc."
                 rows={4}
                 style={{ ...inputStyle, resize: 'vertical' }}
+              />
+            </div>
+
+            {/* Cover Letter */}
+            <div>
+              <label style={labelStyle}>Cover Letter (optional)</label>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+                <button
+                  type="button"
+                  onClick={handleGenerateLetter}
+                  disabled={linkedAnalysis == null || generatingLetter}
+                  style={{
+                    padding: '5px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border-subtle)',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 500,
+                    fontFamily: 'var(--font-sans)',
+                    backgroundColor: linkedAnalysis == null || generatingLetter ? 'var(--color-bg-raised)' : 'var(--color-accent)',
+                    color: linkedAnalysis == null || generatingLetter ? 'var(--color-text-muted)' : '#fff',
+                    cursor: linkedAnalysis == null || generatingLetter ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {generatingLetter
+                    ? 'Generating...'
+                    : hasExistingLetter ? 'Regenerate cover letter' : 'Generate cover letter'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportLetterPdf}
+                  disabled={coverLetter.trim() === '' || exportingLetter}
+                  style={{
+                    padding: '5px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border-subtle)',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 500,
+                    fontFamily: 'var(--font-sans)',
+                    backgroundColor: 'var(--color-bg-surface)',
+                    color: coverLetter.trim() === '' || exportingLetter ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
+                    cursor: coverLetter.trim() === '' || exportingLetter ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {exportingLetter ? 'Exporting...' : 'Export letter as PDF'}
+                </button>
+              </div>
+              {linkedAnalysis == null && (
+                <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', margin: '0 0 var(--space-2) 0' }}>
+                  Requires a linked analysis
+                </p>
+              )}
+              {letterError != null && (
+                <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', margin: '0 0 var(--space-2) 0' }}>
+                  {letterError}
+                </p>
+              )}
+              <textarea
+                value={coverLetter}
+                onChange={(e) => setCoverLetter(e.target.value)}
+                onBlur={handleLetterBlur}
+                rows={12}
+                placeholder="Generate a draft, then edit it here."
+                style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-sans)' }}
               />
             </div>
 
