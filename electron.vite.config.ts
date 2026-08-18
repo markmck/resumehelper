@@ -23,7 +23,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/renderer/index.html'),
-          print: resolve('src/renderer/print.html')
+          print: resolve('src/renderer/print.html'),
+          letter: resolve('src/renderer/print-letter.html')
         }
       }
     },
