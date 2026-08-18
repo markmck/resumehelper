@@ -1,9 +1,10 @@
 import { ipcMain } from 'electron'
 import { db } from '../db'
-import { submissions, submissionEvents, templateVariants, analysisResults, jobPostings, profile } from '../db/schema'
+import { submissions, submissionEvents, templateVariants, analysisResults, jobPostings, profile, coverLetters } from '../db/schema'
 import { eq, desc } from 'drizzle-orm'
 import type { BuilderJob, BuilderSkill, BuilderProject, BuilderEducation, BuilderVolunteer, BuilderAward, BuilderPublication, BuilderLanguage, BuilderInterest, BuilderReference } from '../../preload/index.d'
 import { buildMergedBuilderData } from '../lib/mergeHelper'
+import { saveCoverLetterDraft } from './ai'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type * as schema from '../db/schema'
 
@@ -13,6 +14,7 @@ export interface SubmissionSnapshot {
   layoutTemplate: string
   templateOptions?: { accentColor?: string; skillsDisplay?: string; marginTop?: number; marginBottom?: number; marginSides?: number; showSummary?: boolean }
   profile?: { name: string; email: string; phone: string; location: string; linkedin: string; summary?: string }
+  coverLetter?: string
   jobs: BuilderJob[]
   skills: BuilderSkill[]
   projects: BuilderProject[]
@@ -63,10 +65,24 @@ export async function buildSnapshotForVariant(db: Db, variantId: number, analysi
     ? { name: profileRow.name, email: profileRow.email, phone: profileRow.phone, location: profileRow.location, linkedin: profileRow.linkedin, summary: summaryOverride ?? profileRow.summary ?? undefined }
     : undefined
 
+  // D-11: freeze the letter by value at snapshot-build time. This is the ONLY correct
+  // post-submit read path for a letter — once frozen into a submission's resumeSnapshot,
+  // no post-submit code may re-query cover_letters by analysisId (RESEARCH.md Pitfall 2).
+  let coverLetter: string | undefined
+  if (analysisId != null) {
+    const letterRow = db
+      .select({ letterText: coverLetters.letterText })
+      .from(coverLetters)
+      .where(eq(coverLetters.analysisId, analysisId))
+      .get()
+    coverLetter = letterRow?.letterText || undefined
+  }
+
   return {
     layoutTemplate,
     templateOptions,
     profile: frozenProfile,
+    coverLetter,
     ...builderArrays,
   }
 }
@@ -119,11 +135,27 @@ export async function createSubmission(
     status?: string
     scoreAtSubmit?: number | null
     analysisId?: number | null
+    coverLetter?: string
   },
 ) {
+  // D-11 / eliminates the debounced-save race: when the caller supplies an in-memory
+  // letter text, write it through to cover_letters BEFORE building the snapshot so the
+  // freeze picks up the fresh value rather than a possibly-stale DB row (RESEARCH.md
+  // Pitfall 3 — the frozen letter can never lag the last keystroke in the textarea).
+  if (data.coverLetter && data.coverLetter.length > 0 && data.analysisId != null) {
+    saveCoverLetterDraft(db, data.analysisId, data.coverLetter)
+  }
+
   let snapshot: SubmissionSnapshot = { layoutTemplate: 'traditional', jobs: [], skills: [], projects: [], education: [], volunteer: [], awards: [], publications: [], languages: [], interests: [], references: [] }
   if (data.variantId != null) {
     snapshot = await buildSnapshotForVariant(db, data.variantId, data.analysisId ?? undefined)
+  }
+
+  // Caller's in-memory letter text always wins directly on the returned snapshot,
+  // including the standalone-submission case (no analysisId to persist against) and
+  // the no-variant case (buildSnapshotForVariant never ran).
+  if (data.coverLetter && data.coverLetter.length > 0) {
+    snapshot.coverLetter = data.coverLetter
   }
 
   const rows = await db

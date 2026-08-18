@@ -13,7 +13,8 @@ import {
   seedAnalysis,
 } from '../../../helpers/factories'
 import { buildSnapshotForVariant, createSubmission } from '../../../../src/main/handlers/submissions'
-import { templateVariantItems, education, entityOverrides, submissions } from '../../../../src/main/db/schema'
+import { saveCoverLetterDraft } from '../../../../src/main/handlers/ai'
+import { templateVariantItems, education, entityOverrides, submissions, coverLetters as coverLettersTable } from '../../../../src/main/db/schema'
 import { setAnalysisMargins, setVariantOptions } from '../../../../src/main/handlers/templates'
 import { eq } from 'drizzle-orm'
 
@@ -340,5 +341,177 @@ describe('buildSnapshotForVariant — LAYOUT-04 effectiveMargins freeze', () => 
     expect(parsedSnapshot.templateOptions.marginTop).not.toBe(1.5)
     expect(parsedSnapshot.templateOptions.marginBottom).not.toBe(1.6)
     expect(parsedSnapshot.templateOptions.marginSides).not.toBe(1.7)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// D-11 — the letter freezes into the immutable submission snapshot by value.
+// Regenerating/re-saving after the snapshot is built (or after the submission
+// row is written) must NOT alter the already-frozen value.
+// ---------------------------------------------------------------------------
+describe('cover letter snapshot freeze (D-11)', () => {
+  test('buildSnapshotForVariant returns coverLetter equal to the cover_letters.letterText for that analysis', async () => {
+    const db = createTestDb()
+
+    updateProfile(db, {
+      name: 'Jane Doe',
+      email: 'jane@test.com',
+      phone: '555-1234',
+      location: 'NYC',
+      linkedin: 'janedoe',
+    })
+
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+
+    saveCoverLetterDraft(db, analysis.id, 'Dear Hiring Manager, ...')
+
+    const snapshot = await buildSnapshotForVariant(db, variant.id, analysis.id)
+
+    expect(snapshot.coverLetter).toBe('Dear Hiring Manager, ...')
+  })
+
+  test('coverLetter is undefined with no analysisId argument', async () => {
+    const db = createTestDb()
+
+    updateProfile(db, {
+      name: 'Jane Doe',
+      email: 'jane@test.com',
+      phone: '555-1234',
+      location: 'NYC',
+      linkedin: 'janedoe',
+    })
+
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+
+    const snapshot = await buildSnapshotForVariant(db, variant.id)
+
+    expect(snapshot.coverLetter).toBeUndefined()
+  })
+
+  test('coverLetter is undefined when the analysis has no letter row', async () => {
+    const db = createTestDb()
+
+    updateProfile(db, {
+      name: 'Jane Doe',
+      email: 'jane@test.com',
+      phone: '555-1234',
+      location: 'NYC',
+      linkedin: 'janedoe',
+    })
+
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+    // No saveCoverLetterDraft call — no cover_letters row exists
+
+    const snapshot = await buildSnapshotForVariant(db, variant.id, analysis.id)
+
+    expect(snapshot.coverLetter).toBeUndefined()
+  })
+
+  test('a later saveCoverLetterDraft call does NOT alter a previously returned snapshot object', async () => {
+    const db = createTestDb()
+
+    updateProfile(db, {
+      name: 'Jane Doe',
+      email: 'jane@test.com',
+      phone: '555-1234',
+      location: 'NYC',
+      linkedin: 'janedoe',
+    })
+
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+
+    saveCoverLetterDraft(db, analysis.id, 'ORIGINAL')
+    const snapshot = await buildSnapshotForVariant(db, variant.id, analysis.id)
+    expect(snapshot.coverLetter).toBe('ORIGINAL')
+
+    saveCoverLetterDraft(db, analysis.id, 'CHANGED')
+
+    // The already-returned object must be unaffected by the later write (by-value freeze)
+    expect(snapshot.coverLetter).toBe('ORIGINAL')
+  })
+
+  test('createSubmission writes a resumeSnapshot whose parsed coverLetter matches the letter at submit time, and regenerating afterwards leaves it unchanged', async () => {
+    const db = createTestDb()
+
+    updateProfile(db, {
+      name: 'Jane Doe',
+      email: 'jane@test.com',
+      phone: '555-1234',
+      location: 'NYC',
+      linkedin: 'janedoe',
+    })
+
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+
+    saveCoverLetterDraft(db, analysis.id, 'AT SUBMIT TIME')
+
+    const created = await createSubmission(db, {
+      company: 'LetterCo',
+      role: 'Engineer',
+      variantId: variant.id,
+      analysisId: analysis.id,
+    })
+
+    // Regenerate the letter after submit
+    saveCoverLetterDraft(db, analysis.id, 'REGENERATED AFTER SUBMIT')
+
+    const [persistedRow] = await db
+      .select({ resumeSnapshot: submissions.resumeSnapshot })
+      .from(submissions)
+      .where(eq(submissions.id, created.id))
+
+    const parsedSnapshot = JSON.parse(persistedRow.resumeSnapshot)
+    expect(parsedSnapshot.coverLetter).toBe('AT SUBMIT TIME')
+    expect(parsedSnapshot.coverLetter).not.toBe('REGENERATED AFTER SUBMIT')
+  })
+
+  test('an explicit coverLetter passed to createSubmission wins over cover_letters, and updates the cover_letters row', async () => {
+    const db = createTestDb()
+
+    updateProfile(db, {
+      name: 'Jane Doe',
+      email: 'jane@test.com',
+      phone: '555-1234',
+      location: 'NYC',
+      linkedin: 'janedoe',
+    })
+
+    const variant = seedVariant(db, { layoutTemplate: 'classic' })
+    const posting = seedJobPosting(db)
+    const analysis = seedAnalysis(db, posting.id, { variantId: variant.id })
+
+    // Stale DB value — simulates a debounced-save race where the textarea has a newer
+    // value than what's persisted
+    saveCoverLetterDraft(db, analysis.id, 'STALE DB VALUE')
+
+    const created = await createSubmission(db, {
+      company: 'LetterCo',
+      role: 'Engineer',
+      variantId: variant.id,
+      analysisId: analysis.id,
+      coverLetter: 'FRESH TEXTAREA VALUE',
+    })
+
+    const [persistedRow] = await db
+      .select({ resumeSnapshot: submissions.resumeSnapshot })
+      .from(submissions)
+      .where(eq(submissions.id, created.id))
+    const parsedSnapshot = JSON.parse(persistedRow.resumeSnapshot)
+    expect(parsedSnapshot.coverLetter).toBe('FRESH TEXTAREA VALUE')
+
+    // The cover_letters row was updated to match (removes the debounced-save race)
+    const [letterRow] = await db
+      .select({ letterText: coverLettersTable.letterText })
+      .from(coverLettersTable)
+      .where(eq(coverLettersTable.analysisId, analysis.id))
+    expect(letterRow.letterText).toBe('FRESH TEXTAREA VALUE')
   })
 })
