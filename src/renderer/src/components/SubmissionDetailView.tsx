@@ -136,6 +136,7 @@ function SubmissionDetailView({ submissionId, onBack, onViewAnalysis, onDelete }
   const [viewingSnapshot, setViewingSnapshot] = useState<SubmissionSnapshot | null>(null)
   const [saving, setSaving] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
+  const [exportingLetter, setExportingLetter] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const loadData = useCallback(async () => {
@@ -221,6 +222,35 @@ function SubmissionDetailView({ submissionId, onBack, onViewAnalysis, onDelete }
     }
   }
 
+  // D-11 / Pitfall 2: the letter and profile MUST come from the frozen resumeSnapshot,
+  // never from window.api.ai.getCoverLetter (the mutable draft table) — otherwise a
+  // later regenerate would retroactively change what a previously-submitted
+  // application shows.
+  async function handleExportCoverLetterPdf(): Promise<void> {
+    if (!submission || exportingLetter) return
+    setExportingLetter(true)
+    try {
+      const parsed = JSON.parse(submission.resumeSnapshot) as SubmissionSnapshot
+      if (!parsed.coverLetter || parsed.coverLetter.trim() === '') {
+        alert('This submission has no cover letter.')
+        return
+      }
+      const base = [submission.company, submission.role]
+        .map((p) => sanitizeFilename(p ?? ''))
+        .filter(Boolean)
+        .join('_')
+      const filename = base ? `${base}_cover-letter.pdf` : 'cover-letter.pdf'
+      await window.api.exportFile.coverLetterPdf(
+        { coverLetter: parsed.coverLetter, profile: parsed.profile, company: submission.company, role: submission.role },
+        filename,
+      )
+    } catch {
+      alert('Could not export cover letter PDF.')
+    } finally {
+      setExportingLetter(false)
+    }
+  }
+
   const cardStyle: React.CSSProperties = {
     backgroundColor: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
@@ -270,6 +300,16 @@ function SubmissionDetailView({ submissionId, onBack, onViewAnalysis, onDelete }
         <button onClick={onBack} style={{ ...buttonBase, marginLeft: 'var(--space-4)' }}>Back</button>
       </div>
     )
+  }
+
+  // Hide (not merely disable) the Export Cover Letter button when the frozen
+  // snapshot has no letter, so older submissions are unaffected (D-11).
+  let hasFrozenLetter = false
+  try {
+    const parsedForButton = JSON.parse(submission.resumeSnapshot) as SubmissionSnapshot
+    hasFrozenLetter = !!parsedForButton.coverLetter && parsedForButton.coverLetter.trim() !== ''
+  } catch {
+    hasFrozenLetter = false
   }
 
   return (
@@ -537,6 +577,28 @@ function SubmissionDetailView({ submissionId, onBack, onViewAnalysis, onDelete }
               </p>
             )}
           </div>
+
+          {/* Cover Letter card — only when the frozen snapshot has a letter (D-11) */}
+          {(() => {
+            let frozenLetter: string | null = null
+            try {
+              const parsed = JSON.parse(submission.resumeSnapshot) as SubmissionSnapshot
+              frozenLetter = parsed.coverLetter ?? null
+            } catch {
+              frozenLetter = null
+            }
+            if (!frozenLetter || frozenLetter.trim() === '') return null
+            return (
+              <div style={cardStyle}>
+                <h3 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 var(--space-4) 0' }}>
+                  Cover Letter
+                </h3>
+                <div style={{ ...valueStyle, whiteSpace: 'pre-wrap' }}>
+                  {frozenLetter}
+                </div>
+              </div>
+            )
+          })()}
         </div>
 
         {/* Right column */}
@@ -617,6 +679,23 @@ function SubmissionDetailView({ submissionId, onBack, onViewAnalysis, onDelete }
               >
                 {exportingPdf ? 'Exporting...' : 'Export PDF'}
               </button>
+              {hasFrozenLetter && (
+                <button
+                  onClick={handleExportCoverLetterPdf}
+                  disabled={exportingLetter}
+                  style={{
+                    ...buttonBase,
+                    width: '100%',
+                    justifyContent: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    opacity: exportingLetter ? 0.6 : 1,
+                    cursor: exportingLetter ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {exportingLetter ? 'Exporting...' : 'Export Cover Letter'}
+                </button>
+              )}
             </div>
           </div>
         </div>
