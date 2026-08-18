@@ -93,6 +93,7 @@ const api = {
       status?: string
       scoreAtSubmit?: number | null
       analysisId?: number | null
+      coverLetter?: string
     }) => ipcRenderer.invoke('submissions:create', data),
     update: (
       id: number,
@@ -135,6 +136,8 @@ const api = {
       ipcRenderer.invoke('export:docx', variantId, defaultFilename, analysisId),
     snapshotPdf: (snapshotData: unknown, defaultFilename: string) =>
       ipcRenderer.invoke('export:snapshotPdf', snapshotData, defaultFilename),
+    coverLetterPdf: (payload: unknown, defaultFilename: string) =>
+      ipcRenderer.invoke('export:coverLetterPdf', payload, defaultFilename),
     json: (defaultFilename: string) =>
       ipcRenderer.invoke('export:json', defaultFilename),
     variantJson: (variantId: number, defaultFilename: string, analysisId?: number) =>
@@ -306,6 +309,12 @@ const api = {
       ipcRenderer.invoke('ai:clearAnalysisSummary', analysisId),
     getAnalysisSummary: (analysisId: number) =>
       ipcRenderer.invoke('ai:getAnalysisSummary', analysisId),
+    generateCoverLetter: (analysisId: number) =>
+      ipcRenderer.invoke('ai:generateCoverLetter', analysisId),
+    saveCoverLetterDraft: (analysisId: number, text: string) =>
+      ipcRenderer.invoke('ai:saveCoverLetterDraft', analysisId, text),
+    getCoverLetter: (analysisId: number) =>
+      ipcRenderer.invoke('ai:getCoverLetter', analysisId),
     setSkillAdditionCategory: (analysisId: number, skillName: string, category: string) =>
       ipcRenderer.invoke('ai:setSkillAdditionCategory', analysisId, skillName, category),
     getSkillAdditions: (analysisId: number) =>

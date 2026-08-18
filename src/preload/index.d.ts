@@ -193,6 +193,7 @@ export interface SubmissionSnapshot {
   languages?: BuilderLanguage[]
   interests?: BuilderInterest[]
   references?: BuilderReference[]
+  coverLetter?: string
 }
 
 export interface Project {
@@ -409,6 +410,7 @@ export interface Api {
       status?: string
       scoreAtSubmit?: number | null
       analysisId?: number | null
+      coverLetter?: string
     }) => Promise<Submission>
     update: (
       id: number,
@@ -453,6 +455,15 @@ export interface Api {
     pdf: (variantId: number, defaultFilename: string, analysisId?: number) => Promise<{ canceled: boolean; filePath?: string }>
     docx: (variantId: number, defaultFilename: string, analysisId?: number) => Promise<{ canceled: boolean; filePath?: string }>
     snapshotPdf: (snapshotData: SubmissionSnapshot, defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string }>
+    coverLetterPdf: (
+      payload: {
+        coverLetter: string
+        profile?: { name: string; email: string; phone: string; location: string; linkedin: string }
+        company?: string
+        role?: string
+      },
+      defaultFilename: string,
+    ) => Promise<{ canceled: boolean; filePath?: string }>
     json: (defaultFilename: string) => Promise<{ canceled: boolean; filePath?: string; error?: string }>
     variantJson: (
       variantId: number,
@@ -626,6 +637,9 @@ export interface Api {
     acceptAnalysisSummary: (analysisId: number, text: string) => Promise<{ success: boolean } | { error: string }>
     clearAnalysisSummary: (analysisId: number) => Promise<{ success: boolean } | { error: string }>
     getAnalysisSummary: (analysisId: number) => Promise<string | null>
+    generateCoverLetter: (analysisId: number) => Promise<{ letter: string } | { error: string; code?: string }>
+    saveCoverLetterDraft: (analysisId: number, text: string) => Promise<{ success: boolean } | { error: string }>
+    getCoverLetter: (analysisId: number) => Promise<string | null>
     setSkillAdditionCategory: (analysisId: number, skillName: string, category: string) => Promise<{ success: boolean } | { error: string }>
     getSkillAdditions: (analysisId: number) => Promise<Array<{ skillName: string; category: string; status: string }>>
   }
