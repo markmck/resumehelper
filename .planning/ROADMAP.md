@@ -289,6 +289,35 @@ Plans:
 
 **UI hint**: yes
 
+### Phase 42: Cover Letter Generator on Job Submission
+
+**Goal**: Generate a job-tailored cover letter from the user's structured experience plus the job description at submission time — persisted against the submission, editable in the app, and exportable to PDF through the existing template/export path
+**Depends on**: Phase 41
+**Requirements**: TBD (decisions D-01..D-15 in 42-CONTEXT.md serve as acceptance criteria)
+**Plans**: 6 plans
+
+Plans:
+**Wave 0** *(blocking scaffold — nothing downstream runs until this lands)*
+
+- [x] 42-01-PLAN.md — cover_letters table (schema + ensureSchema + createTestDb) and test scaffolds
+
+**Wave 1** *(blocked on Wave 0 completion)*
+
+- [x] 42-02-PLAN.md — Cover-letter prompt layer + callCoverLetterGenerator + PROJECT.md AI-boundary narrowing
+- [x] 42-03-PLAN.md — print-letter.html + CoverLetterPrintApp.tsx (template-independent) + full preload bridge
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 42-04-PLAN.md — generateCoverLetter/saveCoverLetterDraft/getCoverLetter handlers + D-11 snapshot freeze
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 42-05-PLAN.md — export:coverLetterPdf main-process handler + D-15/D-11 guard tests
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 42-06-PLAN.md — Submission log form generate button (D-09/D-12 gating) + textarea editor + PDF export surfaces
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -314,3 +343,53 @@ Plans:
 - **Live re-score-on-accept** — re-run the ATS scorer when an analysis-tier override is accepted/cleared so the displayed score live-updates with accepted rewrites (new LLM call + progress UX). Deferred from Phase 36 (which threads overrides into initial-run scoring only). Its own future phase.
 
 *Promoted into Phase 41 (2026-06-23) and shipped 2026-06-24: "Save optimized variant as a new variant" (SAVE-01/02) and "Suggest summary for job in optimization" (SUM-01/02).*
+
+### Phase 999.1: Referral tracking on submissions (BACKLOG)
+
+**Goal:** Track who could refer you for a given submission and the state of that ask. Referral is the single largest callback multiplier in every funnel study; the app already knows the company, so it can prompt for a contact and hold the ask state alongside the pipeline. Weak ties count — former colleagues, clients, alumni, second-degree connections.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.2: Recruiter outreach message generator (BACKLOG)
+
+**Goal:** Capture the recruiter / hiring-manager contact per submission and generate a 3–5 sentence outreach message from the experience DB + job description, to send 24–48h after applying. Highest-yield tactic that almost nobody does. Shares its generation plumbing with Phase 42 (cover letters) — same inputs, shorter output.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.3: Posting freshness and fast-apply prioritization (BACKLOG)
+
+**Goal:** Surface days-since-posted on discovered jobs and sort/flag the ones inside the first 48–72h window, since many reqs are functionally decided before the pile gets deep. Depends on the v2.8 Job Discovery source exposing posting dates (Adzuna does). Also worth flagging whether a posting is reachable via the company's own career site rather than a high-volume aggregator apply.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.4: Submission follow-up cadence reminders (BACKLOG)
+
+**Goal:** Remind on a two-touch cadence after applying — roughly 7–10 days, then ~3 weeks — with each touch prompted to add a new detail rather than re-ping. Returns fall off sharply after two. Builds directly on the existing submission pipeline + activity timeline from v2.0.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.5: LinkedIn profile keyword alignment (BACKLOG)
+
+**Goal:** Run the existing keyword/gap scorer against the LinkedIn headline and About section for a target role family, so the profile is tuned for recruiter sourcing rather than for one posting. Recruiters source on LinkedIn far more than they read inbound applications. Adjacent to the v3.0+ "Answer Bank" idea — same reuse of the structured experience DB for non-resume output.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd:review-backlog when ready)

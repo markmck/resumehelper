@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Optimization Layout Controls
-status: Awaiting next milestone
-stopped_at: Phase 40 UI-SPEC approved
-last_updated: "2026-06-24T20:57:50.432Z"
-last_activity: 2026-06-24 — Milestone v2.7 completed and archived
+status: executing
+stopped_at: Completed 42-05-PLAN.md
+last_updated: "2026-08-18T20:41:40.566Z"
+last_activity: 2026-08-18
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 3
-  total_plans: 15
-  completed_plans: 15
-  percent: 43
+  total_plans: 21
+  completed_plans: 20
+  percent: 38
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-09)
 
 **Core value:** Full visibility into job applications — which resume version was sent to which company, when, and where each application stands
-**Current focus:** v2.7 milestone complete — ready to complete/archive milestone
+**Current focus:** Phase 42 — cover-letter-generator-on-job-submission
 
 ## Current Position
 
-Phase: Milestone v2.7 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-24 — Milestone v2.7 completed and archived
+Phase: 42 (cover-letter-generator-on-job-submission) — EXECUTING
+Plan: 6 of 6
+Status: Ready to execute
+Last activity: 2026-08-18
 
 ## Performance Metrics
 
@@ -40,7 +40,16 @@ Last activity: 2026-06-24 — Milestone v2.7 completed and archived
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 42 added: Cover Letter Generator on Job Submission
+
 ### Decisions
+
+Phase 42 decisions (Plan 01):
+
+- `cover_letters` table mirrors `analysis_layout_overrides` structurally: `analysis_id` NOT NULL UNIQUE FK ON DELETE cascade, no `submissionId` column — letter is analysis-scoped since generation happens in the log form before a `submissions` row exists (D-09/D-11)
+- Wave 0 blocking-scaffold pattern: schema/migration/test-helper landed in lockstep with three test files carrying `test.todo` placeholders named per D-ID, so Waves 1-3 fill in real assertions against a stable file layout
 
 Key decisions scoped for v2.6 (from research):
 
@@ -66,6 +75,11 @@ Phase 35 decisions (Plans 01-03):
 - D-01 recorded in PROJECT.md Key Decisions — satisfies ROADMAP #5 and clears Phase 35 blocker
 - [Phase 37]: deriveOverrideSet extracted as pure helper (RWD-04 unit-testable; null-FK rows skipped, any summary row = hasSummary)
 - [Phase ?]: [Phase 37 P03]: Variant reword UI wired — hover pencil + InlineEdit for bullets/project-titles/summary; left accent border orthogonal to excluded (D-01a) via deriveOverrideSet; revert icon clears override; D-04 summary authorable from scratch; onReword bumps previewVersion (no save button, SC#2); locked tokens only, no analysisId
+- [Phase ?]: Cover-letter prompt (buildCoverLetterPrompt/resolveLetterTone) and provider call (callCoverLetterGenerator) added with D-01/D-02/D-03/D-05/D-06/D-07/D-08 all asserted by passing tests
+- [Phase ?]: PROJECT.md AI boundary narrowed (not discarded): Out of Scope, Constraints, and Key Decisions rows updated to state AI may compose grounded prose (summaries, cover letters) but never fabricates
+- [Phase 42]: coverLetterPdf preload signature mirrors snapshotPdf (payload-based, not id-based) since the renderer already holds the letter text/profile in memory
+- [Phase 42]: createSubmission explicit coverLetter always wins on the returned snapshot regardless of analysisId/variantId presence
+- [Phase ?]: 42-05: export:coverLetterPdf handler is payload-keyed (mirrors export:snapshotPdf), has no code path to cover_letters, and never resolves a template — D-11/D-15 enforced structurally.
 
 ### Pending Todos
 
@@ -74,6 +88,7 @@ Phase 35 decisions (Plans 01-03):
 - [ ] Phase 41: Auto-fit orphan-page removal
 - [ ] Backlog: Save optimized variant as a new variant (promote analysis-tier optimizations into a standalone variant)
 - [ ] Backlog: Suggest summary for job in optimization (AI-proposed tailored summary via summaryOverride, accept/edit/dismiss)
+- [ ] Todo (ai): Add cover letter generator on job submission — generate tailored cover letter from resume experience + job description
 
 ### Blockers/Concerns
 
@@ -84,8 +99,8 @@ Phase 35 decisions (Plans 01-03):
 
 ## Session Continuity
 
-Last session: 2026-06-10T17:43:30.914Z
-Stopped at: Phase 40 UI-SPEC approved
+Last session: 2026-08-18T20:41:40.561Z
+Stopped at: Completed 42-05-PLAN.md
 Resume file: None
 
 **Completed Milestone:** v2.6 Per-Variant Text Overrides — 4 phases (35–38), 13 plans — shipped 2026-06-08, 292 tests passing.

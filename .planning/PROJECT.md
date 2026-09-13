@@ -112,9 +112,8 @@ The app is a fully functional resume management tool with AI analysis, three-lay
 
 ### Out of Scope
 
-- AI-generated resume text from scratch — AI suggests rewording of existing bullets but never fabricates experience
+- AI-generated resume text from scratch — AI never fabricates experience; any prose it composes (summaries, cover letters) is grounded only in facts already in the DB
 - Mobile app — desktop-first via Electron
-- Cover letter generation — separate concern
 - Runtime theme installation — bundle curated templates only for now
 - AI-powered auto-variant generation — future milestone
 - Automated tailoring pipeline (paste → analyze → generate → export) — future milestone
@@ -143,7 +142,7 @@ The app is a fully functional resume management tool with AI analysis, three-lay
 ## Constraints
 
 - **Tech stack**: Electron + React + TypeScript + Drizzle ORM + SQLite (established in v1.0)
-- **AI boundary**: AI suggests rewording of existing bullets and flags gaps — never fabricates experience or writes from scratch. User accepts/rejects every suggestion.
+- **AI boundary**: AI suggests rewording of existing bullets, flags gaps, and may compose prose (summaries, cover letters) — but only from facts present in the DB, never inventing experience, titles, or credentials. User accepts/rejects every suggestion and edits every generated letter before it is sent.
 - **AI provider**: Provider-agnostic — user supplies their own API key (Claude, OpenAI, etc.)
 - **Export formats**: PDF and Word/DOCX — both use per-template fonts and margin values
 - **Inline styles**: Use inline styles for layout spacing (Tailwind v4 utility classes unreliable)
@@ -163,7 +162,7 @@ The app is a fully functional resume management tool with AI analysis, three-lay
 | CREATE TABLE IF NOT EXISTS over file migrations | File-based migrations were fragile with partial DB states | ✓ Good |
 | Inline styles over Tailwind for spacing | Tailwind v4 utility classes not applying reliably | ✓ Good |
 | Full resume.json entity coverage | User wanted all resume.json sections, not just core 4 | ✓ Good |
-| AI boundary: suggest rewording, never fabricate | User wants AI help matching job language but still controls every word | ✓ Good |
+| AI boundary: may compose grounded prose, never fabricate | User wants AI help matching job language but still controls every word — narrowed by the Phase 42 row below (cover letters) without contradiction | ✓ Good |
 | Provider-agnostic AI with user-supplied API key | No vendor lock-in; user brings their own key (Claude, OpenAI, etc.) | ✓ Good |
 | Fixed pipeline stages | Covers 95% of cases; notes field handles rest | ✓ Good |
 | Dark design system with CSS custom properties | Stripe/Vercel-inspired, 4px grid, token-based colors/spacing/typography, Inter font | ✓ Good |
@@ -197,6 +196,7 @@ The app is a fully functional resume management tool with AI analysis, three-lay
 | resume.json export is lossy-faithful, append-only, no meta sidecar | Pure JSON Resume spec output; re-import creates new base entries (won't recreate a variant). Conditional-spread omits null/empty fields | ✓ Good |
 | Lazy bootstrap-resolved Proxy DB singleton | db/index.ts forwards db/sqlite per-call via Proxy; enables relocation + resetDbCache() without touching any of 20 handler call-sites. db-location.json bootstrap lives in userData, outside SQLite | ✓ Good |
 | Warn-but-allow on network/cloud DB paths | UNC + OneDrive/Dropbox/iCloud heuristic shows non-blocking WAL-over-network warning; user knows their storage best — hard-block too restrictive | ✓ Good |
+| AI boundary narrowed, not discarded: AI may compose prose (summaries, cover letters) but ONLY from facts present in the DB — never invented experience, titles, or credentials | Phase 41's suggested summary already crossed from "reword an existing bullet" to "compose new prose", fenced by analysisPrompts.ts:73. Phase 42 extends the same fence to a longer output. Reverses the former "Cover letter generation — separate concern" Out of Scope line | — Phase 42 |
 | entity_overrides uses per-entity nullable FK columns (bullet_id, project_id, job_id, project_bullet_id) + entity_type/field discriminators, NOT a generic entity_id | Matches template_variant_items precedent; only shape where SQLite ON DELETE CASCADE fires per parent table — a generic entity_id would orphan override rows on parent delete | — Phase 35 |
 
 ## Evolution
