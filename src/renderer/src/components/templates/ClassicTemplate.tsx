@@ -182,7 +182,7 @@ export default function ClassicTemplate({
                         style={{
                           fontSize: '11px',
                           color: '#1a1a1a',
-                          lineHeight: '1.5',
+                          lineHeight: '1.4',
                           marginBottom: '2px',
                         }}
                       >
@@ -262,7 +262,7 @@ export default function ClassicTemplate({
                         style={{
                           fontSize: '11px',
                           color: '#1a1a1a',
-                          lineHeight: '1.5',
+                          lineHeight: '1.4',
                           marginBottom: '2px',
                         }}
                       >
@@ -359,7 +359,7 @@ export default function ClassicTemplate({
                     {vol.highlights.map((h, i) => (
                       <li
                         key={i}
-                        style={{ fontSize: '11px', color: '#1a1a1a', lineHeight: '1.5', marginBottom: '2px' }}
+                        style={{ fontSize: '11px', color: '#1a1a1a', lineHeight: '1.4', marginBottom: '2px' }}
                       >
                         {h}
                       </li>
