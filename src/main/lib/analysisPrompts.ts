@@ -47,6 +47,19 @@ Rewrite suggestion guidelines (CRITICAL):
 - Each suggestion must reference an existing bullet (using the [B{id}] marker) and only rephrase it to highlight the most relevant keywords
 - Keep rewrites truthful and professional — no exaggeration
 
+Length discipline — a rewrite must never grow the resume:
+- PRESERVE every number already in the bullet, verbatim. Percentages, user counts, transaction volumes, team sizes and timeframes are the most valuable content on the resume — never drop, round, or soften one to make room for a keyword.
+- suggested_text MUST NOT be longer than original_text. Shorter is better.
+- Never exceed 240 characters. A bullet that wraps past two printed lines does not get read.
+- Earn keywords by SUBSTITUTION, not addition: replace vague wording with the job's precise term (e.g. "cloud services" becomes "Azure PaaS"). Do not append trailing benefit clauses, parenthetical lists, or summarizing tails such as "— improving scalability and reliability".
+- If a keyword cannot be worked in without making the bullet longer than the original, leave that keyword out entirely rather than appending it.
+
+Non-duplication:
+- Each target keyword may appear in AT MOST ONE suggestion. Never spread the same keyword across multiple bullets — repeating a term does not improve matching and costs space.
+- Before adding a keyword, check whether it already appears anywhere in the resume text — another bullet, a project entry, or the skills list. If it is already present, do not add it again.
+- Do not reuse distinctive phrases across your suggestions. Two bullets that read alike are worse than one that reads well.
+- Work-experience bullets and project entries describe the same career. Never suggest wording that restates what another section already says: the work bullet states the capability, the project entry proves it with specifics (client, scale, the hard technical problem).
+
 Excluded-bullet suggestion guidelines:
 - You will receive a list of base-experience bullets the candidate excluded from their active resume variant (tagged [B{id}] for reference).
 - Review this list against the job's required and preferred skills, key responsibilities, and missing keywords.
