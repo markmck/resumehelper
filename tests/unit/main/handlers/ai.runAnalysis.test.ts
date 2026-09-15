@@ -196,6 +196,36 @@ describe('runAnalysis', () => {
     expect(progressStages).toContain('done')
   })
 
+  it('cleans AI phrases out of rewrite suggestions and the suggested summary before persisting', async () => {
+    const { posting, variant } = seedRunAnalysisFixtures(db)
+    const { event } = makeEvent()
+
+    const sloppyScore = {
+      ...cannedScore,
+      rewrite_suggestions: [
+        {
+          original_text: 'Led team of 3',
+          suggested_text: 'Spearheaded a team of 3 TypeScript engineers',
+          target_keywords: ['typescript'],
+        },
+      ],
+      suggested_summary: 'Engineer who leveraged TypeScript — shipping features weekly',
+    }
+    const mock = makeSequentialMock([cannedParsed, sloppyScore])
+    vi.spyOn(aiProvider, 'getModel').mockReturnValue(mock as any)
+
+    const result = await runAnalysis(db, event, posting.id, variant.id)
+
+    const analysisRow = db.select().from(arTable).where(eq(arTable.id, (result as any).analysisId)).get()
+    const suggestions = JSON.parse(analysisRow!.suggestions)
+    expect(suggestions[0].original_text).toBe('Led team of 3')
+    expect(suggestions[0].suggested_text).toBe('Led a team of 3 TypeScript engineers')
+
+    const raw = JSON.parse(analysisRow!.rawLlmResponse)
+    expect(raw.suggested_summary).toBe('Engineer who used TypeScript, shipping features weekly')
+    expect(raw.ai_phrases_removed).toEqual(expect.arrayContaining(['spearheaded', 'leveraged', '—']))
+  })
+
   // Phase 36 Wave-0 RED — D-05: effectiveProfile uses a variant-tier summary override.
   // Per RESEARCH Pitfall 4, buildResumeTextForLlm does NOT render basics.summary, so we do
   // NOT assert the scorer's resumeText contains the override. We assert the override row is

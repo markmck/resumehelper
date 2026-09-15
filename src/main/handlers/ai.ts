@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm'
 import { db, sqlite } from '../db'
 import { aiSettings, jobPostings, analysisResults, profile, analysisSkillAdditions, entityOverrides, analysisExcludedBulletSuggestions, analysisExcludedProjectSuggestions, jobBullets, projects, templateVariantItems, coverLetters, templateVariants } from '../db/schema'
 import { callJobParser, callResumeScorer, callCoverLetterGenerator, deriveOverallScore, getModel } from '../lib/aiProvider'
+import { cleanScorerProse } from '../lib/aiPhrases'
 import { buildResumeTextForLlm, resolveLetterTone } from '../lib/analysisPrompts'
 import { buildMergedBuilderData } from '../lib/mergeHelper'
 import { buildResumeJson } from '../lib/themeRegistry'
@@ -129,7 +130,14 @@ export async function runAnalysis(db: Db, event: Electron.IpcMainInvokeEvent, jo
     // 5. Call 2 — score resume
     event.sender.send('ai:progress', 'scoring', 50)
 
-    const scoreResult = await callResumeScorer(resumeText, parsedJob, llm, excludedBulletsText, excludedProjectsText)
+    const rawScore = await callResumeScorer(resumeText, parsedJob, llm, excludedBulletsText, excludedProjectsText)
+    // Swap machine-sounding words and em-dashes out of the AI-authored prose before anything is
+    // stored. The cleaned result is also what goes into rawLlmResponse, because the suggested
+    // summary is read back from there (SUM-01).
+    const { score: scoreResult, removed: aiPhrasesRemoved } = cleanScorerProse(rawScore, {
+      jobText: posting.rawText,
+      resumeText,
+    })
     const overallScore = deriveOverallScore(scoreResult)
 
     // 6. Store results in analysis_results table
@@ -152,7 +160,7 @@ export async function runAnalysis(db: Db, event: Electron.IpcMainInvokeEvent, jo
           experience_score: scoreResult.experience_score,
           ats_score: scoreResult.ats_score,
         }),
-        rawLlmResponse: JSON.stringify(scoreResult),
+        rawLlmResponse: JSON.stringify({ ...scoreResult, ai_phrases_removed: aiPhrasesRemoved }),
         status: 'unreviewed',
       })
       .returning()
