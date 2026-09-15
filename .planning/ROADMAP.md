@@ -318,6 +318,17 @@ Plans:
 
 - [ ] 42-06-PLAN.md — Submission log form generate button (D-09/D-12 gating) + textarea editor + PDF export surfaces
 
+### Phase 43: Deterministic Rewrite Validation + Keyword Coverage
+
+**Goal**: Enforce the scorer's grounding rules (numbers preserved, no growth, no duplicate keywords, keyword actually injected) in code rather than in the prompt, and compute exact keyword coverage as a pure function so the match score and the live "+N pts" delta are reproducible and provable
+**Depends on**: Phase 42
+**Requirements**: TBD (findings F-1..F-3 and decisions D-1..D-4 in 43-CONTEXT.md serve as acceptance criteria)
+**Plans**: TBD (run /gsd:plan-phase)
+
+Plans:
+
+- [ ] TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -340,7 +351,7 @@ Plans:
 
 ## Backlog
 
-- **Live re-score-on-accept** — re-run the ATS scorer when an analysis-tier override is accepted/cleared so the displayed score live-updates with accepted rewrites (new LLM call + progress UX). Deferred from Phase 36 (which threads overrides into initial-run scoring only). Its own future phase.
+- ~~**Live re-score-on-accept**~~ — re-run the ATS scorer when an analysis-tier override is accepted/cleared so the displayed score live-updates with accepted rewrites (new LLM call + progress UX). Deferred from Phase 36 (which threads overrides into initial-run scoring only). **Superseded by Phase 43 (2026-09-14):** deterministic keyword coverage gives the same live-updating score with no LLM call and no progress UX.
 
 *Promoted into Phase 41 (2026-06-23) and shipped 2026-06-24: "Save optimized variant as a new variant" (SAVE-01/02) and "Suggest summary for job in optimization" (SUM-01/02).*
 
@@ -387,6 +398,26 @@ Plans:
 ### Phase 999.5: LinkedIn profile keyword alignment (BACKLOG)
 
 **Goal:** Run the existing keyword/gap scorer against the LinkedIn headline and About section for a target role family, so the profile is tuned for recruiter sourcing rather than for one posting. Recruiters source on LinkedIn far more than they read inbound applications. Adjacent to the v3.0+ "Answer Bank" idea — same reuse of the structured experience DB for non-resume output.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.6: LinkedIn job import via guest endpoint (BACKLOG)
+
+**Goal:** Accept a LinkedIn job URL in the existing job-posting URL flow. `https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{jobId}` is unauthenticated and returns an HTML fragment carrying an `application/ld+json` JobPosting block with title, company, and full description — callable from the main process with `net.request`, no browser and no extension. Job ID comes from `/jobs/view/(\d+)` or the `currentJobId` query param. Fits behind the interface `src/main/lib/jobPostingUrlPrompt.ts` already establishes, and avoids the AI-extraction fallback entirely when the JSON-LD is present. Scope note: this is detail-fetch by ID, **not** search — LinkedIn exposes no public search endpoint, so this is unrelated to v2.8 discovery sourcing. Source: sleepingfreak94/resume-tracker `extension/content.js:130`, which reaches for the guest endpoint first because LinkedIn's signed-in search panel is virtualized and often has no description in the DOM. Explicitly excludes Easy Apply automation (their extension is at v3.6.1 against LinkedIn's frontend, with `/checkpoint` and `/authwall` detection in it — a different risk profile that should not travel with this).
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.7: IDF-weighted pre-rank for discovered jobs (BACKLOG)
+
+**Goal:** Rank discovered jobs by term rarity rather than raw hit count, and spend LLM match calls only on the survivors. Gsync/jobsync `src/lib/scraper/ats/rank.ts` builds a **run-local IDF** across the whole scraped batch, so a term appearing in most of the batch ("engineer") contributes ~0 while a rare one ("kubernetes") contributes ~1; score is `w_title × min(1, titleWeight/2) + w_skill × min(1, keywordWeight/3) + recency × 0.01`, followed by a `passesFloor` gate that tests hit *presence* (not weighted magnitude, so it stays invariant to weight tuning). The design is source-agnostic — it works over Adzuna results exactly as well as over Greenhouse ones, so it does not disturb the v2.8 source decision. Read `rank.ts` before planning v2.8 filtering. Its word-boundary matcher `(^|[^a-z0-9+#])term([^a-z0-9+#]|$)` is the same one Phase 43's `keywordCoverage.ts` should use, so the two phases likely share it.
 **Requirements:** TBD
 **Plans:** 0 plans
 
