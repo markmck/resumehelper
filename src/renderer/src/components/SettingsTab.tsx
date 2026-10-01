@@ -6,7 +6,7 @@ type TestStatus = 'idle' | 'loading' | 'success' | 'error'
 
 const FALLBACK_MODELS: Record<Provider, string[]> = {
   openai: ['gpt-4o', 'gpt-4o-mini'],
-  anthropic: ['claude-sonnet-4-5-20250514'],
+  anthropic: ['claude-sonnet-5-5'],
 }
 
 const cardStyle: React.CSSProperties = {

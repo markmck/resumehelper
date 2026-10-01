@@ -168,7 +168,7 @@ export function getModel(
     model.length > 0
       ? model
       : provider === 'anthropic'
-        ? 'claude-sonnet-4-5-20250514'
+        ? 'claude-sonnet-5-5'
         : 'gpt-4o'
 
   if (provider === 'anthropic') {
